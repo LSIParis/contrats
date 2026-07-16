@@ -1,0 +1,124 @@
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import type { Scope } from '@lsi/persistence';
+import { ContractsService } from './contracts.service.js';
+import { CreateContractDto } from './dto/create-contract.dto.js';
+import { ListContractsDto } from './dto/list-contracts.dto.js';
+import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import type { Session } from '../auth/session.service.js';
+import { IsString, MinLength } from 'class-validator';
+
+class ReasonDto {
+  @IsString()
+  @MinLength(1, { message: 'Un motif est obligatoire.' })
+  reason!: string;
+}
+
+/**
+ * API contrats. (§14.4)
+ *
+ * Les transitions d'état sont des SOUS-RESSOURCES D'ACTION
+ * (POST /contracts/:id/submit), jamais un PATCH {status: 'APPROVED'}.
+ *
+ * Un PATCH de statut serait une erreur de conception : une transition n'est
+ * pas une affectation de champ. Elle a des gardes, des effets de bord et des
+ * acteurs distincts. L'URL doit dire l'intention.
+ *
+ * Aucune méthode ne lit tenantId : @CurrentScope vient de la session (RM-29).
+ */
+@Controller('v1/contracts')
+export class ContractsController {
+  constructor(private readonly contracts: ContractsService) {}
+
+  @Post()
+  async create(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Body() dto: CreateContractDto,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.create(scope, dto, new Date());
+  }
+
+  @Get()
+  async list(@CurrentScope() scope: Scope, @Query() q: ListContractsDto) {
+    return this.contracts.list(scope, q);
+  }
+
+  @Get(':id')
+  async findOne(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    // 404 si hors scope, jamais 403 : un 403 confirmerait l'existence et
+    // transformerait l'API en oracle d'énumération (RM-30).
+    return this.contracts.findOne(scope, id);
+  }
+
+  @Get(':id/allowed-actions')
+  async allowed(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    // Permet à l'interface de désactiver les bons boutons sans dupliquer
+    // la machine à états côté client (§14.3).
+    return { allowedActions: await this.contracts.allowedActions(scope, id) };
+  }
+
+  @Post(':id/submit')
+  async submit(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.applyEvent(
+      scope,
+      id,
+      { type: 'SUBMIT_FOR_REVIEW', actorUserId: session.userId },
+      new Date(),
+    );
+  }
+
+  @Post(':id/approve')
+  async approve(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    // RM-10 : le rôle autorise, mais le DOMAINE refusera si l'acteur est
+    // celui qui a soumis. Rôle, scope et état sont trois contrôles distincts.
+    assertRole(session, ['MSP_ADMIN', 'LEGAL_REVIEWER']);
+    return this.contracts.applyEvent(
+      scope,
+      id,
+      { type: 'APPROVE', actorUserId: session.userId },
+      new Date(),
+    );
+  }
+
+  @Post(':id/request-changes')
+  async requestChanges(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReasonDto,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'LEGAL_REVIEWER']);
+    return this.contracts.applyEvent(
+      scope,
+      id,
+      { type: 'REQUEST_CHANGES', actorUserId: session.userId, reason: dto.reason },
+      new Date(),
+    );
+  }
+
+  @Post(':id/cancel')
+  async cancel(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReasonDto,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.applyEvent(
+      scope,
+      id,
+      { type: 'CANCEL', actorUserId: session.userId, reason: dto.reason },
+      new Date(),
+    );
+  }
+}

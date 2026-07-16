@@ -86,6 +86,21 @@ export default [
   },
 
   // ---------------------------------------------------------------------
+  // Exception 1 bis : les helpers de seed, exposés via @lsi/persistence/testing.
+  //
+  // Portée volontairement réduite à CE fichier, pas à src/testing/**. Ils
+  // écrivent avec le rôle propriétaire, ne sont jamais exposés au réseau et
+  // ne reçoivent aucune entrée utilisateur — les seules conditions qui
+  // rendent $executeRawUnsafe acceptable.
+  // ---------------------------------------------------------------------
+  {
+    files: ['packages/persistence/src/testing/seed.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
+  },
+
+  // ---------------------------------------------------------------------
   // Exception 2 : les tests et fixtures de persistence.
   //
   // Les tests d'isolation DOIVENT pouvoir émettre des requêtes non scopées :
