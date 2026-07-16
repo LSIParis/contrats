@@ -16,6 +16,7 @@
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
     "@types/node": "^22.9.0",
+    "eslint": "^9",
     "prisma": "^5.22.0",
     "testcontainers": "^10.13.2",
     "tsx": "^4.19.2",
