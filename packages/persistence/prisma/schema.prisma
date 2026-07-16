@@ -1,0 +1,126 @@
+// Schéma du prototype de cloisonnement.
+// Périmètre volontairement réduit aux tables nécessaires pour prouver R2 :
+// tenants / customers / contracts / comments.
+// Le schéma complet (§8) viendra une fois le prototype validé.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ContractType {
+  MAIN
+  AMENDMENT
+}
+
+enum ContractStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  PENDING_SIGNATURE
+  PARTIALLY_SIGNED
+  SIGNED
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+  CANCELLED
+  DECLINED
+}
+
+enum CommentVisibility {
+  INTERNAL
+  SHARED
+}
+
+/// Table de classe « plateforme » : pas de scope.
+model Tenant {
+  id        String       @id @db.Uuid
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @map("created_at")
+  updatedAt DateTime     @map("updated_at")
+
+  customers Customer[]
+  contracts Contract[]
+
+  @@map("tenants")
+}
+
+/// Table de classe « tenant » : scope = tenant_id.
+model Customer {
+  id        String         @id @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  name      String
+  siren     String?        @db.Char(9)
+  status    CustomerStatus @default(ACTIVE)
+  createdAt DateTime       @map("created_at")
+  updatedAt DateTime       @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  contracts Contract[]
+
+  /// Clé candidate composite : cible des FK porteuses de scope (§8.4).
+  @@unique([id, tenantId])
+  @@unique([tenantId, siren])
+  @@map("customers")
+}
+
+/// Table de classe « customer » : scope = tenant_id + customer_id.
+model Contract {
+  id         String         @id @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  customerId String         @map("customer_id") @db.Uuid
+  reference  String
+  title      String
+  type       ContractType   @default(MAIN)
+  status     ContractStatus @default(DRAFT)
+  startDate  DateTime?      @map("start_date") @db.Date
+  endDate    DateTime?      @map("end_date") @db.Date
+  createdAt  DateTime       @map("created_at")
+  updatedAt  DateTime       @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  customer Customer @relation(fields: [customerId, tenantId], references: [id, tenantId])
+  comments Comment[]
+
+  /// Clé candidate composite portant le scope complet (§8.4).
+  @@unique([id, tenantId, customerId])
+  @@unique([tenantId, reference])
+  @@index([tenantId, customerId, status])
+  @@map("contracts")
+}
+
+/// Le commentaire : porteur du risque de fuite le plus probable (§6.10).
+model Comment {
+  id         String            @id @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  customerId String            @map("customer_id") @db.Uuid
+  contractId String            @map("contract_id") @db.Uuid
+  visibility CommentVisibility @default(INTERNAL)
+  body       String
+  createdAt  DateTime          @map("created_at")
+
+  /// FK COMPOSITE : rend physiquement impossible d'attacher un commentaire
+  /// du client A à un contrat du client B (§8.4).
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId])
+
+  @@index([tenantId, customerId, contractId])
+  @@map("comments")
+}
