@@ -1,0 +1,251 @@
+import { describe, test, expect, beforeAll } from 'vitest';
+import { PrismaClient } from '@prisma/client';
+import { withScope } from '../../src/scoped-client.js';
+import { adminScope } from '../../src/scope.js';
+import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
+import { uuidv7 } from '../../src/uuid.js';
+
+let owner: PrismaClient;
+let fx: Fixture;
+
+beforeAll(async () => {
+  await applyMigrations();
+  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  fx = await seedTwoCustomers();
+});
+
+/**
+ * Les règles métier traduites en contraintes de base.
+ *
+ * Chacune pourrait vivre dans un service. Elle vivrait alors dans UN service,
+ * et le prochain chemin d'écriture (job, script de reprise, migration de
+ * données) l'ignorerait. Ces tests vérifient qu'elles sont vraies pour tout
+ * le monde — y compris pour le propriétaire de la base.
+ */
+describe('RM-32 — aucun compte hybride INTERNAL + CLIENT', () => {
+  test('un utilisateur INTERNAL avec un customer_id est rejeté', async () => {
+    await expect(
+      owner.$executeRawUnsafe(`
+        INSERT INTO users (id, tenant_id, kind, customer_id, email, full_name, status, created_at, updated_at)
+        VALUES ('${uuidv7()}', '${fx.tenantId}', 'INTERNAL', '${fx.customerA.id}',
+                'hybride-${uuidv7().slice(-12)}@lsi.fr', 'Compte hybride', 'ACTIVE', now(), now())
+      `),
+    ).rejects.toThrow(/users_kind_customer_coherence/i);
+  });
+
+  test('un utilisateur CLIENT sans customer_id est rejeté', async () => {
+    await expect(
+      owner.$executeRawUnsafe(`
+        INSERT INTO users (id, tenant_id, kind, customer_id, email, full_name, status, created_at, updated_at)
+        VALUES ('${uuidv7()}', '${fx.tenantId}', 'CLIENT', NULL,
+                'orphelin-${uuidv7().slice(-12)}@x.fr', 'Client orphelin', 'ACTIVE', now(), now())
+      `),
+    ).rejects.toThrow(/users_kind_customer_coherence/i);
+  });
+});
+
+describe('RM-10 — séparation des tâches sur la validation', () => {
+  test('le même utilisateur ne peut pas soumettre ET valider', async () => {
+    // Sans cette contrainte, la validation interne est un théâtre.
+    await expect(
+      owner.$executeRawUnsafe(`
+        INSERT INTO contract_approvals (id, tenant_id, customer_id, contract_id, version_id,
+                                        submitted_by_user_id, decided_by_user_id, decision, submitted_at)
+        VALUES ('${uuidv7()}', '${fx.tenantId}', '${fx.customerA.id}', '${fx.customerA.contractId}',
+                '${uuidv7()}', '${fx.amUserId}', '${fx.amUserId}', 'APPROVED', now())
+      `),
+    ).rejects.toThrow(/approvals_separation_of_duties/i);
+  });
+
+  test('deux utilisateurs distincts sont acceptés', async () => {
+    await expect(
+      owner.$executeRawUnsafe(`
+        INSERT INTO contract_approvals (id, tenant_id, customer_id, contract_id, version_id,
+                                        submitted_by_user_id, decided_by_user_id, decision, submitted_at)
+        VALUES ('${uuidv7()}', '${fx.tenantId}', '${fx.customerA.id}', '${fx.customerA.contractId}',
+                '${uuidv7()}', '${fx.amUserId}', '${fx.adminUserId}', 'APPROVED', now())
+      `),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('RM-08 — cohérence des dates et montants', () => {
+  test('start_date > end_date est rejeté', async () => {
+    await expect(
+      owner.$executeRawUnsafe(`
+        UPDATE contracts SET start_date = '2027-01-01', end_date = '2026-01-01'
+        WHERE id = '${fx.customerA.contractId}'
+      `),
+    ).rejects.toThrow(/contracts_date_order/i);
+  });
+
+  test('un montant négatif est rejeté', async () => {
+    await expect(
+      owner.$executeRawUnsafe(`
+        UPDATE contracts SET amount_cents = -1 WHERE id = '${fx.customerA.contractId}'
+      `),
+    ).rejects.toThrow(/contracts_amount_non_negative/i);
+  });
+
+  test('un contrat MAIN avec un parent est rejeté', async () => {
+    await expect(
+      owner.$executeRawUnsafe(`
+        UPDATE contracts SET parent_contract_id = '${fx.customerB.contractId}'
+        WHERE id = '${fx.customerA.contractId}'
+      `),
+    ).rejects.toThrow(/contracts_amendment_has_parent/i);
+  });
+});
+
+describe('RM-05 — immuabilité des versions de contrat', () => {
+  test('lsi_app ne peut pas UPDATE contract_versions', async () => {
+    // Un contrat signé est immuable définitivement, y compris pour MSP_ADMIN.
+    // Ce n'est pas une question de rôle applicatif : c'est la valeur probante.
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.$executeRawUnsafe(`UPDATE contract_versions SET body_html = 'falsifié'`),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  test('lsi_app ne peut pas DELETE contract_versions', async () => {
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.$executeRawUnsafe(`DELETE FROM contract_versions`),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+});
+
+describe('§13.4 — journal d’audit append-only', () => {
+  test('lsi_app ne peut pas UPDATE audit_logs', async () => {
+    // Un journal qu'un administrateur applicatif peut réécrire n'est pas
+    // un journal d'audit.
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.$executeRawUnsafe(`UPDATE audit_logs SET action = 'falsifié'`),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  test('lsi_app ne peut pas DELETE audit_logs', async () => {
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.$executeRawUnsafe(`DELETE FROM audit_logs`),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  test('lsi_app PEUT insérer dans audit_logs', async () => {
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.auditLog.create({
+          data: {
+            id: uuidv7(),
+            tenantId: fx.tenantId,
+            customerId: fx.customerA.id,
+            actorUserId: fx.adminUserId,
+            actorKind: 'INTERNAL',
+            action: 'contract.viewed',
+            resourceType: 'contract',
+            resourceId: fx.customerA.contractId,
+            occurredAt: new Date(),
+            hash: 'a'.repeat(64),
+          },
+        }),
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  test('lsi_app ne peut pas UPDATE signature_events', async () => {
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.$executeRawUnsafe(`UPDATE signature_events SET event_type = 'FORM_COMPLETED'`),
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
+});
+
+describe('§12.3 — le rôle scheduler est borné', () => {
+  test('lsi_scheduler existe, sans BYPASSRLS ni superuser', async () => {
+    const [r] = await owner.$queryRawUnsafe<{ bypass: boolean; superuser: boolean }[]>(`
+      SELECT rolbypassrls AS bypass, rolsuper AS superuser
+      FROM pg_roles WHERE rolname = 'lsi_scheduler'
+    `);
+    expect(r).toBeDefined();
+    expect(r!.bypass).toBe(false);
+    expect(r!.superuser).toBe(false);
+  });
+
+  /**
+   * On positionne un scope PLAUSIBLE avant chaque tentative.
+   *
+   * Sans cela, le test ne prouverait rien d'intéressant : le prédicat RLS
+   * lèverait « scope absent » (évalué à la planification, avant le contrôle
+   * de permission de table) et l'on croirait le rôle borné alors qu'on
+   * n'aurait mesuré que l'absence de GUC.
+   *
+   * La vraie question est : le scheduler pourrait-il lire les contrats S'IL
+   * positionnait un scope ? La réponse doit être non — parce que le GRANT
+   * n'existe pas, indépendamment de RLS.
+   */
+  async function schedulerWithScope() {
+    const uri = new URL(process.env.DATABASE_URL!);
+    uri.username = 'lsi_scheduler';
+    uri.password = 'lsi_scheduler_test_pwd';
+    const sched = new PrismaClient({ datasourceUrl: uri.toString() });
+    return sched;
+  }
+
+  async function asScheduler<T>(fn: (tx: any) => Promise<T>): Promise<T> {
+    const sched = await schedulerWithScope();
+    try {
+      return await sched.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SELECT set_config('app.tenant_id', '${fx.tenantId}', true)`);
+        await tx.$executeRawUnsafe(`SELECT set_config('app.all_customers', 'on', true)`);
+        await tx.$executeRawUnsafe(`SELECT set_config('app.actor_kind', 'SYSTEM', true)`);
+        await tx.$executeRawUnsafe(`SELECT set_config('app.user_id', 'system', true)`);
+        return fn(tx);
+      });
+    } finally {
+      await sched.$disconnect();
+    }
+  }
+
+  test('lsi_scheduler ne peut PAS lire les contrats, MÊME avec un scope valide', async () => {
+    // L'exception au cloisonnement doit être aussi étroite que sa raison
+    // d'être : il découvre des identifiants de scope, il ne lit ni contrat,
+    // ni contenu, ni adresse.
+    await expect(asScheduler((tx) => tx.$queryRawUnsafe(`SELECT id FROM contracts LIMIT 1`))).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  test('lsi_scheduler ne peut PAS lire les commentaires', async () => {
+    await expect(asScheduler((tx) => tx.$queryRawUnsafe(`SELECT body FROM comments LIMIT 1`))).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  test('lsi_scheduler ne peut PAS lire les adresses email', async () => {
+    await expect(asScheduler((tx) => tx.$queryRawUnsafe(`SELECT email FROM users LIMIT 1`))).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  test('lsi_scheduler ne peut pas lire les colonnes non accordées de reminders', async () => {
+    await expect(
+      asScheduler((tx) => tx.$queryRawUnsafe(`SELECT last_error FROM reminders`)),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  test('lsi_scheduler PEUT découvrir les rappels dus — sa seule raison d’être', async () => {
+    await expect(
+      asScheduler((tx) =>
+        tx.$queryRawUnsafe(
+          `SELECT id, tenant_id, customer_id FROM reminders WHERE status = 'PENDING' AND due_at <= now()`,
+        ),
+      ),
+    ).resolves.toBeDefined();
+  });
+});

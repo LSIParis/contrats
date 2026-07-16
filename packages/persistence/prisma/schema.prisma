@@ -1,7 +1,21 @@
-// Schéma du prototype de cloisonnement.
-// Périmètre volontairement réduit aux tables nécessaires pour prouver R2 :
-// tenants / customers / contracts / comments.
-// Le schéma complet (§8) viendra une fois le prototype validé.
+// Schéma de données — LSI Contrats
+// Référence : docs/superpowers/specs/2026-07-16-gestion-contrats-msp-design.md §8
+//
+// TROIS CLASSES DE TABLES, et c'est la distinction la plus importante du modèle :
+//
+//   plateforme  → aucun scope             : tenants
+//   tenant      → tenant_id               : users, roles, customers, contract_templates
+//   customer    → tenant_id + customer_id : tout le reste
+//
+// customer_id est DÉNORMALISÉ sur toutes les tables filles, y compris là où il
+// serait dérivable via contract_id. Redondance assumée : une politique RLS qui
+// doit joindre pour connaître le scope d'une ligne est lente et fragile. Le
+// scope doit être lisible sur la ligne elle-même.
+//
+// La cohérence est garantie par des FK COMPOSITES (§8.4) : sans elles, on
+// pourrait insérer un commentaire portant le customer_id de A sur un contrat
+// de B. La ligne serait visible de A tout en parlant du contrat de B, et RLS
+// n'y verrait rien à redire — elle vérifie le scope, pas la cohérence.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,9 +26,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===========================================================================
+// Énumérations
+// ===========================================================================
+
 enum TenantStatus {
   ACTIVE
   SUSPENDED
+}
+
+/// RM-32 : un compte est interne OU client, jamais les deux.
+enum UserKind {
+  INTERNAL
+  CLIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum RoleCode {
+  MSP_ADMIN
+  ACCOUNT_MANAGER
+  LEGAL_REVIEWER
+  TECHNICIAN
+  CLIENT_SIGNER
+  CLIENT_VIEWER
 }
 
 enum CustomerStatus {
@@ -22,11 +60,29 @@ enum CustomerStatus {
   ARCHIVED
 }
 
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  DEPRECATED
+}
+
+enum ContractCategory {
+  MAINTENANCE
+  SUPPORT
+  HOSTING
+  SLA
+  OTHER
+}
+
 enum ContractType {
   MAIN
   AMENDMENT
 }
 
+/// §7.1. EXPIRING_SOON et ARCHIVED n'en font PAS partie :
+///   - EXPIRING_SOON est dérivé de end_date (RM-02) — un état que seul un job
+///     saurait produire ferait dépendre la vérité métier du scheduler.
+///   - ARCHIVED est l'attribut archived_at (RM-03), orthogonal au cycle de vie.
 enum ContractStatus {
   DRAFT
   IN_REVIEW
@@ -43,12 +99,124 @@ enum ContractStatus {
   DECLINED
 }
 
+enum BillingFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ONE_OFF
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum SignerParty {
+  LSI
+  CLIENT
+}
+
+enum SignerStatus {
+  PENDING
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+}
+
+/// Énuméré dès le MVP alors qu'il n'y a qu'une valeur : deux caractères
+/// aujourd'hui contre une migration de données le jour où un client grand
+/// compte exigera une signature avancée eIDAS (§11.1).
+enum SignatureProvider {
+  DOCUSEAL
+}
+
+enum SignatureRequestStatus {
+  CREATING
+  SENT
+  PARTIALLY_COMPLETED
+  COMPLETED
+  DECLINED
+  EXPIRED
+  REVOKED
+  FAILED
+}
+
+enum SignatureEventType {
+  FORM_VIEWED
+  FORM_STARTED
+  FORM_COMPLETED
+  FORM_DECLINED
+  SUBMISSION_COMPLETED
+  SUBMISSION_EXPIRED
+}
+
+/// Le défaut est INTERNAL (§6.10). C'est le risque de fuite le plus banal
+/// et le plus probable de toute l'application.
 enum CommentVisibility {
   INTERNAL
   SHARED
 }
 
-/// Table de classe « plateforme » : pas de scope.
+enum VirusScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+}
+
+enum ReminderKind {
+  EXPIRY
+  NOTICE_DEADLINE
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  SKIPPED_OBSOLETE
+  CANCELLED
+  FAILED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  READ
+}
+
+enum ActorKind {
+  INTERNAL
+  CLIENT
+  SYSTEM
+}
+
+enum RenewalStatus {
+  PENDING
+  ACCEPTED
+  REFUSED
+  EXPIRED
+}
+
+enum CancellationType {
+  CANCELLATION
+  TERMINATION
+}
+
+enum InitiatedBy {
+  LSI
+  CLIENT
+}
+
+// ===========================================================================
+// Classe « plateforme »
+// ===========================================================================
+
 model Tenant {
   id        String       @id @db.Uuid
   name      String
@@ -57,70 +225,641 @@ model Tenant {
   createdAt DateTime     @map("created_at")
   updatedAt DateTime     @map("updated_at")
 
+  users     User[]
+  roles     Role[]
   customers Customer[]
+  templates ContractTemplate[]
   contracts Contract[]
 
   @@map("tenants")
 }
 
-/// Table de classe « tenant » : scope = tenant_id.
-model Customer {
-  id        String         @id @db.Uuid
-  tenantId  String         @map("tenant_id") @db.Uuid
-  name      String
-  siren     String?        @db.Char(9)
-  status    CustomerStatus @default(ACTIVE)
-  createdAt DateTime       @map("created_at")
-  updatedAt DateTime       @map("updated_at")
+// ===========================================================================
+// Classe « tenant »
+// ===========================================================================
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
-  contracts Contract[]
+model User {
+  id             String     @id @db.Uuid
+  tenantId       String     @map("tenant_id") @db.Uuid
+  kind           UserKind
+  /// NULL si INTERNAL, NOT NULL si CLIENT. Contrainte CHECK en migration (RM-32).
+  /// Non modifiable après création : la session client est épinglée (RM-31).
+  customerId     String?    @map("customer_id") @db.Uuid
+  email          String
+  fullName       String     @map("full_name")
+  status         UserStatus @default(ACTIVE)
+  /// Sujet OIDC Entra ID (H6).
+  externalIdpSub String?    @map("external_idp_sub")
+  lastLoginAt    DateTime?  @map("last_login_at")
+  createdAt      DateTime   @map("created_at")
+  updatedAt      DateTime   @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  customer Customer? @relation("ClientUsers", fields: [customerId, tenantId], references: [id, tenantId])
+
+  roles          UserRole[]
+  customerAccess CustomerAccess[] @relation("AccessUser")
+  grantedAccess  CustomerAccess[] @relation("AccessGrantedBy")
+  notifications  Notification[]
+  comments       Comment[]
+
+  @@unique([tenantId, email])
+  @@unique([id, tenantId])
+  @@index([tenantId, kind])
+  @@map("users")
+}
+
+model Role {
+  id       String   @id @db.Uuid
+  tenantId String   @map("tenant_id") @db.Uuid
+  code     RoleCode
+  label    String
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  users  UserRole[]
+
+  @@unique([tenantId, code])
+  @@unique([id, tenantId])
+  @@map("roles")
+}
+
+model UserRole {
+  tenantId String @map("tenant_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  roleId   String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  role Role @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([tenantId])
+  @@map("user_roles")
+}
+
+/// LE PORTEFEUILLE. La table la plus sensible de l'application :
+/// elle définit qui voit quoi côté interne (§10.4).
+///
+/// MSP_ADMIN et LEGAL_REVIEWER n'y ont PAS de lignes — ils portent un accès
+/// all_customers implicite, résolu à l'ouverture de session.
+model CustomerAccess {
+  tenantId         String   @map("tenant_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  customerId       String   @map("customer_id") @db.Uuid
+  grantedByUserId  String   @map("granted_by_user_id") @db.Uuid
+  grantedAt        DateTime @map("granted_at")
+
+  user      User     @relation("AccessUser", fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  grantedBy User     @relation("AccessGrantedBy", fields: [grantedByUserId, tenantId], references: [id, tenantId])
+  customer  Customer @relation(fields: [customerId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@id([userId, customerId])
+  @@index([userId])
+  @@index([tenantId, customerId])
+  @@map("customer_access")
+}
+
+model Customer {
+  id           String         @id @db.Uuid
+  tenantId     String         @map("tenant_id") @db.Uuid
+  name         String
+  legalName    String?        @map("legal_name")
+  siren        String?        @db.Char(9)
+  vatNumber    String?        @map("vat_number")
+  addressLine1 String?        @map("address_line1")
+  addressLine2 String?        @map("address_line2")
+  postalCode   String?        @map("postal_code")
+  city         String?
+  country      String         @default("FR") @db.Char(2)
+  status       CustomerStatus @default(ACTIVE)
+  notes        String?
+  createdAt    DateTime       @map("created_at")
+  updatedAt    DateTime       @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  contacts      CustomerContact[]
+  contracts     Contract[]
+  clientUsers   User[]            @relation("ClientUsers")
+  access        CustomerAccess[]
 
   /// Clé candidate composite : cible des FK porteuses de scope (§8.4).
   @@unique([id, tenantId])
   @@unique([tenantId, siren])
+  @@index([tenantId, status])
   @@map("customers")
 }
 
-/// Table de classe « customer » : scope = tenant_id + customer_id.
+model CustomerContact {
+  id          String   @id @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  customerId  String   @map("customer_id") @db.Uuid
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  email       String
+  phone       String?
+  jobTitle    String?  @map("job_title")
+  isSignatory Boolean  @default(false) @map("is_signatory")
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  createdAt   DateTime @map("created_at")
+  updatedAt   DateTime @map("updated_at")
+
+  customer Customer         @relation(fields: [customerId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  signers  ContractSigner[]
+
+  @@unique([customerId, email])
+  @@unique([id, tenantId, customerId])
+  @@index([tenantId, customerId])
+  @@map("customer_contacts")
+}
+
+/// Les modèles sont au niveau TENANT, pas customer (H10) : ils sont
+/// mutualisés entre clients. Seules les INSTANCES de contrats sont cloisonnées.
+model ContractTemplate {
+  id               String           @id @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  name             String
+  category         ContractCategory @default(MAINTENANCE)
+  status           TemplateStatus   @default(DRAFT)
+  currentVersionId String?          @map("current_version_id") @db.Uuid
+  createdAt        DateTime         @map("created_at")
+  updatedAt        DateTime         @map("updated_at")
+
+  tenant   Tenant                    @relation(fields: [tenantId], references: [id])
+  versions ContractTemplateVersion[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, status])
+  @@map("contract_templates")
+}
+
+model ContractTemplateVersion {
+  id                String   @id @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  templateId        String   @map("template_id") @db.Uuid
+  versionNumber     Int      @map("version_number")
+  bodyHtml          String   @map("body_html")
+  /// JSON Schema des variables attendues.
+  variablesSchema   Json     @map("variables_schema")
+  docusealTemplateId Int?    @map("docuseal_template_id")
+  publishedAt       DateTime? @map("published_at")
+  publishedByUserId String?  @map("published_by_user_id") @db.Uuid
+  isImmutable       Boolean  @default(false) @map("is_immutable")
+  createdAt         DateTime @map("created_at")
+
+  template  ContractTemplate @relation(fields: [templateId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  contracts Contract[]
+
+  @@unique([templateId, versionNumber])
+  @@unique([id, tenantId])
+  @@map("contract_template_versions")
+}
+
+// ===========================================================================
+// Classe « customer » — tout ce qui suit porte tenant_id + customer_id
+// ===========================================================================
+
 model Contract {
-  id         String         @id @db.Uuid
-  tenantId   String         @map("tenant_id") @db.Uuid
-  customerId String         @map("customer_id") @db.Uuid
-  reference  String
-  title      String
-  type       ContractType   @default(MAIN)
-  status     ContractStatus @default(DRAFT)
-  startDate  DateTime?      @map("start_date") @db.Date
-  endDate    DateTime?      @map("end_date") @db.Date
-  createdAt  DateTime       @map("created_at")
-  updatedAt  DateTime       @map("updated_at")
+  id         String  @id @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  /// LA FRONTIÈRE D'ISOLATION.
+  customerId String  @map("customer_id") @db.Uuid
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  customer Customer @relation(fields: [customerId, tenantId], references: [id, tenantId])
-  comments Comment[]
+  reference String
+  title     String
+  type      ContractType     @default(MAIN)
+  status    ContractStatus   @default(DRAFT)
+  category  ContractCategory @default(MAINTENANCE)
 
-  /// Clé candidate composite portant le scope complet (§8.4).
+  /// Référence FIGÉE vers la version de modèle utilisée. NULL si from scratch.
+  /// Savoir quel texte type a servi est indispensable en litige.
+  templateVersionId String? @map("template_version_id") @db.Uuid
+  currentVersionId  String? @map("current_version_id") @db.Uuid
+  /// RM-11 : une validation porte sur une VERSION, jamais sur un contrat.
+  approvedVersionId String? @map("approved_version_id") @db.Uuid
+
+  /// Avenant → contrat parent (RM-17).
+  parentContractId      String? @map("parent_contract_id") @db.Uuid
+  /// Renouvellement (RM-16).
+  predecessorContractId String? @map("predecessor_contract_id") @db.Uuid
+  successorContractId   String? @map("successor_contract_id") @db.Uuid
+
+  startDate        DateTime? @map("start_date") @db.Date
+  /// NULL = durée indéterminée (EC-13).
+  endDate          DateTime? @map("end_date") @db.Date
+  noticePeriodDays Int?      @map("notice_period_days")
+
+  /// Entier, JAMAIS un flottant : on ne stocke pas de la monnaie en float.
+  amountCents      BigInt?          @map("amount_cents")
+  currency         String           @default("EUR") @db.Char(3)
+  billingFrequency BillingFrequency @default(MONTHLY) @map("billing_frequency")
+
+  /// Intention DOCUMENTAIRE seulement. Ne déclenche AUCUNE action (RM-21) :
+  /// reconduire silencieusement une obligation contractuelle depuis un cron
+  /// est un risque juridique que l'application refuse de porter.
+  autoRenewIntent Boolean @default(false) @map("auto_renew_intent")
+
+  /// Incrémenté à chaque régénération de rappels (EC-12).
+  reminderCycle Int @default(0) @map("reminder_cycle")
+
+  signedAt     DateTime? @map("signed_at")
+  activatedAt  DateTime? @map("activated_at")
+  terminatedAt DateTime? @map("terminated_at")
+  /// RM-03 : attribut orthogonal, pas un statut.
+  archivedAt   DateTime? @map("archived_at")
+
+  ownerUserId     String   @map("owner_user_id") @db.Uuid
+  createdAt       DateTime @map("created_at")
+  updatedAt       DateTime @map("updated_at")
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  updatedByUserId String   @map("updated_by_user_id") @db.Uuid
+
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id])
+  customer        Customer                 @relation(fields: [customerId, tenantId], references: [id, tenantId])
+  templateVersion ContractTemplateVersion? @relation(fields: [templateVersionId, tenantId], references: [id, tenantId])
+
+  parentContract Contract?  @relation("Amendments", fields: [parentContractId], references: [id])
+  amendments     Contract[] @relation("Amendments")
+
+  versions          ContractVersion[]
+  signers           ContractSigner[]
+  approvals         ContractApproval[]
+  signatureRequests SignatureRequest[]
+  comments          Comment[]
+  attachments       Attachment[]
+  reminders         Reminder[]
+  renewalRequests   RenewalRequest[]  @relation("ParentContract")
+  cancellations     Cancellation[]
+
+  /// Clé candidate composite portant le scope complet : cible de TOUTES
+  /// les FK des tables filles (§8.4).
   @@unique([id, tenantId, customerId])
   @@unique([tenantId, reference])
   @@index([tenantId, customerId, status])
+  @@index([tenantId, customerId, endDate])
+  @@index([tenantId, ownerUserId, status])
+  @@index([tenantId, customerId, archivedAt])
   @@map("contracts")
 }
 
-/// Le commentaire : porteur du risque de fuite le plus probable (§6.10).
-model Comment {
-  id         String            @id @db.Uuid
-  tenantId   String            @map("tenant_id") @db.Uuid
-  customerId String            @map("customer_id") @db.Uuid
-  contractId String            @map("contract_id") @db.Uuid
-  visibility CommentVisibility @default(INTERNAL)
-  body       String
-  createdAt  DateTime          @map("created_at")
+/// IMMUABLES. Aucun updatedAt : l'absence de cette colonne EST la
+/// documentation de l'immuabilité. UPDATE/DELETE révoqués en migration.
+model ContractVersion {
+  id            String   @id @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  customerId    String   @map("customer_id") @db.Uuid
+  contractId    String   @map("contract_id") @db.Uuid
+  versionNumber Int      @map("version_number")
+  bodyHtml      String   @map("body_html")
+  variables     Json
+  pdfObjectKey  String?  @map("pdf_object_key")
+  /// Calculé AVANT envoi : c'est ce qui permet d'affirmer plus tard
+  /// « le document envoyé est exactement celui-ci » (§11.2).
+  pdfSha256     String?  @map("pdf_sha256") @db.Char(64)
+  changeSummary String?  @map("change_summary")
+  createdAt     DateTime @map("created_at")
+  createdByUserId String @map("created_by_user_id") @db.Uuid
 
-  /// FK COMPOSITE : rend physiquement impossible d'attacher un commentaire
-  /// du client A à un contrat du client B (§8.4).
-  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId])
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+
+  @@unique([contractId, versionNumber])
+  @@unique([id, tenantId, customerId])
+  @@index([tenantId, customerId, contractId])
+  @@map("contract_versions")
+}
+
+model ContractSigner {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+
+  party        SignerParty
+  contactId    String?      @map("contact_id") @db.Uuid
+  userId       String?      @map("user_id") @db.Uuid
+  fullName     String       @map("full_name")
+  email        String
+  roleLabel    String?      @map("role_label")
+  signingOrder Int          @default(0) @map("signing_order")
+  status       SignerStatus @default(PENDING)
+
+  signedAt      DateTime? @map("signed_at")
+  declinedAt    DateTime? @map("declined_at")
+  declineReason String?   @map("decline_reason")
+
+  /// Rapprochement DocuSeal. external_id côté provider = cet id (§11.5).
+  /// Jamais par email : deux signataires peuvent partager une adresse.
+  providerSubmitterId   String? @map("provider_submitter_id")
+  providerSubmitterSlug String? @map("provider_submitter_slug")
+
+  createdAt DateTime @map("created_at")
+  updatedAt DateTime @map("updated_at")
+
+  contract Contract         @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  contact  CustomerContact? @relation(fields: [contactId], references: [id])
+
+  @@unique([contractId, email])
+  @@unique([providerSubmitterId])
+  @@index([tenantId, customerId, contractId])
+  @@map("contract_signers")
+}
+
+model ContractApproval {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+  versionId  String @map("version_id") @db.Uuid
+
+  submittedByUserId String           @map("submitted_by_user_id") @db.Uuid
+  /// RM-10 : CHECK en base garantit decided_by <> submitted_by.
+  /// Sans cette séparation, la validation interne est un théâtre.
+  decidedByUserId   String?          @map("decided_by_user_id") @db.Uuid
+  decision          ApprovalDecision @default(PENDING)
+  reason            String?
+  submittedAt       DateTime         @map("submitted_at")
+  decidedAt         DateTime?        @map("decided_at")
+
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+
+  @@index([tenantId, customerId, contractId])
+  @@index([tenantId, decision])
+  @@map("contract_approvals")
+}
+
+model SignatureRequest {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+  versionId  String @map("version_id") @db.Uuid
+
+  provider SignatureProvider @default(DOCUSEAL)
+  /// C'EST CETTE COLONNE QUI RÉSOUT LE SCOPE D'UN WEBHOOK (§11.4).
+  /// Un webhook arrive sans session : le scope ne peut PAS venir d'un cookie.
+  /// Il est résolu ici, depuis NOTRE base — jamais depuis le payload.
+  providerSubmissionId String?                @map("provider_submission_id")
+  status               SignatureRequestStatus @default(CREATING)
+  /// Anti-double-envoi sur timeout à la création (§11.8).
+  idempotencyKey       String                 @map("idempotency_key")
+  expireAt             DateTime?              @map("expire_at")
+
+  signedPdfObjectKey   String? @map("signed_pdf_object_key")
+  signedPdfSha256      String? @map("signed_pdf_sha256") @db.Char(64)
+  auditTrailObjectKey  String? @map("audit_trail_object_key")
+  /// Jeton RFC 3161 — prévu au schéma, hors MVP (§11.6).
+  timestampToken       Bytes?  @map("timestamp_token")
+
+  lastSyncedAt DateTime? @map("last_synced_at")
+  errorMessage String?   @map("error_message")
+
+  createdAt       DateTime @map("created_at")
+  updatedAt       DateTime @map("updated_at")
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+
+  contract Contract         @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  events   SignatureEvent[]
+
+  @@unique([provider, providerSubmissionId])
+  @@unique([idempotencyKey])
+  @@unique([id, tenantId, customerId])
+  @@index([tenantId, customerId, contractId])
+  @@index([status, lastSyncedAt])
+  @@map("signature_requests")
+}
+
+model SignatureEvent {
+  id                 String @id @db.Uuid
+  tenantId           String @map("tenant_id") @db.Uuid
+  customerId         String @map("customer_id") @db.Uuid
+  signatureRequestId String @map("signature_request_id") @db.Uuid
+
+  /// L'IDEMPOTENCE DES WEBHOOKS, garantie en base et non par un `if` (EC-05).
+  providerEventId String             @map("provider_event_id")
+  eventType       SignatureEventType @map("event_type")
+  submitterEmail  String?            @map("submitter_email")
+  occurredAt      DateTime           @map("occurred_at")
+  receivedAt      DateTime           @map("received_at")
+  ip              String?
+  userAgent       String?            @map("user_agent")
+  rawPayload      Json               @map("raw_payload")
+  processedAt     DateTime?          @map("processed_at")
+  processingError String?            @map("processing_error")
+
+  signatureRequest SignatureRequest @relation(fields: [signatureRequestId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+
+  @@unique([providerEventId])
+  @@index([tenantId, customerId, signatureRequestId])
+  @@map("signature_events")
+}
+
+/// Le risque de fuite le plus probable de l'application (§6.10).
+/// Traité en BASE par une politique RLS, pas seulement par un `if`.
+model Comment {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+
+  parentCommentId String?           @map("parent_comment_id") @db.Uuid
+  authorUserId    String            @map("author_user_id") @db.Uuid
+  /// Défaut INTERNAL. Le passage INTERNAL → SHARED est irréversible.
+  visibility      CommentVisibility @default(INTERNAL)
+  body            String
+
+  resolvedAt       DateTime? @map("resolved_at")
+  resolvedByUserId String?   @map("resolved_by_user_id") @db.Uuid
+  createdAt        DateTime  @map("created_at")
+  updatedAt        DateTime  @map("updated_at")
+
+  contract Contract  @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  author   User      @relation(fields: [authorUserId, tenantId], references: [id, tenantId])
+  parent   Comment?  @relation("Replies", fields: [parentCommentId], references: [id])
+  replies  Comment[] @relation("Replies")
 
   @@index([tenantId, customerId, contractId])
   @@map("comments")
+}
+
+model Attachment {
+  id         String  @id @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  customerId String  @map("customer_id") @db.Uuid
+  contractId String  @map("contract_id") @db.Uuid
+  versionId  String? @map("version_id") @db.Uuid
+
+  filename    String
+  contentType String @map("content_type")
+  sizeBytes   Int    @map("size_bytes")
+  /// Clé S3 : t/{tenant}/c/{customer}/contracts/{id}/attachments/... (§10.7)
+  objectKey   String @map("object_key")
+  sha256      String @db.Char(64)
+
+  visibility       CommentVisibility @default(INTERNAL)
+  uploadedByUserId String            @map("uploaded_by_user_id") @db.Uuid
+  /// Un fichier non scanné n'est pas téléchargeable : l'état par défaut
+  /// est le refus (§14.4).
+  virusScanStatus  VirusScanStatus   @default(PENDING) @map("virus_scan_status")
+  createdAt        DateTime          @map("created_at")
+
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+
+  @@index([tenantId, customerId, contractId])
+  @@map("attachments")
+}
+
+/// MATÉRIALISÉS en base, pas calculés à la volée (§12.1).
+///
+/// Un contrat perdu parce qu'un cron a échoué pendant un week-end, c'est le
+/// problème n°1 que cette application existe pour résoudre. Le calcul à la
+/// volée n'y survit pas : si le job ne tourne pas, le rappel n'existe jamais.
+model Reminder {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+
+  kind       ReminderKind   @default(EXPIRY)
+  /// 90 / 60 / 30
+  offsetDays Int            @map("offset_days")
+  /// Incrémenté à la régénération après avenant (EC-12) : permet de recréer
+  /// les mêmes offsets sans violer l'unicité, tout en gardant l'historique.
+  cycle      Int            @default(0)
+  dueAt      DateTime       @map("due_at")
+  status     ReminderStatus @default(PENDING)
+  sentAt     DateTime?      @map("sent_at")
+  /// Un rappel dû mais non envoyé reste dû (RM-26).
+  late       Boolean        @default(false)
+  attempts   Int            @default(0)
+  lastError  String?        @map("last_error")
+  createdAt  DateTime       @map("created_at")
+
+  contract      Contract       @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  notifications Notification[]
+
+  /// RM-24 : l'anti-doublon est une contrainte de BASE, pas de la logique
+  /// applicative qu'on peut oublier.
+  @@unique([contractId, kind, offsetDays, cycle])
+  @@index([status, dueAt])
+  @@index([tenantId, customerId, contractId])
+  @@map("reminders")
+}
+
+model Notification {
+  id         String  @id @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  /// NULL pour une notification interne non liée à un client.
+  customerId String? @map("customer_id") @db.Uuid
+
+  recipientUserId String              @map("recipient_user_id") @db.Uuid
+  channel         NotificationChannel @default(IN_APP)
+  type            String
+  subject         String
+  body            String
+
+  relatedContractId String? @map("related_contract_id") @db.Uuid
+  relatedReminderId String? @map("related_reminder_id") @db.Uuid
+
+  status  NotificationStatus @default(QUEUED)
+  sentAt  DateTime?          @map("sent_at")
+  readAt  DateTime?          @map("read_at")
+  /// Anti-doublon d'envoi (§12.4).
+  dedupKey String?           @map("dedup_key")
+  error    String?
+  createdAt DateTime         @map("created_at")
+
+  recipient User      @relation(fields: [recipientUserId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  reminder  Reminder? @relation(fields: [relatedReminderId], references: [id])
+
+  @@unique([dedupKey])
+  @@index([tenantId, recipientUserId, status])
+  @@map("notifications")
+}
+
+/// APPEND-ONLY, chaîné par hash (§13.4).
+///
+/// UPDATE et DELETE sont RÉVOQUÉS au niveau SGBD, y compris au propriétaire.
+/// Un journal d'audit qu'un administrateur applicatif peut réécrire n'est
+/// pas un journal d'audit.
+model AuditLog {
+  id         String  @id @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  /// NULL si action de niveau tenant.
+  customerId String? @map("customer_id") @db.Uuid
+
+  actorUserId    String?   @map("actor_user_id") @db.Uuid
+  actorKind      ActorKind @map("actor_kind")
+  actorIp        String?   @map("actor_ip")
+  actorUserAgent String?   @map("actor_user_agent")
+
+  action       String
+  resourceType String  @map("resource_type")
+  resourceId   String? @map("resource_id") @db.Uuid
+
+  before Json?
+  after  Json?
+
+  /// Corrélation trace ↔ log ↔ audit.
+  requestId  String?  @map("request_id")
+  occurredAt DateTime @map("occurred_at")
+
+  /// Chaîne de hash : une entrée modifiée ou supprimée casse la chaîne.
+  /// Ne rend pas la falsification impossible — la rend DÉTECTABLE, ce qui
+  /// est l'objectif réel d'une piste d'audit.
+  prevHash String? @map("prev_hash") @db.Char(64)
+  hash     String  @db.Char(64)
+
+  @@index([tenantId, customerId, occurredAt(sort: Desc)])
+  @@index([tenantId, resourceType, resourceId, occurredAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model RenewalRequest {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  /// Le contrat parent.
+  contractId String @map("contract_id") @db.Uuid
+  /// Le contrat successeur, NULL au début.
+  newContractId String? @map("new_contract_id") @db.Uuid
+
+  status           RenewalStatus @default(PENDING)
+  initiatedByUserId String       @map("initiated_by_user_id") @db.Uuid
+  initiatedAt      DateTime      @map("initiated_at")
+  decidedAt        DateTime?     @map("decided_at")
+  /// EC-08 : un refus ne prolonge rien. Le parent expire normalement.
+  refusalReason    String?       @map("refusal_reason")
+
+  contract Contract @relation("ParentContract", fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+
+  @@index([tenantId, customerId, contractId])
+  @@index([tenantId, status])
+  @@map("renewal_requests")
+}
+
+/// Reste une table à part, contrairement aux avenants (fusionnés dans
+/// contracts) : une résiliation n'est pas un document à signer dans notre
+/// périmètre, c'est un acte de gestion avec motif, date d'effet et
+/// dérogation éventuelle (§8.2).
+model Cancellation {
+  id         String @id @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+
+  type            CancellationType
+  reason          String
+  initiatedBy     InitiatedBy      @map("initiated_by")
+  effectiveDate   DateTime         @map("effective_date") @db.Date
+  noticeRespected Boolean          @default(true) @map("notice_respected")
+  /// RM-20 : contourner le préavis exige MSP_ADMIN et une justification tracée.
+  overrideReason   String? @map("override_reason")
+  overrideByUserId String? @map("override_by_user_id") @db.Uuid
+
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @map("created_at")
+
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+
+  @@index([tenantId, customerId, contractId])
+  @@map("cancellations")
 }

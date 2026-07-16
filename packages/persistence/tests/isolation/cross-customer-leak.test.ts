@@ -48,8 +48,11 @@ describe('WITH CHECK — on ne peut pas ÉCRIRE hors de son scope', () => {
             id: uuidv7(),
             tenantId: fx.tenantId,
             customerId: fx.customerB.id, // ← hors scope
-            reference: 'LSI-2026-9999',
+            reference: `LSI-2026-${uuidv7().slice(-12)}`,
             title: 'Contrat injecté',
+            ownerUserId: fx.amUserId,
+            createdByUserId: fx.amUserId,
+            updatedByUserId: fx.amUserId,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -101,12 +104,14 @@ describe('cloison de visibilité des commentaires (§6.10)', () => {
           contractId: fx.customerA.contractId,
           visibility: 'INTERNAL',
           body: 'Marge à 32 %, on peut descendre à 28 % si blocage.',
+          authorUserId: fx.adminUserId,
           createdAt: new Date(),
+          updatedAt: new Date(),
         },
       }),
     );
 
-    const seen = await withScope(clientScope(fx.tenantId, fx.customerA.id, uuidv7()), (tx) =>
+    const seen = await withScope(clientScope(fx.tenantId, fx.customerA.id, fx.customerA.clientUserId), (tx) =>
       tx.comment.findMany(),
     );
     expect(seen).toHaveLength(0);
@@ -114,7 +119,7 @@ describe('cloison de visibilité des commentaires (§6.10)', () => {
 
   test('un CLIENT ne peut pas ÉCRIRE un commentaire INTERNAL', async () => {
     await expect(
-      withScope(clientScope(fx.tenantId, fx.customerA.id, uuidv7()), (tx) =>
+      withScope(clientScope(fx.tenantId, fx.customerA.id, fx.customerA.clientUserId), (tx) =>
         tx.comment.create({
           data: {
             id: uuidv7(),
@@ -123,7 +128,9 @@ describe('cloison de visibilité des commentaires (§6.10)', () => {
             contractId: fx.customerA.contractId,
             visibility: 'INTERNAL',
             body: 'tentative',
+            authorUserId: fx.customerA.clientUserId,
             createdAt: new Date(),
+            updatedAt: new Date(),
           },
         }),
       ),
@@ -140,12 +147,14 @@ describe('cloison de visibilité des commentaires (§6.10)', () => {
           contractId: fx.customerA.contractId,
           visibility: 'SHARED',
           body: 'Bonjour, voici le contrat.',
+          authorUserId: fx.adminUserId,
           createdAt: new Date(),
+          updatedAt: new Date(),
         },
       }),
     );
 
-    const seen = await withScope(clientScope(fx.tenantId, fx.customerA.id, uuidv7()), (tx) =>
+    const seen = await withScope(clientScope(fx.tenantId, fx.customerA.id, fx.customerA.clientUserId), (tx) =>
       tx.comment.findMany(),
     );
     expect(seen).toHaveLength(1);

@@ -102,9 +102,11 @@ describe('intégrité référentielle composite (§8.4)', () => {
 
     await expect(
       owner.$executeRawUnsafe(`
-        INSERT INTO comments (id, tenant_id, customer_id, contract_id, visibility, body, created_at)
+        INSERT INTO comments (id, tenant_id, customer_id, contract_id, author_user_id,
+                              visibility, body, created_at, updated_at)
         VALUES ('${uuidv7()}', '${fx.tenantId}', '${fx.customerA.id}',
-                '${fx.customerB.contractId}', 'INTERNAL', 'incohérent', now())
+                '${fx.customerB.contractId}', '${fx.adminUserId}',
+                'INTERNAL', 'incohérent', now(), now())
       `),
     ).rejects.toThrow(/foreign key constraint/i);
   });
