@@ -1,0 +1,1 @@
+export const DOCUMENT_RENDERER = Symbol('DOCUMENT_RENDERER');

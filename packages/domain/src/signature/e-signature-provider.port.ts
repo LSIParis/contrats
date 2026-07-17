@@ -60,8 +60,92 @@ export interface WebhookVerification {
   readonly reason?: string;
 }
 
+/** Un signataire, tel que le domaine le décrit — pas tel que DocuSeal l'attend. */
+export interface SubmitterCommand {
+  readonly party: 'LSI' | 'CLIENT';
+  /** NOTRE contract_signers.id. Clé de rapprochement des webhooks (§11.5). */
+  readonly externalId: string;
+  readonly fullName: string;
+  readonly email: string;
+  readonly signingOrder: number;
+  readonly requireEmail2fa: boolean;
+  readonly fields: readonly SubmitterField[];
+}
+
+export interface SubmitterField {
+  readonly name: string;
+  readonly defaultValue: string;
+  /**
+   * TOUJOURS true pour les valeurs contractuelles.
+   *
+   * `default_value` seul est modifiable par le signataire depuis les
+   * devtools : DocuSeal n'applique l'immuabilité que si le champ est marqué
+   * readonly CÔTÉ SERVEUR. Un montant contractuel pré-rempli mais éditable
+   * serait une faille béante.
+   */
+  readonly readonly: boolean;
+}
+
+export interface CreateSubmissionCommand {
+  /** Le PDF déjà rendu et haché (§11.2). */
+  readonly pdf: Buffer;
+  readonly documentName: string;
+  /** 'preserved' : LSI signe d'abord, le client ensuite (RM-13). */
+  readonly order: 'preserved' | 'random';
+  readonly expireAt: Date;
+  readonly subject: string;
+  readonly body: string;
+  readonly completedRedirectUrl: string;
+  readonly submitters: readonly SubmitterCommand[];
+  /**
+   * Scope, à des fins de DIAGNOSTIC uniquement.
+   *
+   * Elle revient dans les webhooks, où elle sert de SONDE de divergence —
+   * jamais d'autorisation (§11.4). Le scope d'un webhook se résout depuis
+   * notre base, pas depuis ce que le provider nous renvoie.
+   */
+  readonly metadata: Record<string, string>;
+}
+
+export interface ProviderSubmission {
+  readonly providerSubmissionId: string;
+  readonly submitters: readonly {
+    readonly externalId: string | null;
+    readonly providerSubmitterId: string;
+    readonly slug: string;
+  }[];
+}
+
+/** Erreur du provider. `retryable` décide du code HTTP et du réessai. */
+export class ProviderError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = 'ProviderError';
+  }
+}
+
 export interface ESignatureProvider {
   readonly name: ProviderName;
+
+  /**
+   * Crée la demande de signature chez le provider.
+   *
+   * Le contrat ne passe PENDING_SIGNATURE qu'après le retour de cet appel
+   * (EC-04) : on ne prétend jamais avoir envoyé ce qui n'est pas parti.
+   */
+  createSubmission(cmd: CreateSubmissionCommand): Promise<ProviderSubmission>;
+
+  /**
+   * Retrouve une submission par notre clé d'idempotence.
+   *
+   * Indispensable avant tout réessai après timeout (§11.8) : la submission
+   * a peut-être été créée malgré l'absence de réponse. Sans cette
+   * vérification, le client reçoit DEUX invitations à signer.
+   */
+  findSubmissionByExternalId(externalId: string): Promise<ProviderSubmission | null>;
 
   /**
    * Vérifie la signature sur le CORPS BRUT.

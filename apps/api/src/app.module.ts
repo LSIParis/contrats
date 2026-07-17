@@ -9,6 +9,11 @@ import { ContractsService } from './contracts/contracts.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
 import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
 import { DocusealAdapter } from './signature/docuseal.adapter.js';
+import { SendForSignatureService } from './signature/send-for-signature.service.js';
+import { ESIGNATURE_PROVIDER } from './signature/provider.token.js';
+import { DOCUMENT_RENDERER } from './documents/renderer.token.js';
+import { GotenbergRenderer } from './documents/gotenberg.renderer.js';
+import { ObjectStorage } from './documents/object-storage.js';
 
 @Controller()
 class HealthController {
@@ -26,6 +31,13 @@ class HealthController {
     SessionService,
     DocusealWebhookService,
     DocusealAdapter,
+    SendForSignatureService,
+    ObjectStorage,
+    // Les services dépendent des PORTS, pas des adaptateurs : c'est ce qui
+    // rend le changement de provider possible sans toucher au métier (§11.1),
+    // et ce qui permet de tester la logique d'envoi sans DocuSeal ni Chromium.
+    { provide: ESIGNATURE_PROVIDER, useExisting: DocusealAdapter },
+    { provide: DOCUMENT_RENDERER, useClass: GotenbergRenderer },
     {
       // LE point clé de l'architecture (§9.2, §10.5).
       //

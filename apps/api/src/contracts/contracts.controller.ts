@@ -1,7 +1,20 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import type { Scope } from '@lsi/persistence';
 import { ContractsService } from './contracts.service.js';
+import { SendForSignatureService } from '../signature/send-for-signature.service.js';
 import { CreateContractDto } from './dto/create-contract.dto.js';
+import { SendForSignatureDto } from './dto/send-for-signature.dto.js';
 import { ListContractsDto } from './dto/list-contracts.dto.js';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
@@ -27,7 +40,10 @@ class ReasonDto {
  */
 @Controller('v1/contracts')
 export class ContractsController {
-  constructor(private readonly contracts: ContractsService) {}
+  constructor(
+    private readonly contracts: ContractsService,
+    private readonly send: SendForSignatureService,
+  ) {}
 
   @Post()
   async create(
@@ -104,6 +120,34 @@ export class ContractsController {
       { type: 'REQUEST_CHANGES', actorUserId: session.userId, reason: dto.reason },
       new Date(),
     );
+  }
+
+  @Post(':id/send-for-signature')
+  @HttpCode(202)
+  async sendForSignature(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendForSignatureDto,
+    @Headers('idempotency-key') idempotencyKey: string,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+
+    // Obligatoire, pas optionnelle. Sans clé, un timeout réseau suivi d'un
+    // réessai enverrait DEUX invitations au client (§11.8). On refuse plutôt
+    // que de générer une clé nous-mêmes : une clé générée côté serveur serait
+    // différente à chaque tentative, donc inutile.
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException({
+        code: 'IDEMPOTENCY_KEY_REQUIRED',
+        detail: 'L’en-tête Idempotency-Key est obligatoire sur cette opération.',
+      });
+    }
+
+    // 202 et non 201 : la création chez le provider est asynchrone du point
+    // de vue du client. Répondre 201 ferait mentir l'API sur un état qui
+    // n'existe pas encore (§14.4).
+    return this.send.send(scope, id, dto, idempotencyKey, new Date());
   }
 
   @Post(':id/cancel')

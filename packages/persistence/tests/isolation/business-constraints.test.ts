@@ -97,15 +97,70 @@ describe('RM-08 — cohérence des dates et montants', () => {
   });
 });
 
-describe('RM-05 — immuabilité des versions de contrat', () => {
-  test('lsi_app ne peut pas UPDATE contract_versions', async () => {
+describe('RM-05 — immuabilité du contenu, écriture unique de l’empreinte', () => {
+  async function seedVersion(): Promise<string> {
+    const id = uuidv7();
+    await owner.$executeRawUnsafe(`
+      INSERT INTO contract_versions (id, tenant_id, customer_id, contract_id, version_number,
+                                     body_html, variables, created_at, created_by_user_id)
+      VALUES ('${id}', '${fx.tenantId}', '${fx.customerA.id}', '${fx.customerA.contractId}',
+              ${Math.floor(Math.random() * 100000)}, '<h1>Contrat</h1>', '{}'::jsonb, now(), '${fx.amUserId}')
+    `);
+    return id;
+  }
+
+  test('le CONTENU d’une version ne peut pas être modifié', async () => {
     // Un contrat signé est immuable définitivement, y compris pour MSP_ADMIN.
     // Ce n'est pas une question de rôle applicatif : c'est la valeur probante.
+    const id = await seedVersion();
     await expect(
       withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
-        tx.$executeRawUnsafe(`UPDATE contract_versions SET body_html = 'falsifié'`),
+        tx.$executeRawUnsafe(`UPDATE contract_versions SET body_html = 'falsifié' WHERE id = '${id}'`),
       ),
     ).rejects.toThrow(/permission denied/i);
+  });
+
+  test('l’empreinte peut être renseignée UNE fois', async () => {
+    const id = await seedVersion();
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.contractVersion.update({
+          where: { id },
+          data: { pdfSha256: 'a'.repeat(64), pdfObjectKey: 'k1' },
+        }),
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  test('l’empreinte ne peut PAS être réécrite une fois posée', async () => {
+    // C'est tout l'enjeu : un hash réécrivable ne prouve rien. On pourrait
+    // le faire correspondre à un autre document que celui réellement envoyé.
+    const id = await seedVersion();
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contractVersion.update({
+        where: { id },
+        data: { pdfSha256: 'a'.repeat(64), pdfObjectKey: 'k1' },
+      }),
+    );
+
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.contractVersion.update({ where: { id }, data: { pdfSha256: 'b'.repeat(64) } }),
+      ),
+    ).rejects.toThrow(/écriture unique/i);
+  });
+
+  test('réécrire la même valeur est toléré (idempotence d’un réessai)', async () => {
+    const id = await seedVersion();
+    const hash = 'c'.repeat(64);
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contractVersion.update({ where: { id }, data: { pdfSha256: hash, pdfObjectKey: 'k2' } }),
+    );
+    await expect(
+      withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.contractVersion.update({ where: { id }, data: { pdfSha256: hash, pdfObjectKey: 'k2' } }),
+      ),
+    ).resolves.toBeDefined();
   });
 
   test('lsi_app ne peut pas DELETE contract_versions', async () => {
