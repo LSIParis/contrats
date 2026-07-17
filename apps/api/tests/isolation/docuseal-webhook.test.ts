@@ -28,8 +28,19 @@ let subA: {
   clientSignerId: string;
 };
 
-function sign(body: string): string {
-  return createHmac('sha256', SECRET).update(body).digest('hex');
+/**
+ * Réplique FIDÈLE de DocuSeal lib/webhook_urls/signatures.rb :
+ *
+ *   "#{timestamp}.#{OpenSSL::HMAC.hexdigest('sha256', secret, "#{timestamp}.#{body}")}"
+ *
+ * Relevée dans la source de l'instance réelle, pas déduite de la doc.
+ * La version précédente de ce helper signait le corps seul et produisait un
+ * digest nu : elle validait un format inventé contre lui-même, et les tests
+ * étaient verts alors qu'aucun webhook réel n'aurait été accepté.
+ */
+function sign(body: string, timestamp = Math.floor(Date.now() / 1000)): string {
+  const digest = createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex');
+  return `${timestamp}.${digest}`;
 }
 
 function post(payload: unknown, opts: { signature?: string } = {}) {
@@ -190,6 +201,64 @@ describe('§11.7 — vérification HMAC', () => {
       .set('X-Docuseal-Signature', sign(weird))
       .send(weird);
     expect(res.status).toBe(200);
+  });
+
+  test('un horodatage trop ancien est rejeté — anti-rejeu', async () => {
+    // Sans borne temporelle, une signature valide capturée reste valide
+    // éternellement : un webhook intercepté pourrait être rejoué des mois
+    // plus tard. DocuSeal tolère ±5 min ; on s'aligne.
+    const payload = formEvent();
+    const old = Math.floor(Date.now() / 1000) - 6 * 60;
+    const bodyStr = JSON.stringify(payload);
+    const res = await request(app.getHttpServer())
+      .post('/v1/webhooks/docuseal')
+      .set('Content-Type', 'application/json')
+      .set('X-Docuseal-Signature', sign(bodyStr, old))
+      .send(bodyStr);
+    expect(res.status).toBe(401);
+  });
+
+  test('un horodatage dans le futur est rejeté', async () => {
+    const payload = formEvent();
+    const future = Math.floor(Date.now() / 1000) + 6 * 60;
+    const bodyStr = JSON.stringify(payload);
+    const res = await request(app.getHttpServer())
+      .post('/v1/webhooks/docuseal')
+      .set('Content-Type', 'application/json')
+      .set('X-Docuseal-Signature', sign(bodyStr, future))
+      .send(bodyStr);
+    expect(res.status).toBe(401);
+  });
+
+  test('l’horodatage ne peut pas être modifié sans casser la signature', async () => {
+    // L'horodatage est DANS le message signé ("<ts>.<body>"). Le rejouer
+    // avec un ts récent ne suffit donc pas : le digest ne correspondrait plus.
+    // C'est exactement ce qui rend la tolérance utile.
+    const bodyStr = JSON.stringify(formEvent());
+    const old = Math.floor(Date.now() / 1000) - 6 * 60;
+    const captured = sign(bodyStr, old);
+    const digest = captured.slice(captured.indexOf('.') + 1);
+    const forged = `${Math.floor(Date.now() / 1000)}.${digest}`;
+
+    const res = await request(app.getHttpServer())
+      .post('/v1/webhooks/docuseal')
+      .set('Content-Type', 'application/json')
+      .set('X-Docuseal-Signature', forged)
+      .send(bodyStr);
+    expect(res.status).toBe(401);
+  });
+
+  test('un en-tête sans horodatage est rejeté', async () => {
+    // Le format historique — digest nu, sans horodatage — est celui que
+    // j'avais implémenté par erreur. Il doit désormais être REFUSÉ.
+    const bodyStr = JSON.stringify(formEvent());
+    const bare = createHmac('sha256', SECRET).update(bodyStr).digest('hex');
+    const res = await request(app.getHttpServer())
+      .post('/v1/webhooks/docuseal')
+      .set('Content-Type', 'application/json')
+      .set('X-Docuseal-Signature', bare)
+      .send(bodyStr);
+    expect(res.status).toBe(401);
   });
 
   test('un corps altéré après signature est rejeté', async () => {

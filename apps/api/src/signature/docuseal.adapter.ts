@@ -28,17 +28,21 @@ const EVENT_MAP: Record<string, SignatureEventKind> = {
 };
 
 /**
- * ⚠ R6 — nom d'en-tête À CONFIRMER au déploiement.
+ * R6 — LEVÉ le 2026-07-17, contre l'instance réelle.
  *
- * La documentation DocuSeal consultée impose la vérification HMAC sans
- * nommer l'en-tête pour l'instance auto-hébergée. Cette constante est le
- * SEUL endroit à ajuster, et le ticket W-04 prévoit un test d'intégration
- * contre l'instance réelle pour le valider.
- *
- * Signalé plutôt qu'inventé : je préfère une constante fausse et isolée à
- * une certitude fabriquée disséminée dans le code.
+ * Vérifié dans la source DocuSeal (lib/webhook_urls/signatures.rb et
+ * lib/send_webhook_request.rb) : l'en-tête est bien `X-Docuseal-Signature`.
  */
 const SIGNATURE_HEADER = (process.env.DOCUSEAL_SIGNATURE_HEADER ?? 'x-docuseal-signature').toLowerCase();
+
+/**
+ * Tolérance d'horodatage, en secondes.
+ *
+ * DocuSeal utilise 5 minutes (TOLERANCE = 5 * 60). On aligne : plus strict
+ * rejetterait des webhooks légitimes en cas de dérive d'horloge, plus laxiste
+ * élargirait la fenêtre de rejeu.
+ */
+const TIMESTAMP_TOLERANCE_S = 5 * 60;
 
 @Injectable()
 export class DocusealAdapter implements ESignatureProvider {
@@ -172,6 +176,25 @@ export class DocusealAdapter implements ESignatureProvider {
     return `${d.toISOString().slice(0, 19).replace('T', ' ')} UTC`;
   }
 
+  /**
+   * Vérifie la signature webhook DocuSeal.
+   *
+   * FORMAT RÉEL, relevé dans la source de l'instance
+   * (lib/webhook_urls/signatures.rb) :
+   *
+   *   en-tête  : "<timestamp>.<hexdigest>"
+   *   digest   : HMAC_SHA256(secret, "<timestamp>.<body>")
+   *   tolérance: ±5 minutes
+   *
+   * ⚠ La première implémentation signait le CORPS SEUL et attendait un
+   * digest nu. Elle aurait rejeté TOUS les webhooks DocuSeal réels — et ses
+   * 15 tests passaient, parce qu'ils validaient ce format inventé contre
+   * lui-même. C'est le danger d'un adaptateur testé contre ses propres
+   * hypothèses : les tests étaient verts et le code inutilisable.
+   *
+   * L'horodatage n'est pas décoratif : il est DANS le message signé, donc
+   * infalsifiable, et la fenêtre de tolérance borne le rejeu.
+   */
   verifyWebhook(
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>,
@@ -180,12 +203,34 @@ export class DocusealAdapter implements ESignatureProvider {
     const received = Array.isArray(raw) ? raw[0] : raw;
     if (!received) return { valid: false, reason: 'signature absente' };
 
-    const expected = createHmac('sha256', this.secret).update(rawBody).digest('hex');
+    // `split('.', 2)` façon Ruby : le digest ne contient pas de point, mais
+    // on découpe sur le PREMIER séparateur pour rester fidèle à l'émetteur.
+    const dot = received.indexOf('.');
+    if (dot < 1) return { valid: false, reason: 'signature malformée' };
 
-    const a = Buffer.from(received, 'utf8');
+    const tsPart = received.slice(0, dot);
+    const sig = received.slice(dot + 1);
+    if (!/^\d+$/.test(tsPart) || !sig) return { valid: false, reason: 'signature malformée' };
+
+    const ts = Number(tsPart);
+    const now = Math.floor(Date.now() / 1000);
+
+    // Anti-rejeu. Une signature valide capturée reste valide éternellement
+    // sans cette borne : un attaquant qui intercepte un webhook pourrait le
+    // rejouer des mois plus tard.
+    if (ts < now - TIMESTAMP_TOLERANCE_S) return { valid: false, reason: 'horodatage trop ancien' };
+    if (ts > now + TIMESTAMP_TOLERANCE_S) return { valid: false, reason: 'horodatage dans le futur' };
+
+    // Le message signé est "<timestamp>.<body>", pas le corps seul.
+    // C'est ce qui lie la signature à son instant : autrement l'horodatage
+    // serait modifiable à volonté et la tolérance ne servirait à rien.
+    const signedPayload = Buffer.concat([Buffer.from(`${ts}.`, 'utf8'), rawBody]);
+    const expected = createHmac('sha256', this.secret).update(signedPayload).digest('hex');
+
+    const a = Buffer.from(sig, 'utf8');
     const b = Buffer.from(expected, 'utf8');
-    // Longueurs différentes → timingSafeEqual lève. On sort avant, mais on
-    // ne révèle rien de plus : la longueur attendue est publique (hex sha256).
+    // Longueurs différentes → timingSafeEqual lève. On sort avant sans rien
+    // révéler de plus : la longueur attendue est publique (hex de sha256).
     if (a.length !== b.length) return { valid: false, reason: 'signature malformée' };
 
     // Comparaison à temps constant : un === classique fuit la position du

@@ -76,7 +76,17 @@ services:
     volumes:
       - docuseal-data:/data
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1']
+      # 127.0.0.1, PAS localhost.
+      #
+      # DocuSeal n'écoute qu'en IPv4 (0.0.0.0:3000). `localhost` résout
+      # d'abord vers ::1 dans ce conteneur → connexion refusée, et le
+      # healthcheck ne passe JAMAIS. Le service répond pourtant
+      # parfaitement depuis l'hôte : le symptôme est donc un `depends_on`
+      # qui pend indéfiniment, pour un service en parfaite santé.
+      #
+      # Diagnostiqué au démarrage réel de la pile. `curl` est absent de
+      # cette image ; `wget` y est.
+      test: ['CMD-SHELL', 'wget -q --spider http://127.0.0.1:3000/ || exit 1']
       interval: 10s
       timeout: 5s
       retries: 30
