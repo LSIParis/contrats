@@ -1,0 +1,191 @@
+# Pile de développement local. (§9.4)
+#
+# `docker compose up -d` doit suffire à démarrer tout ce dont l'application
+# a besoin. Si un nouvel arrivant doit installer quoi que ce soit à la main,
+# le compose est incomplet.
+#
+# Rien ici n'est utilisable en production : les mots de passe sont en clair
+# et les ports sont exposés sur l'hôte. La production passe par Terraform,
+# avec Secrets Manager (§13.5).
+
+name: lsi-contrats
+
+services:
+  # ---------------------------------------------------------------------
+  # PostgreSQL 16 — RLS oblige (§9.2)
+  # ---------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lsi_contrats
+      # Locale française : la recherche plein texte utilise le dictionnaire
+      # `french` (§9.3), et les tris doivent traiter les accents correctement.
+      LANG: fr_FR.utf8
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d lsi_contrats']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ---------------------------------------------------------------------
+  # Redis — sessions serveur (§9.2) + file BullMQ (§12.3)
+  # ---------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - '${REDIS_PORT:-6380}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------------------------------------------------------------------
+  # DocuSeal auto-hébergé (H4)
+  #
+  # Les documents contractuels ne quittent pas notre infra. En production,
+  # cette instance vit dans un SOUS-RÉSEAU PRIVÉ : aucune entrée publique
+  # hormis le chemin webhook via l'ALB, restreint par WAF (§11.7).
+  # ---------------------------------------------------------------------
+  docuseal:
+    image: docuseal/docuseal:latest
+    environment:
+      # DocuSeal gère son propre schéma : base séparée, pas de mélange avec
+      # le nôtre. Nos migrations et les siennes n'ont aucune raison de se
+      # croiser — et notre test structurel RLS refuserait ses tables.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/docuseal
+      SECRET_KEY_BASE: dev-secret-key-base-not-for-production-0000000000000000
+      FORCE_SSL: 'false'
+      HOST: localhost:3002
+    ports:
+      - '${DOCUSEAL_PORT:-3002}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docuseal-db-init:
+        condition: service_completed_successfully
+    volumes:
+      - docuseal-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  # DocuSeal ne crée pas sa base, il l'attend.
+  docuseal-db-init:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: postgres
+    entrypoint:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='docuseal'" \
+          | grep -q 1 || psql -h postgres -U postgres -c "CREATE DATABASE docuseal"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------
+  # Gotenberg — HTML → PDF/A (§11.2)
+  #
+  # Chromium dans SA PROPRE boîte, pas dans le process API. Un moteur de
+  # rendu est une surface d'attaque : le corps des contrats est du HTML.
+  # ---------------------------------------------------------------------
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    command:
+      - gotenberg
+      # LISTE BLANCHE, pas liste noire.
+      #
+      # Chromium ne peut charger QUE son propre fichier temporaire. Tout le
+      # reste — http, https, file:// ailleurs — est refusé. Une balise
+      # <script src=…> ou une <img src=http://…> injectée dans un corps de
+      # contrat ne peut donc ni exfiltrer, ni charger (§13.3).
+      #
+      # Le deny-list PAR DÉFAUT de Gotenberg (^file:(?!//\/tmp/).*) ne bloque
+      # que les fichiers locaux hors /tmp : il laisse passer tout le HTTP.
+      # Insuffisant ici.
+      #
+      # Et `--chromium-deny-list=.*` — première tentative — bloquait TOUT,
+      # y compris le fichier à rendre : 403 sur chaque conversion. Vérifié
+      # par tests/integration/gotenberg.integration.test.ts.
+      - --chromium-allow-list=^file:///tmp/.*
+      - --chromium-disable-javascript=true
+      # Défense en profondeur : refuse toute URL résolvant vers une IP privée.
+      # Redondant avec la liste blanche, mais survit à un élargissement futur.
+      - --chromium-deny-private-ips
+      - --log-level=warn
+    ports:
+      - '${GOTENBERG_PORT:-3003}:3000'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # ---------------------------------------------------------------------
+  # MinIO — S3 en local (§10.7)
+  # ---------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mc alias set local http://minio:9000 minioadmin minioadmin
+        mc mb --ignore-existing local/lsi-contrats-dev
+        # Versioning : les PDF signés ne doivent jamais être écrasés (§10.7).
+        # En production, Object Lock en mode gouvernance sur le préfixe signed/.
+        mc version enable local/lsi-contrats-dev
+
+  # ---------------------------------------------------------------------
+  # Mailpit — capture les emails, n'en envoie aucun
+  #
+  # Indispensable : sans cela, un test de rappel J-30 enverrait un vrai
+  # email à un vrai client.
+  # ---------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+    environment:
+      MP_MAX_MESSAGES: 500
+
+volumes:
+  postgres-data:
+  redis-data:
+  docuseal-data:
+  minio-data:
