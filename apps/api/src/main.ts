@@ -4,7 +4,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: conserve les octets reçus, indispensable au HMAC du webhook
+  // DocuSeal (§11.7). Sans cela, verifyWebhook n'a rien à vérifier et le
+  // webhook refuserait TOUT en production — ou pire, si on l'avait fait
+  // porter sur le JSON reparsé, il accepterait des corps falsifiés.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.useGlobalPipes(
     new ValidationPipe({

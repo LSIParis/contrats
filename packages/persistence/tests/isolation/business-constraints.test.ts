@@ -239,6 +239,18 @@ describe('§12.3 — le rôle scheduler est borné', () => {
     ).rejects.toThrow(/permission denied/i);
   });
 
+  test('il existe EXACTEMENT deux rôles autorisés hors scope', async () => {
+    // Le dossier n'en prévoyait qu'un ; l'implémentation du webhook a révélé
+    // le second. Ce test fige le compte : un TROISIÈME rôle qui apparaîtrait
+    // casse la CI et force à justifier l'exception.
+    const rows = await owner.$queryRawUnsafe<{ rolname: string }[]>(`
+      SELECT rolname FROM pg_roles
+      WHERE rolname LIKE 'lsi_%' AND rolcanlogin
+      ORDER BY rolname
+    `);
+    expect(rows.map((r) => r.rolname)).toEqual(['lsi_app', 'lsi_scheduler', 'lsi_webhook']);
+  });
+
   test('lsi_scheduler PEUT découvrir les rappels dus — sa seule raison d’être', async () => {
     await expect(
       asScheduler((tx) =>
@@ -247,5 +259,75 @@ describe('§12.3 — le rôle scheduler est borné', () => {
         ),
       ),
     ).resolves.toBeDefined();
+  });
+});
+
+describe('§11.4 — le rôle webhook est borné', () => {
+  async function asWebhook<T>(fn: (c: PrismaClient) => Promise<T>): Promise<T> {
+    const uri = new URL(process.env.DATABASE_URL!);
+    uri.username = 'lsi_webhook';
+    uri.password = 'lsi_webhook_test_pwd';
+    const wh = new PrismaClient({ datasourceUrl: uri.toString() });
+    try {
+      return await fn(wh);
+    } finally {
+      await wh.$disconnect();
+    }
+  }
+
+  test('lsi_webhook n’a NI BYPASSRLS NI superuser', async () => {
+    const [r] = await owner.$queryRawUnsafe<{ bypass: boolean; superuser: boolean }[]>(`
+      SELECT rolbypassrls AS bypass, rolsuper AS superuser
+      FROM pg_roles WHERE rolname = 'lsi_webhook'
+    `);
+    expect(r).toBeDefined();
+    expect(r!.bypass).toBe(false);
+    expect(r!.superuser).toBe(false);
+  });
+
+  test('lsi_webhook PEUT résoudre le scope d’une submission — sa seule raison d’être', async () => {
+    await expect(
+      asWebhook((c) =>
+        c.$queryRawUnsafe(
+          `SELECT id, tenant_id, customer_id, contract_id FROM signature_requests
+           WHERE provider = 'DOCUSEAL' AND provider_submission_id = 'x'`,
+        ),
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  test('lsi_webhook ne peut PAS lire le PDF signé ni les preuves', async () => {
+    // L'exception ouvre la RÉSOLUTION DE SCOPE, pas la lecture des preuves.
+    // Si ce rôle fuitait, l'attaquant apprendrait que des demandes de
+    // signature existent — pas ce qu'elles contiennent.
+    await expect(
+      asWebhook((c) => c.$queryRawUnsafe(`SELECT signed_pdf_object_key FROM signature_requests`)),
+    ).rejects.toThrow(/permission denied/i);
+
+    await expect(
+      asWebhook((c) => c.$queryRawUnsafe(`SELECT signed_pdf_sha256 FROM signature_requests`)),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  test('lsi_webhook ne peut lire AUCUNE autre table', async () => {
+    await expect(asWebhook((c) => c.$queryRawUnsafe(`SELECT id FROM contracts`))).rejects.toThrow(
+      /permission denied/i,
+    );
+    await expect(asWebhook((c) => c.$queryRawUnsafe(`SELECT body FROM comments`))).rejects.toThrow(
+      /permission denied/i,
+    );
+    await expect(asWebhook((c) => c.$queryRawUnsafe(`SELECT email FROM users`))).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  test('lsi_webhook ne peut RIEN écrire', async () => {
+    // Le traitement de l'événement se fait ensuite sous lsi_app, DANS le
+    // scope résolu. Ce rôle ne sert qu'à trouver le scope.
+    await expect(
+      asWebhook((c) =>
+        c.$executeRawUnsafe(`UPDATE signature_requests SET status = 'COMPLETED'`),
+      ),
+    ).rejects.toThrow(/permission denied/i);
   });
 });

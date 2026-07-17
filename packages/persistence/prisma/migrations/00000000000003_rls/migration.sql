@@ -24,6 +24,7 @@
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenants FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenants_scope ON tenants
+  FOR ALL TO lsi_app
   USING      (id = app_current_tenant())
   WITH CHECK (id = app_current_tenant());
 
@@ -36,6 +37,7 @@ CREATE POLICY tenants_scope ON tenants
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users FORCE ROW LEVEL SECURITY;
 CREATE POLICY users_scope ON users
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND (app_actor_kind() <> 'CLIENT' OR id = app_current_user())
@@ -48,12 +50,14 @@ CREATE POLICY users_scope ON users
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles FORCE ROW LEVEL SECURITY;
 CREATE POLICY roles_scope ON roles
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant())
   WITH CHECK (tenant_id = app_current_tenant());
 
 ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_roles FORCE ROW LEVEL SECURITY;
 CREATE POLICY user_roles_scope ON user_roles
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_actor_kind() <> 'CLIENT')
   WITH CHECK (tenant_id = app_current_tenant() AND app_actor_kind() <> 'CLIENT');
 
@@ -62,6 +66,7 @@ CREATE POLICY user_roles_scope ON user_roles
 ALTER TABLE customer_access ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customer_access FORCE ROW LEVEL SECURITY;
 CREATE POLICY customer_access_scope ON customer_access
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_actor_kind() <> 'CLIENT'
@@ -77,6 +82,7 @@ CREATE POLICY customer_access_scope ON customer_access
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers FORCE ROW LEVEL SECURITY;
 CREATE POLICY customers_scope ON customers
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(id));
 
@@ -85,18 +91,21 @@ CREATE POLICY customers_scope ON customers
 ALTER TABLE contract_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_templates FORCE ROW LEVEL SECURITY;
 CREATE POLICY contract_templates_scope ON contract_templates
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_actor_kind() <> 'CLIENT')
   WITH CHECK (tenant_id = app_current_tenant() AND app_actor_kind() <> 'CLIENT');
 
 ALTER TABLE contract_template_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_template_versions FORCE ROW LEVEL SECURITY;
 CREATE POLICY contract_template_versions_scope ON contract_template_versions
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_actor_kind() <> 'CLIENT')
   WITH CHECK (tenant_id = app_current_tenant() AND app_actor_kind() <> 'CLIENT');
 
 ALTER TABLE customer_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customer_contacts FORCE ROW LEVEL SECURITY;
 CREATE POLICY customer_contacts_scope ON customer_contacts
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
@@ -107,18 +116,21 @@ CREATE POLICY customer_contacts_scope ON customer_contacts
 ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contracts FORCE ROW LEVEL SECURITY;
 CREATE POLICY contracts_scope ON contracts
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
 ALTER TABLE contract_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_versions FORCE ROW LEVEL SECURITY;
 CREATE POLICY contract_versions_scope ON contract_versions
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
 ALTER TABLE contract_signers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_signers FORCE ROW LEVEL SECURITY;
 CREATE POLICY contract_signers_scope ON contract_signers
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
@@ -127,6 +139,7 @@ CREATE POLICY contract_signers_scope ON contract_signers
 ALTER TABLE contract_approvals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_approvals FORCE ROW LEVEL SECURITY;
 CREATE POLICY contract_approvals_scope ON contract_approvals
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope(customer_id)
@@ -141,6 +154,7 @@ CREATE POLICY contract_approvals_scope ON contract_approvals
 ALTER TABLE signature_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE signature_requests FORCE ROW LEVEL SECURITY;
 CREATE POLICY signature_requests_scope ON signature_requests
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
@@ -149,6 +163,7 @@ CREATE POLICY signature_requests_scope ON signature_requests
 ALTER TABLE signature_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE signature_events FORCE ROW LEVEL SECURITY;
 CREATE POLICY signature_events_scope ON signature_events
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope(customer_id)
@@ -164,6 +179,7 @@ CREATE POLICY signature_events_scope ON signature_events
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments FORCE ROW LEVEL SECURITY;
 CREATE POLICY comments_scope ON comments
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope(customer_id)
@@ -180,6 +196,7 @@ CREATE POLICY comments_scope ON comments
 ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attachments FORCE ROW LEVEL SECURITY;
 CREATE POLICY attachments_scope ON attachments
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope(customer_id)
@@ -194,6 +211,7 @@ CREATE POLICY attachments_scope ON attachments
 ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reminders FORCE ROW LEVEL SECURITY;
 CREATE POLICY reminders_scope ON reminders
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope(customer_id)
@@ -207,12 +225,14 @@ CREATE POLICY reminders_scope ON reminders
 ALTER TABLE renewal_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE renewal_requests FORCE ROW LEVEL SECURITY;
 CREATE POLICY renewal_requests_scope ON renewal_requests
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
 ALTER TABLE cancellations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cancellations FORCE ROW LEVEL SECURITY;
 CREATE POLICY cancellations_scope ON cancellations
+  FOR ALL TO lsi_app
   USING      (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id))
   WITH CHECK (tenant_id = app_current_tenant() AND app_customer_in_scope(customer_id));
 
@@ -226,6 +246,7 @@ CREATE POLICY cancellations_scope ON cancellations
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications FORCE ROW LEVEL SECURITY;
 CREATE POLICY notifications_scope ON notifications
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope_or_null(customer_id)
@@ -241,6 +262,7 @@ CREATE POLICY notifications_scope ON notifications
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 CREATE POLICY audit_logs_scope ON audit_logs
+  FOR ALL TO lsi_app
   USING (
     tenant_id = app_current_tenant()
     AND app_customer_in_scope_or_null(customer_id)

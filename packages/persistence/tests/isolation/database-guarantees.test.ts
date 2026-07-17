@@ -51,6 +51,29 @@ describe('garanties structurelles de la base', () => {
     }
   });
 
+  test('aucune politique de scope n’est TO PUBLIC', async () => {
+    // Les politiques permissives sont combinées en OU. Une politique de scope
+    // TO PUBLIC s'appliquerait AUSSI aux rôles bornés (lsi_scheduler,
+    // lsi_webhook) et serait OU-évaluée avec la leur — donc le résultat
+    // dépendrait de l'ordre d'évaluation du planificateur, qui n'est pas
+    // garanti.
+    //
+    // Une politique doit cibler le rôle auquel elle est destinée. Sinon
+    // « ça marche » est une coïncidence, pas une propriété.
+    const rows = await owner.$queryRawUnsafe<{ table: string; policy: string }[]>(`
+      SELECT c.relname AS "table", p.polname AS policy
+      FROM pg_policy p
+      JOIN pg_class c ON c.oid = p.polrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND p.polroles = '{0}'
+      ORDER BY c.relname, p.polname
+    `);
+    expect(
+      rows.map((r) => `${r.table}.${r.policy}`),
+      'politiques TO PUBLIC : le résultat dépendrait de l’ordre d’évaluation',
+    ).toEqual([]);
+  });
+
   test('toute table métier porte tenant_id', async () => {
     // RM-28. `customers` porte le scope via sa propre colonne id.
     const rows = await owner.$queryRawUnsafe<{ relname: string }[]>(`

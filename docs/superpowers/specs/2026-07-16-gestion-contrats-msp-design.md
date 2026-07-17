@@ -1504,7 +1504,9 @@ Worker `reminders.send`
    })
 ```
 
-`lsi_scheduler` est le seul rôle autorisé hors scope, et il est borné à `SELECT` sur trois colonnes de `reminders`. Il ne peut lire ni un contrat, ni un contenu, ni une adresse. Il découvre du travail et des identifiants de scope — rien d'autre. Une exception au cloisonnement doit être aussi étroite que sa raison d'être.
+`lsi_scheduler` est borné à `SELECT` sur trois colonnes de `reminders`. Il ne peut lire ni un contrat, ni un contenu, ni une adresse. Il découvre du travail et des identifiants de scope — rien d'autre. Une exception au cloisonnement doit être aussi étroite que sa raison d'être.
+
+> **Correction issue de l'implémentation (2026-07-17).** Ce paragraphe affirmait que `lsi_scheduler` était le **seul** rôle autorisé hors scope. C'était une **lacune de conception** : le webhook DocuSeal (§11.4) doit lui aussi lire hors scope, puisqu'il cherche précisément de quel scope relève une submission. Le prédicat fail-closed l'a révélé en bloquant le webhook à l'implémentation — le garde-fou a fait son travail en exposant le trou plutôt qu'en le laissant passer. Un second rôle borné, `lsi_webhook`, a été ajouté (migration `00000000000006_webhook_role`) : six colonnes d'identité de `signature_requests`, aucune écriture, aucun contenu. **Il y a donc exactement deux exceptions au cloisonnement, et elles sont closes.** Toute troisième exigerait le même traitement : un rôle nommé, borné, et un test qui prouve ses limites.
 
 `FOR UPDATE SKIP LOCKED` autorise plusieurs workers sans double envoi. `jobId` déterministe : BullMQ déduplique même si le scan est rejoué.
 

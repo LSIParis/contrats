@@ -19,3 +19,7 @@ export {
   type ActorKind,
 } from './scope.js';
 export { uuidv7 } from './uuid.js';
+export {
+  resolveWebhookScope,
+  type ResolvedWebhookScope,
+} from './webhook-scope-lookup.js';

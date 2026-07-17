@@ -7,6 +7,8 @@ import { Public } from './auth/public.decorator.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
+import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
+import { DocusealAdapter } from './signature/docuseal.adapter.js';
 
 @Controller()
 class HealthController {
@@ -22,6 +24,8 @@ class HealthController {
   providers: [
     ContractsService,
     SessionService,
+    DocusealWebhookService,
+    DocusealAdapter,
     {
       // LE point clé de l'architecture (§9.2, §10.5).
       //

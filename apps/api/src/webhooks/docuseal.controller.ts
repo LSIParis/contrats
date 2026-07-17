@@ -1,43 +1,39 @@
-import { Controller, Post, Body, Headers, HttpCode } from '@nestjs/common';
+import { Controller, Post, Headers, HttpCode, Req, BadRequestException } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
+import type { Request } from 'express';
 import { Public } from '../auth/public.decorator.js';
+import { DocusealWebhookService } from './docuseal-webhook.service.js';
 
 /**
  * Webhook DocuSeal. (§11.4)
  *
  * @Public() : un webhook arrive SANS session. C'est le seul endpoint de
- * l'application où le scope ne peut pas venir d'un cookie — et donc celui
- * où se joue la sécurité de toute l'intégration.
+ * l'application où le scope ne peut pas venir d'un cookie — et donc celui où
+ * se joue la sécurité de toute l'intégration.
  *
- * LA RÈGLE ABSOLUE : le scope n'est JAMAIS lu dans le payload.
- *
- * Le payload contient bien metadata.tenant_id et metadata.customer_id : c'est
- * un piège. Ces valeurs viennent du réseau. Les utiliser reviendrait à laisser
- * un appelant externe choisir dans quel client écrire.
- *
- * Le scope est RÉSOLU depuis notre base, via la contrainte
- * UNIQUE (provider, provider_submission_id) sur signature_requests : elle
- * mappe de façon déterministe une submission externe vers le couple
- * (tenant, customer) que NOUS avons écrit à la création.
- *
- * Squelette : l'implémentation complète (vérification HMAC sur le corps brut,
- * idempotence par provider_event_id, réconciliation) est le ticket W-04.
+ * La compensation n'est pas « moins de contrôle » mais « un autre contrôle » :
+ * HMAC sur le corps brut à l'entrée, et scope résolu depuis notre propre base.
  */
 @Controller('v1/webhooks')
 export class DocusealWebhookController {
+  constructor(private readonly service: DocusealWebhookService) {}
+
   @Public()
   @Post('docuseal')
   @HttpCode(200)
-  async handle(@Body() _payload: unknown, @Headers() _headers: Record<string, string>) {
-    // TODO(W-04) — dans l'ordre, et l'ordre compte :
-    //  1. vérifier le HMAC sur le CORPS BRUT, avant tout parsing
-    //  2. idempotence : INSERT signature_events (provider_event_id UNIQUE)
-    //  3. résoudre le scope via provider_submission_id — DEPUIS NOTRE BASE
-    //  4. si divergence avec metadata du payload → alerte de sécurité
-    //  5. withScope(systemScope(...)) puis appliquer l'événement
-    //
-    // 200 même sur erreur métier définitive (submission inconnue) : DocuSeal
-    // réessaie 48 h sur les 4xx/5xx, et faire réessayer un événement
-    // définitivement non traitable n'est que du bruit.
-    return { status: 'not_implemented' };
+  async handle(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    // Le CORPS BRUT, pas le JSON reparsé. Un HMAC calculé sur
+    // JSON.stringify(JSON.parse(body)) serait faux dès que l'émetteur
+    // ordonne ses clés ou espace autrement — et « ça marche chez moi »
+    // deviendrait « ça échoue en production ».
+    const raw = req.rawBody;
+    if (!raw) throw new BadRequestException('Corps brut indisponible');
+
+    // 200 sur les erreurs métier définitives, 5xx uniquement sur le
+    // transitoire : DocuSeal réessaie 48 h en backoff sur les 4xx/5xx.
+    return this.service.handle(raw, headers);
   }
 }
