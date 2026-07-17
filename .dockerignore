@@ -1,0 +1,31 @@
+# Ne pas envoyer au contexte de build ce qui l'alourdit ou ne doit pas y être.
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.turbo
+**/.turbo
+coverage
+**/coverage
+test-results
+playwright-report
+
+# Secrets et local — JAMAIS dans une image (§13.5)
+.env
+.env.*
+!.env.example
+.env.docuseal
+
+# Git et docs : inutiles au runtime
+.git
+.github
+docs
+*.md
+!README.md
+
+# Divers
+.vscode
+.idea
+*.log
