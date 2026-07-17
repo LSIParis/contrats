@@ -28,10 +28,14 @@ const EVENT_MAP: Record<string, SignatureEventKind> = {
 };
 
 /**
- * R6 — LEVÉ le 2026-07-17, contre l'instance réelle.
+ * R6 — LEVÉ le 2026-07-17.
  *
  * Vérifié dans la source DocuSeal (lib/webhook_urls/signatures.rb et
- * lib/send_webhook_request.rb) : l'en-tête est bien `X-Docuseal-Signature`.
+ * lib/send_webhook_request.rb) : l'en-tête est `X-Docuseal-Signature`.
+ *
+ * Confirmé IDENTIQUE sur l'instance Enterprise de production
+ * (signe.lsi-maintenance.fr, image ds-ee) : même fichier, même format
+ * `<timestamp>.<hmac>`, même tolérance ±5 min. Aucune divergence EE/OSS.
  */
 const SIGNATURE_HEADER = (process.env.DOCUSEAL_SIGNATURE_HEADER ?? 'x-docuseal-signature').toLowerCase();
 
@@ -82,13 +86,16 @@ export class DocusealAdapter implements ESignatureProvider {
     const payload = {
       name: cmd.documentName,
       documents: [{ name: cmd.documentName, file: cmd.pdf.toString('base64') }],
-      send_email: true,
+      send_email: cmd.sendEmail ?? true,
       order: cmd.order,
       expire_at: this.formatExpiry(cmd.expireAt),
       completed_redirect_url: cmd.completedRedirectUrl,
       message: { subject: cmd.subject, body: cmd.body },
       submitters: cmd.submitters.map((s) => ({
-        role: s.party === 'LSI' ? 'LSI Maintenance' : 'Client',
+        // Le rôle vient du domaine (roleLabel), pas d'un mapping local :
+        // il doit être IDENTIQUE à celui de la balise {{...;role=…}} dans le
+        // document, sinon le signataire n'a aucun champ à signer (§11.3).
+        role: s.roleLabel,
         name: s.fullName,
         email: s.email,
         order: s.signingOrder,
@@ -127,15 +134,20 @@ export class DocusealAdapter implements ESignatureProvider {
       throw new ProviderError(`DocuSeal a répondu ${res.status} : ${body.slice(0, 300)}`, res.status >= 500);
     }
 
-    const submitters = (await res.json()) as any[];
-    const submissionId = submitters[0]?.submission_id;
-    if (submissionId === undefined) {
-      throw new ProviderError('Réponse DocuSeal sans submission_id', false);
+    // POST /submissions/pdf renvoie un OBJET {id, submitters:[...]}, alors que
+    // POST /submissions (par template) renvoie un TABLEAU de submitters.
+    // L'implémentation initiale supposait le tableau et aurait levé sur la
+    // vraie réponse. Forme confirmée contre l'instance EE réelle (2026-07-17).
+    const body = (await res.json()) as any;
+    const submissionId = body?.id ?? body?.submitters?.[0]?.submission_id;
+    if (submissionId === undefined || submissionId === null) {
+      throw new ProviderError('Réponse DocuSeal sans identifiant de submission', false);
     }
+    const subs: any[] = Array.isArray(body?.submitters) ? body.submitters : [];
 
     return {
       providerSubmissionId: String(submissionId),
-      submitters: submitters.map((s) => ({
+      submitters: subs.map((s) => ({
         externalId: s.external_id ?? null,
         providerSubmitterId: String(s.id),
         slug: s.slug,

@@ -152,8 +152,15 @@ export class SendForSignatureService {
     // --- I/O : HORS transaction --------------------------------------------
     const { contract, version, signers, sigReq } = prepared;
 
+    // Le corps du contrat ne porte AUCUN champ de signature. Sans balise, la
+    // submission DocuSeal n'aurait rien à faire signer (découvert en testant
+    // contre l'EE réelle). On annexe donc un bloc de signature avec une
+    // balise {{Signature;role=…}} par signataire — le rôle DOIT correspondre
+    // au roleLabel du submitter (§11.3).
+    const withSignatureBlock = version.bodyHtml + this.buildSignatureBlock(dto.signers);
+
     const rendered = await this.renderer.render({
-      html: version.bodyHtml,
+      html: withSignatureBlock,
       documentTitle: `${contract.reference} — ${contract.title}`,
     });
 
@@ -182,19 +189,22 @@ export class SendForSignatureService {
         const row = signers.find((x) => x.email === s.email)!;
         return {
           party: s.party,
+          roleLabel: this.roleLabel(s.party), // même valeur que la balise du doc
           externalId: row.id, // ← clé de rapprochement des webhooks (§11.5)
           fullName: s.fullName,
           email: s.email,
           signingOrder: s.signingOrder,
           requireEmail2fa: s.requireEmail2fa ?? s.party === 'CLIENT',
-          fields: [
-            { name: 'Référence', defaultValue: contract.reference, readonly: true },
-            {
-              name: 'Montant',
-              defaultValue: this.formatAmount(contract.amountCents, contract.currency),
-              readonly: true,
-            },
-          ],
+          // AUCUN champ pré-rempli.
+          //
+          // DocuSeal rejette (422 « Unknown field ») tout champ de
+          // submitters[].fields qui n'existe pas dans le document — découvert
+          // contre l'EE réelle. Et c'était de toute façon redondant : la
+          // référence et le montant sont IMPRIMÉS dans le corps du contrat
+          // (donc déjà immuables et visibles). Les redoubler en champs
+          // DocuSeal n'ajoutait rien. Le seul champ interactif est la
+          // signature, qui vient de la balise {{Signature;...}} du document.
+          fields: [],
         };
       });
 
@@ -321,6 +331,46 @@ export class SendForSignatureService {
     };
   }
 
+  /**
+   * Le libellé de rôle DocuSeal par partie. Source unique.
+   *
+   * Utilisé à la fois pour la balise {{...;role=…}} du document et pour le
+   * `roleLabel` du submitter. S'ils divergeaient, le signataire n'aurait
+   * aucun champ à signer — le genre de bug silencieux qu'on ne voit qu'en
+   * envoyant un vrai contrat.
+   */
+  private roleLabel(party: 'LSI' | 'CLIENT'): string {
+    return party === 'LSI' ? 'LSI Maintenance' : 'Client';
+  }
+
+  /**
+   * Bloc de signature annexé au document, une balise DocuSeal par signataire.
+   *
+   * `{{Signature;role=<rôle>;type=signature}}` : DocuSeal parse ces balises du
+   * texte du PDF et les transforme en champs de signature attribués au bon
+   * rôle. On ajoute la date de signature à côté — utile en preuve.
+   */
+  private buildSignatureBlock(signers: readonly { party: 'LSI' | 'CLIENT'; fullName: string }[]): string {
+    const rows = [...signers]
+      .sort((a, b) => (a.party === 'LSI' ? -1 : 1) - (b.party === 'LSI' ? -1 : 1))
+      .map((s) => {
+        const role = this.roleLabel(s.party);
+        const who = s.party === 'LSI' ? 'Pour LSI Maintenance' : 'Pour le client';
+        return `<td style="width:50%;vertical-align:top;padding:8px;">
+  <div style="font-weight:bold;">${who}</div>
+  <div>${escapeHtml(s.fullName)}</div>
+  <div style="margin-top:12px;">Signature : {{Signature;role=${role};type=signature}}</div>
+  <div style="margin-top:8px;">Date : {{Date;role=${role};type=date}}</div>
+</td>`;
+      })
+      .join('\n');
+
+    return `<div style="margin-top:40px;page-break-inside:avoid;">
+  <h2 style="font-size:13pt;">Signatures</h2>
+  <table style="width:100%;border-collapse:collapse;"><tr>${rows}</tr></table>
+</div>`;
+  }
+
   private expiry(now: Date, days?: number): Date {
     const d = new Date(now);
     d.setDate(d.getDate() + (days ?? 30)); // évite les demandes zombies
@@ -331,4 +381,11 @@ export class SendForSignatureService {
     if (cents === null) return '—';
     return `${(Number(cents) / 100).toFixed(2)} ${currency}`;
   }
+}
+
+/** Le nom d'un signataire est du texte utilisateur : on l'échappe (§13.3). */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }

@@ -17,9 +17,11 @@ let provider: FakeProvider;
 const SESS_AM_A = 'sess-am-a';
 let contractId: string;
 let versionId: string;
+let renderer: FakeRenderer;
 
 beforeAll(async () => {
   provider = new FakeProvider();
+  renderer = new FakeRenderer();
 
   const mod = await Test.createTestingModule({ imports: [AppModule] })
     // Le port est remplacé, pas le HTTP : on teste ICI la logique d'envoi
@@ -28,7 +30,7 @@ beforeAll(async () => {
     .overrideProvider(ESIGNATURE_PROVIDER)
     .useValue(provider)
     .overrideProvider(DOCUMENT_RENDERER)
-    .useValue(new FakeRenderer())
+    .useValue(renderer)
     .compile();
 
   app = mod.createNestApplication({ rawBody: true });
@@ -281,15 +283,25 @@ describe('§11.3 — contenu de la demande', () => {
     expect(cmd.submitters[1]!.party).toBe('CLIENT');
   });
 
-  test('les champs pré-remplis sont READONLY côté serveur', async () => {
-    // default_value seul est modifiable depuis les devtools du signataire.
-    // Un montant contractuel éditable côté client serait une faille béante.
+  test('chaque signataire porte le roleLabel de sa partie', async () => {
+    // Le roleLabel doit être IDENTIQUE à la balise {{...;role=…}} du document,
+    // sinon le signataire n'a aucun champ à signer (§11.3).
     await send(contractId);
     const cmd = provider.calls[0]!;
-    for (const s of cmd.submitters) {
-      expect(s.fields.length).toBeGreaterThan(0);
-      expect(s.fields.every((f) => f.readonly)).toBe(true);
-    }
+    const byParty = Object.fromEntries(cmd.submitters.map((s) => [s.party, s.roleLabel]));
+    expect(byParty.LSI).toBe('LSI Maintenance');
+    expect(byParty.CLIENT).toBe('Client');
+  });
+
+  test('le document envoyé contient une balise de signature par signataire', async () => {
+    // Découvert contre l'EE réelle : sans balise dans le document, la
+    // submission n'a rien à faire signer. Le send service annexe un bloc
+    // de signature. Aucun champ pré-rempli (DocuSeal rejette les champs
+    // inexistants — 422 « Unknown field »).
+    await send(contractId);
+    expect(renderer.lastHtml).toContain('{{Signature;role=LSI Maintenance;type=signature}}');
+    expect(renderer.lastHtml).toContain('{{Signature;role=Client;type=signature}}');
+    expect(provider.calls[0]!.submitters.every((s) => s.fields.length === 0)).toBe(true);
   });
 
   test('le 2FA email est transmis pour le signataire client', async () => {

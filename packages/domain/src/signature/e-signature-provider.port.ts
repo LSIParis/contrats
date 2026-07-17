@@ -63,6 +63,16 @@ export interface WebhookVerification {
 /** Un signataire, tel que le domaine le décrit — pas tel que DocuSeal l'attend. */
 export interface SubmitterCommand {
   readonly party: 'LSI' | 'CLIENT';
+  /**
+   * Libellé de rôle du signataire (ex. « Client », « LSI Maintenance »).
+   *
+   * DocuSeal apparie les champs du document aux signataires PAR CE RÔLE :
+   * une balise `{{Signature;role=Client;type=signature}}` va au signataire de
+   * rôle « Client ». Le même libellé doit donc servir à la balise dans le
+   * document ET au submitter ici — sinon le signataire n'a aucun champ à
+   * signer. C'est une seule source de vérité, portée jusqu'ici.
+   */
+  readonly roleLabel: string;
   /** NOTRE contract_signers.id. Clé de rapprochement des webhooks (§11.5). */
   readonly externalId: string;
   readonly fullName: string;
@@ -96,6 +106,14 @@ export interface CreateSubmissionCommand {
   readonly subject: string;
   readonly body: string;
   readonly completedRedirectUrl: string;
+  /**
+   * `false` désactive l'envoi des emails de demande de signature.
+   *
+   * Défaut (non renseigné) = envoi actif : en production, c'est DocuSeal qui
+   * notifie les signataires. Utile à `false` pour les tests (ne pas spammer)
+   * et pour les cas où LSI contrôle elle-même la remise (§11.7).
+   */
+  readonly sendEmail?: boolean;
   readonly submitters: readonly SubmitterCommand[];
   /**
    * Scope, à des fins de DIAGNOSTIC uniquement.

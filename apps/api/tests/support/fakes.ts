@@ -79,7 +79,11 @@ export class FakeProvider implements ESignatureProvider {
  * test d'intégration à part — et il n'existe pas encore.
  */
 export class FakeRenderer implements DocumentRenderer {
+  /** Dernier HTML reçu — permet de vérifier l'injection du bloc de signature. */
+  lastHtml = '';
+
   async render(req: RenderRequest): Promise<RenderedDocument> {
+    this.lastHtml = req.html;
     // Un PDF minimal mais réel : commence par %PDF-, donc reconnaissable.
     const pdf = Buffer.from(`%PDF-1.7\n% ${req.documentTitle}\n${req.html}\n%%EOF`, 'utf8');
     return { pdf, sha256: createHash('sha256').update(pdf).digest('hex') };
