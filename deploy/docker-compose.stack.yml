@@ -1,0 +1,114 @@
+# Stack de déploiement — LSI Contrats (Phase A)
+#
+# Destinée à Portainer sur Docker Legal. À déployer comme « stack » Portainer,
+# avec les variables d'environnement renseignées dans l'onglet Environment
+# (voir .env.deploy.example) — JAMAIS en dur ici (§13.5).
+#
+# PÉRIMÈTRE HONNÊTE : cette stack ne contient que ce que l'app utilise
+# aujourd'hui — Postgres, Gotenberg, l'API. Pas de Redis (sessions en
+# mémoire, arrive en Phase B avec l'auth) ni de MinIO (stockage en mémoire,
+# Phase C). On ne fait pas tourner de service inutile.
+#
+# DocuSeal n'est PAS ici : il vit dans sa propre stack sur le même hôte.
+# L'app le joint par son URL publique (validée), et reçoit ses webhooks via
+# contrats.lsi-maintenance.fr.
+
+name: lsi-contrats
+
+services:
+  # ---------------------------------------------------------------------
+  # PostgreSQL — RLS oblige (§9.2)
+  # ---------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: lsi_contrats
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d lsi_contrats']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Pas de port publié : Postgres n'est joignable que sur le réseau interne
+    # de la stack. Rien de la base ne doit être exposé à l'hôte.
+
+  # ---------------------------------------------------------------------
+  # Gotenberg — HTML → PDF/A (§11.2)
+  # ---------------------------------------------------------------------
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - gotenberg
+      # Liste blanche : Chromium ne lit que son fichier temporaire. Tout le
+      # reste (http, file ailleurs) est refusé — un <script src> ou une
+      # <img src=http> injecté ne peut ni exfiltrer ni charger (§13.3).
+      - --chromium-allow-list=^file:///tmp/.*
+      - --chromium-disable-javascript=true
+      - --chromium-deny-private-ips
+      - --log-level=warn
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------
+  # Migrations + rotation des mots de passe de rôles — job one-shot
+  #
+  # Un `migrate deploy` par réplique d'API serait une course. On le sort donc
+  # dans un job dédié qui tourne UNE fois et se termine ; l'API n'attend que
+  # sa complétion.
+  # ---------------------------------------------------------------------
+  migrate:
+    image: ghcr.io/lsiparis/contrats:${IMAGE_TAG:-latest}
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Superutilisateur : les migrations créent les rôles et le schéma.
+      DATABASE_URL: postgresql://postgres:${POSTGRES_SUPERUSER_PASSWORD}@postgres:5432/lsi_contrats
+      # Secrets de rotation (voir deploy/migrate.sh).
+      LSI_APP_PASSWORD: ${LSI_APP_PASSWORD}
+      LSI_WEBHOOK_PASSWORD: ${LSI_WEBHOOK_PASSWORD}
+      LSI_SCHEDULER_PASSWORD: ${LSI_SCHEDULER_PASSWORD}
+    entrypoint: ['sh', '/app/deploy/migrate.sh']
+
+  # ---------------------------------------------------------------------
+  # L'API
+  # ---------------------------------------------------------------------
+  api:
+    image: ghcr.io/lsiparis/contrats:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      gotenberg:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # L'app se connecte avec le rôle NON-propriétaire lsi_app (RLS active).
+      # Utiliser le superutilisateur ici désactiverait tout le cloisonnement.
+      DATABASE_URL_APP: postgresql://lsi_app:${LSI_APP_PASSWORD}@postgres:5432/lsi_contrats
+      DATABASE_URL_WEBHOOK: postgresql://lsi_webhook:${LSI_WEBHOOK_PASSWORD}@postgres:5432/lsi_contrats
+      DATABASE_URL_SCHEDULER: postgresql://lsi_scheduler:${LSI_SCHEDULER_PASSWORD}@postgres:5432/lsi_contrats
+      # DocuSeal : URL publique (app → DocuSeal validé), + secrets.
+      DOCUSEAL_URL: ${DOCUSEAL_URL:-https://signe.lsi-maintenance.fr/api}
+      DOCUSEAL_API_KEY: ${DOCUSEAL_API_KEY}
+      DOCUSEAL_WEBHOOK_SECRET: ${DOCUSEAL_WEBHOOK_SECRET}
+      GOTENBERG_URL: http://gotenberg:3000
+      APP_ORIGIN: https://contrats.lsi-maintenance.fr
+      PORTAL_URL: https://contrats.lsi-maintenance.fr
+    ports:
+      # Publié pour que nginx-pm (sur Docker 01) puisse proxifier vers l'API.
+      # ⚠ À RESTREINDRE par pare-feu à l'IP de nginx-pm — voir README.
+      - '${API_PORT:-3001}:3001'
+
+volumes:
+  pgdata:
