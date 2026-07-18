@@ -238,10 +238,29 @@ export class ContractsService {
   }
 
   async allowedActions(scope: Scope, id: string) {
-    // findOne renvoie désormais la fiche enrichie ({ contract, ... }) — on
-    // extrait le contrat brut pour construire le snapshot du domaine.
-    const { contract: c } = await this.findOne(scope, id);
+    // Lookup allégé (une seule requête) : on n'a besoin que du contrat brut
+    // pour construire le snapshot du domaine. Ne PAS appeler findOne ici —
+    // sa version enrichie (customer/signatureRequest/reminders/timeline)
+    // coûte 3-4 requêtes inutiles pour ce seul besoin.
+    const c = await this.getContractOrThrow(scope, id);
     return allowedEvents(this.toSnapshot({ ...c, signers: [], attachments: [], amendments: [] }, null));
+  }
+
+  /**
+   * Charge le contrat brut (avec son client) et lève une 404 si la ligne est
+   * masquée par la RLS. RLS a déjà filtré : hors scope, la ligne n'existe
+   * simplement pas pour cette session. Le comportement sûr est le
+   * comportement par défaut — on n'a pas à y penser (RM-30).
+   */
+  private async getContractOrThrow(scope: Scope, id: string) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({
+        where: { id },
+        include: { customer: { select: { id: true, name: true } } },
+      });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      return c;
+    });
   }
 
   private toSnapshot(c: any, submittedByUserId: string | null): ContractSnapshot {
