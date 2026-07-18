@@ -34,7 +34,7 @@ export class ScopeGuard implements CanActivate {
     private readonly sessions: SessionService,
   ) {}
 
-  canActivate(ctx: ExecutionContext): boolean {
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       ctx.getHandler(),
       ctx.getClass(),
@@ -45,8 +45,10 @@ export class ScopeGuard implements CanActivate {
     const sessionId = this.readSessionCookie(req);
     if (!sessionId) throw new UnauthorizedException('Session absente');
 
-    const session = this.sessions.get(sessionId);
-    // Session révoquée ou expirée → refus immédiat (EC-17).
+    // Lecture Redis à CHAQUE requête : c'est ce qui donne la révocation
+    // immédiate et un scope toujours frais (EC-17). Une session révoquée
+    // n'existe plus, la requête est refusée.
+    const session = await this.sessions.get(sessionId);
     if (!session) throw new UnauthorizedException('Session invalide ou expirée');
 
     req.session = session;

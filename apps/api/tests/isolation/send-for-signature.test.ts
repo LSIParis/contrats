@@ -39,7 +39,7 @@ beforeAll(async () => {
 
   fx = await seedTwoCustomers();
 
-  app.get(SessionService).put({
+  await app.get(SessionService).put({
     sessionId: SESS_AM_A,
     userId: fx.amUserId,
     tenantId: fx.tenantId,

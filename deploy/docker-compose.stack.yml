@@ -58,6 +58,23 @@ services:
       retries: 10
 
   # ---------------------------------------------------------------------
+  # Redis — sessions serveur (§9.2). Ajouté en Phase B (auth).
+  # Pas de port publié : joignable uniquement sur le réseau interne de la
+  # stack. Mot de passe obligatoire.
+  # ---------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD}', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------
   # Migrations + rotation des mots de passe de rôles — job one-shot
   #
   # Un `migrate deploy` par réplique d'API serait une course. On le sort donc
@@ -90,9 +107,12 @@ services:
         condition: service_completed_successfully
       gotenberg:
         condition: service_started
+      redis:
+        condition: service_started
     environment:
       NODE_ENV: production
       PORT: 3001
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       # L'app se connecte avec le rôle NON-propriétaire lsi_app (RLS active).
       # Utiliser le superutilisateur ici désactiverait tout le cloisonnement.
       DATABASE_URL_APP: postgresql://lsi_app:${LSI_APP_PASSWORD}@postgres:5432/lsi_contrats
@@ -115,3 +135,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:

@@ -3,6 +3,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { ScopeGuard } from './auth/scope.guard.js';
 import { SessionService } from './auth/session.service.js';
+import { RedisProvider } from './auth/redis.provider.js';
 import { Public } from './auth/public.decorator.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
@@ -28,6 +29,7 @@ class HealthController {
   controllers: [ContractsController, DocusealWebhookController, HealthController],
   providers: [
     ContractsService,
+    RedisProvider,
     SessionService,
     DocusealWebhookService,
     DocusealAdapter,

@@ -1,5 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type Redis from 'ioredis';
 import type { Scope } from '@lsi/persistence';
+import { REDIS } from './redis.provider.js';
+import { RedisSessionStore } from './redis-session-store.js';
 
 export type RoleCode =
   | 'MSP_ADMIN'
@@ -18,46 +21,42 @@ export interface Session {
   readonly scope: Scope;
 }
 
+/** TTL de session par famille (§13.1). */
+export const SESSION_TTL = {
+  INTERNAL: 8 * 3600, // 8 h
+  CLIENT: 30 * 60, // 30 min
+} as const;
+
 /**
- * Store de sessions serveur. (§9.2)
+ * Sessions serveur, désormais adossées à Redis (Phase B).
  *
- * Cookie opaque → session serveur, PAS de JWT.
- *
- * Un JWT embarque le scope. Le scope change : un account manager perd un
- * client (EC-17). Un JWT valide 15 minutes, c'est 15 minutes d'accès à des
- * données qu'on vient de lui retirer. On peut raccourcir la durée, ajouter
- * une liste de révocation, consulter un cache à chaque requête — mais on a
- * alors reconstruit une session serveur, en moins fiable.
- *
- * À moins de 20 utilisateurs internes (H5), le seul argument en faveur du
- * JWT — l'absence d'état — n'achète rien.
- *
- * En production : Redis. Ici : en mémoire, derrière la même interface.
+ * Cookie opaque → session serveur, PAS de JWT (§9.2). Un JWT embarque le
+ * scope, qui change (un account manager perd un client, EC-17) ; 15 minutes
+ * de validité = 15 minutes d'accès à ce qu'on vient de retirer. La session
+ * serveur donne la révocation immédiate et un scope toujours frais.
  */
 @Injectable()
 export class SessionService {
-  private readonly sessions = new Map<string, Session>();
+  private readonly store: RedisSessionStore;
 
-  get(sessionId: string): Session | undefined {
-    return this.sessions.get(sessionId);
+  constructor(@Inject(REDIS) redis: Redis) {
+    this.store = new RedisSessionStore(redis);
   }
 
-  put(s: Session): void {
-    this.sessions.set(s.sessionId, s);
+  get(sessionId: string): Promise<Session | null> {
+    return this.store.get(sessionId);
   }
 
-  /**
-   * Révocation immédiate (EC-17). C'est précisément ce qu'un JWT ne sait
-   * pas faire : le retrait d'un client du portefeuille prend effet à la
-   * requête suivante, pas à l'expiration du jeton.
-   */
-  revoke(sessionId: string): void {
-    this.sessions.delete(sessionId);
+  put(session: Session, ttlSeconds: number = SESSION_TTL.INTERNAL): Promise<void> {
+    return this.store.put(session, ttlSeconds);
   }
 
-  revokeAllForUser(userId: string): void {
-    for (const [id, s] of this.sessions) {
-      if (s.userId === userId) this.sessions.delete(id);
-    }
+  /** Révocation immédiate (EC-17). */
+  revoke(sessionId: string): Promise<void> {
+    return this.store.revoke(sessionId);
+  }
+
+  revokeAllForUser(userId: string): Promise<void> {
+    return this.store.revokeAllForUser(userId);
   }
 }

@@ -1,9 +1,11 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 let container: StartedPostgreSqlContainer;
+let redis: StartedRedisContainer;
 
 const persistenceDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -32,8 +34,14 @@ export async function setup() {
   uri.username = 'lsi_app';
   uri.password = 'lsi_app_test_pwd';
   process.env.DATABASE_URL_APP = uri.toString();
+
+  // Redis réel pour les sessions (Phase B) : on teste le vrai comportement
+  // (TTL, sérialisation), pas un double en mémoire.
+  redis = await new RedisContainer('redis:7-alpine').start();
+  process.env.REDIS_URL = redis.getConnectionUrl();
 }
 
 export async function teardown() {
   await container?.stop();
+  await redis?.stop();
 }

@@ -36,28 +36,28 @@ beforeAll(async () => {
   fx = await seedTwoCustomers();
 
   const sessions = app.get(SessionService);
-  sessions.put({
+  await sessions.put({
     sessionId: SESS_AM_A,
     userId: fx.amUserId,
     tenantId: fx.tenantId,
     roles: ['ACCOUNT_MANAGER'],
     scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId),
   });
-  sessions.put({
+  await sessions.put({
     sessionId: SESS_AM_B,
     userId: fx.amBUserId,
     tenantId: fx.tenantId,
     roles: ['ACCOUNT_MANAGER'],
     scope: internalScope(fx.tenantId, [fx.customerB.id], fx.amBUserId),
   });
-  sessions.put({
+  await sessions.put({
     sessionId: SESS_ADMIN,
     userId: fx.adminUserId,
     tenantId: fx.tenantId,
     roles: ['MSP_ADMIN'],
     scope: adminScope(fx.tenantId, fx.adminUserId),
   });
-  sessions.put({
+  await sessions.put({
     sessionId: SESS_CLIENT_A,
     userId: fx.customerA.clientUserId,
     tenantId: fx.tenantId,
