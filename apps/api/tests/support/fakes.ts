@@ -62,6 +62,13 @@ export class FakeProvider implements ESignatureProvider {
     return this.created.get(externalId) ?? null;
   }
 
+  async downloadSignedDocuments(providerSubmissionId: string): Promise<{ signedPdf: Buffer; auditTrail: Buffer | null }> {
+    return {
+      signedPdf: Buffer.from(`%PDF-1.7 signed ${providerSubmissionId}\n%%EOF`, 'utf8'),
+      auditTrail: Buffer.from(`%PDF-1.7 audit ${providerSubmissionId}\n%%EOF`, 'utf8'),
+    };
+  }
+
   verifyWebhook() {
     return { valid: true };
   }

@@ -60,6 +60,13 @@ export interface WebhookVerification {
   readonly reason?: string;
 }
 
+/** Le PDF signé et sa piste d'audit, rapatriés du provider. */
+export interface SignedDocuments {
+  readonly signedPdf: Buffer;
+  /** Peut être absent si le provider n'expose pas de piste d'audit. */
+  readonly auditTrail: Buffer | null;
+}
+
 /** Un signataire, tel que le domaine le décrit — pas tel que DocuSeal l'attend. */
 export interface SubmitterCommand {
   readonly party: 'LSI' | 'CLIENT';
@@ -164,6 +171,15 @@ export interface ESignatureProvider {
    * vérification, le client reçoit DEUX invitations à signer.
    */
   findSubmissionByExternalId(externalId: string): Promise<ProviderSubmission | null>;
+
+  /**
+   * Télécharge le PDF signé et sa piste d'audit. (§11.6)
+   *
+   * Dès la signature, on rapatrie et stocke ces preuves chez nous : on ne
+   * dépend JAMAIS d'une URL du provider à long terme pour produire une
+   * preuve. Un fournisseur peut disparaître ; l'obligation dure 10 ans.
+   */
+  downloadSignedDocuments(providerSubmissionId: string): Promise<SignedDocuments>;
 
   /**
    * Vérifie la signature sur le CORPS BRUT.

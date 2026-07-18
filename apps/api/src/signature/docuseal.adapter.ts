@@ -183,6 +183,38 @@ export class DocusealAdapter implements ESignatureProvider {
     };
   }
 
+  /**
+   * Télécharge le PDF signé combiné + la piste d'audit. (§11.6)
+   *
+   * GET /submissions/{id} expose `audit_log_url` et les documents combinés.
+   * On rapatrie les octets pour les stocker chez nous.
+   */
+  async downloadSignedDocuments(providerSubmissionId: string): Promise<{ signedPdf: Buffer; auditTrail: Buffer | null }> {
+    const res = await fetch(`${this.baseUrl}/submissions/${providerSubmissionId}`, {
+      headers: { 'X-Auth-Token': this.apiKey },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      throw new ProviderError(`DocuSeal GET submission ${res.status}`, res.status >= 500);
+    }
+    const body = (await res.json()) as any;
+
+    // Le PDF signé : combined_document_url, sinon le 1er document.
+    const pdfUrl: string | undefined =
+      body.combined_document_url ?? body.documents?.[0]?.url;
+    if (!pdfUrl) throw new ProviderError('Aucun document signé disponible', false);
+
+    const signedPdf = await this.fetchBinary(pdfUrl);
+    const auditTrail = body.audit_log_url ? await this.fetchBinary(body.audit_log_url) : null;
+    return { signedPdf, auditTrail };
+  }
+
+  private async fetchBinary(url: string): Promise<Buffer> {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new ProviderError(`Téléchargement ${res.status} : ${url.slice(0, 80)}`, res.status >= 500);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
   /** DocuSeal attend « 2024-09-01 12:00:00 UTC », pas de l'ISO 8601. */
   private formatExpiry(d: Date): string {
     return `${d.toISOString().slice(0, 19).replace('T', ' ')} UTC`;
