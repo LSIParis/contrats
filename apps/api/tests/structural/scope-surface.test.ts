@@ -53,6 +53,8 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
     // explicite qui casse ce test et exige de le mettre à jour.
     expect(unguarded.sort()).toEqual([
       'GET /health',
+      'GET /v1/auth/callback',
+      'GET /v1/auth/login',
       'GET /v1/portal/auth/verify',
       'POST /v1/portal/auth/logout',
       'POST /v1/portal/auth/request-link',
