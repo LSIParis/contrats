@@ -43,7 +43,7 @@ export function ContractsPage() {
       />
       {query.isLoading ? (
         <Spinner />
-      ) : query.error || !query.data ? (
+      ) : (query.error || !query.data) && rows.length === 0 ? (
         <p className="text-red-600">Erreur de chargement.</p>
       ) : rows.length === 0 ? (
         <p className="text-gray-400">Aucun contrat.</p>
@@ -60,7 +60,15 @@ export function ContractsPage() {
               </tr>
             ))}
           </Table>
-          {query.hasNextPage ? (
+          {query.isFetchNextPageError ? (
+            <button
+              type="button"
+              onClick={() => query.fetchNextPage()}
+              className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600"
+            >
+              Échec du chargement. Réessayer
+            </button>
+          ) : query.hasNextPage ? (
             <button
               type="button"
               onClick={() => query.fetchNextPage()}

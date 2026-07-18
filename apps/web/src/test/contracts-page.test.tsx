@@ -54,3 +54,27 @@ test('charge la page suivante via « Charger plus »', async () => {
   expect(screen.getByText('Martin')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Charger plus/i })).not.toBeInTheDocument();
 });
+
+test('un échec de « Charger plus » n’efface pas la liste déjà chargée', async () => {
+  const user = userEvent.setup();
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        data: [{ id: 'c1', reference: 'LSI-1', title: 'Maintenance', customer: { name: 'Dupont' }, status: 'ACTIVE', endDate: '2026-09-01' }],
+        pagination: { nextCursor: 'cur1', hasMore: true },
+      }), { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+    .mockResolvedValueOnce(new Response('erreur', { status: 500 }));
+  vi.stubGlobal('fetch', fetchMock);
+  wrap();
+  await waitFor(() => expect(screen.getByText('LSI-1')).toBeInTheDocument());
+
+  const button = await screen.findByRole('button', { name: /Charger plus/i });
+  await user.click(button);
+
+  const retry = await screen.findByRole('button', { name: /Échec du chargement/i });
+  expect(retry).toBeInTheDocument();
+  expect(screen.getByText('LSI-1')).toBeInTheDocument();
+  expect(screen.queryByText('Erreur de chargement.')).not.toBeInTheDocument();
+});
