@@ -23,6 +23,7 @@ export {
   resolveWebhookScope,
   type ResolvedWebhookScope,
 } from './webhook-scope-lookup.js';
+export { findSignaturesNeedingProof } from './reconciliation-lookup.js';
 export {
   resolveUserScope,
   findLoginUser,

@@ -25,6 +25,12 @@ import { GotenbergRenderer } from './documents/gotenberg.renderer.js';
 import { DOCUMENT_STORAGE } from './documents/document-storage.port.js';
 import { S3Storage } from './documents/s3-storage.js';
 import { InMemoryStorage } from './documents/in-memory-storage.js';
+import { ProofCaptureService } from './signature/proof-capture.service.js';
+import { JOB_QUEUE } from './jobs/job-queue.port.js';
+import { BullMqJobQueue } from './jobs/bullmq-job-queue.js';
+import { NoOpJobQueue } from './jobs/noop-job-queue.js';
+import { ReconciliationService } from './jobs/reconciliation.service.js';
+import { SignatureWorkerService } from './jobs/signature-worker.service.js';
 
 @Controller()
 class HealthController {
@@ -54,6 +60,19 @@ class HealthController {
     DocusealWebhookService,
     DocusealAdapter,
     SendForSignatureService,
+    ProofCaptureService,
+    ReconciliationService,
+    // Le worker est TOUJOURS instancié mais ne démarre sa plomberie BullMQ
+    // que si WORKER_ENABLED=true : en test/dev il ne touche pas Redis.
+    SignatureWorkerService,
+    {
+      // Producteur de jobs. Réel (BullMQ) uniquement si JOBS_ENABLED=true —
+      // sinon no-op, pour qu'aucun test n'ouvre de connexion Redis. En prod,
+      // tous les conteneurs API enfilent (JOBS_ENABLED), un seul consomme
+      // (WORKER_ENABLED).
+      provide: JOB_QUEUE,
+      useClass: process.env.JOBS_ENABLED === 'true' ? BullMqJobQueue : NoOpJobQueue,
+    },
     {
       // S3 si les identifiants sont fournis (prod), sinon in-memory (tests,
       // dev sans MinIO). Le service d'envoi dépend du port, pas de l'impl.

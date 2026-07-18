@@ -1,7 +1,8 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { withScope, systemScope, resolveWebhookScope, uuidv7 } from '@lsi/persistence';
 import { applyEvent, type NormalizedSignatureEvent } from '@lsi/domain';
 import { DocusealAdapter } from '../signature/docuseal.adapter.js';
+import { JOB_QUEUE, type CaptureProofJob, type JobQueue } from '../jobs/job-queue.port.js';
 
 export type WebhookOutcome =
   | 'processed'
@@ -26,7 +27,10 @@ export type WebhookOutcome =
 export class DocusealWebhookService {
   private readonly log = new Logger(DocusealWebhookService.name);
 
-  constructor(private readonly provider: DocusealAdapter) {}
+  constructor(
+    private readonly provider: DocusealAdapter,
+    @Inject(JOB_QUEUE) private readonly queue: JobQueue,
+  ) {}
 
   async handle(
     rawBody: Buffer,
@@ -89,7 +93,7 @@ export class DocusealWebhookService {
 
     // --- 5. Appliquer DANS le scope résolu --------------------------------
     const scope = systemScope(sigReq.tenantId, sigReq.customerId);
-    return withScope(scope, async (tx) => {
+    const result = await withScope(scope, async (tx) => {
       // Idempotence par contrainte UNIQUE (provider_event_id), pas par un
       // `if` : deux webhooks concurrents passeraient un `if`, pas une
       // contrainte de base (EC-05).
@@ -111,26 +115,50 @@ export class DocusealWebhookService {
           },
         });
       } catch (e: any) {
-        if (e?.code === 'P2002') return { status: 'duplicate_ignored' as const };
+        if (e?.code === 'P2002') return { status: 'duplicate_ignored' as const, captureJob: null };
         throw e;
       }
 
-      await this.applyBusinessEffect(tx, sigReq, event);
+      const captureJob = await this.applyBusinessEffect(tx, sigReq, event);
 
       await tx.signatureEvent.updateMany({
         where: { providerEventId: event.eventId },
         data: { processedAt: new Date() },
       });
 
-      return { status: 'processed' as const };
+      return { status: 'processed' as const, captureJob };
     });
+
+    // --- 6. Enfiler la capture de preuve APRÈS COMMIT ---------------------
+    //
+    // Jamais dans la transaction : un rollback laisserait un job pointant sur
+    // un état jamais persisté. La capture est ASYNCHRONE — on ne bloque pas la
+    // réponse au webhook sur le téléchargement du PDF signé (§11.6). Si
+    // l'enfilement échoue, la réconciliation (EC-06) rattrape.
+    if (result.status === 'processed' && result.captureJob) {
+      try {
+        await this.queue.enqueueCaptureProof(result.captureJob);
+      } catch (e) {
+        this.log.error(
+          `enfilement capture échoué (rattrapé par réconciliation) : ${(e as Error).message}`,
+        );
+      }
+    }
+
+    return { status: result.status };
   }
 
+  /**
+   * Applique l'effet métier de l'événement.
+   *
+   * Renvoie un job de capture de preuve à enfiler APRÈS commit lorsque toutes
+   * les signatures sont réunies (COMPLETED), sinon null.
+   */
   private async applyBusinessEffect(
     tx: any,
-    sigReq: { signatureRequestId: string; contractId: string },
+    sigReq: { signatureRequestId: string; contractId: string; tenantId: string; customerId: string },
     event: NormalizedSignatureEvent,
-  ): Promise<void> {
+  ): Promise<CaptureProofJob | null> {
     const now = new Date();
 
     // Rapprochement par external_id, JAMAIS par email : deux signataires
@@ -150,11 +178,11 @@ export class DocusealWebhookService {
             data: { status: 'VIEWED', updatedAt: now },
           });
         }
-        return; // aucun effet sur le contrat
+        return null; // aucun effet sur le contrat
       }
 
       case 'FORM_STARTED':
-        return; // journalisé, sans effet
+        return null; // journalisé, sans effet
 
       case 'FORM_DECLINED': {
         if (signer) {
@@ -173,7 +201,7 @@ export class DocusealWebhookService {
           data: { status: 'DECLINED', lastSyncedAt: now, updatedAt: now },
         });
         await this.transition(tx, sigReq.contractId, { type: 'SIGNER_DECLINED', reason: event.declineReason ?? '' }, now);
-        return;
+        return null;
       }
 
       case 'FORM_COMPLETED': {
@@ -201,11 +229,18 @@ export class DocusealWebhookService {
         });
         await this.transition(tx, sigReq.contractId, { type: 'SIGNER_SIGNED', allSigned }, now);
 
-        // TODO(W-05) : à SIGNED, enfiler le téléchargement du PDF signé et
-        // de la piste d'audit (§11.6). Job ASYNCHRONE, jamais ici : DocuSeal
-        // réessaie sur timeout, et un timeout provoquerait un double
-        // traitement.
-        return;
+        // À complétion TOTALE : capturer le PDF signé et la piste d'audit
+        // (§11.6). Job ASYNCHRONE, enfilé APRÈS commit par handle() — jamais
+        // en ligne : DocuSeal réessaie sur timeout, et télécharger ici
+        // bloquerait la réponse et risquerait un double traitement.
+        if (allSigned) {
+          return {
+            signatureRequestId: sigReq.signatureRequestId,
+            tenantId: sigReq.tenantId,
+            customerId: sigReq.customerId,
+          };
+        }
+        return null;
       }
 
       case 'SUBMISSION_EXPIRED': {
@@ -213,7 +248,7 @@ export class DocusealWebhookService {
           where: { id: sigReq.signatureRequestId },
           data: { status: 'EXPIRED', lastSyncedAt: now, updatedAt: now },
         });
-        return;
+        return null;
       }
 
       case 'SUBMISSION_COMPLETED': {
@@ -221,9 +256,11 @@ export class DocusealWebhookService {
           where: { id: sigReq.signatureRequestId },
           data: { lastSyncedAt: now, updatedAt: now },
         });
-        return;
+        return null;
       }
     }
+
+    return null;
   }
 
   /**
