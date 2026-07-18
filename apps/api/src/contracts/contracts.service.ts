@@ -110,6 +110,13 @@ export class ContractsService {
       }
       if (q.cursor) where.id = { gt: q.cursor };
 
+      if (q.q?.trim()) {
+        where.OR = [
+          { reference: { contains: q.q.trim(), mode: 'insensitive' } },
+          { title: { contains: q.q.trim(), mode: 'insensitive' } },
+        ];
+      }
+
       const rows = await tx.contract.findMany({
         where,
         take: limit + 1,
