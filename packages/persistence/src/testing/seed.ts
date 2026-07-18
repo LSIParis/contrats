@@ -20,12 +20,17 @@ export interface CustomerFixture {
   name: string;
   contractId: string;
   clientUserId: string;
+  /** Email du contact client (kind CLIENT). */
+  clientEmail: string;
 }
 
 export interface TwoCustomerFixture {
   tenantId: string;
+  /** Slug du tenant seedé (pour DEFAULT_TENANT_SLUG). */
+  tenantSlug: string;
   /** ACCOUNT_MANAGER, portefeuille = customerA uniquement. */
   amUserId: string;
+  amEmail: string;
   /** ACCOUNT_MANAGER, portefeuille = customerB uniquement. */
   amBUserId: string;
   /** MSP_ADMIN, accès all_customers. */
@@ -52,17 +57,21 @@ export async function seedTwoCustomers(databaseUrl?: string): Promise<TwoCustome
   const amUserId = uuidv7();
   const amBUserId = uuidv7();
   const adminUserId = uuidv7();
+  const aClientUser = uuidv7();
+  const bClientUser = uuidv7();
   const a: CustomerFixture = {
     id: uuidv7(),
     name: 'Dupont SAS',
     contractId: uuidv7(),
-    clientUserId: uuidv7(),
+    clientUserId: aClientUser,
+    clientEmail: `cl-${aClientUser.slice(-12)}@example.fr`,
   };
   const b: CustomerFixture = {
     id: uuidv7(),
     name: 'Martin SARL',
     contractId: uuidv7(),
-    clientUserId: uuidv7(),
+    clientUserId: bClientUser,
+    clientEmail: `cl-${bClientUser.slice(-12)}@example.fr`,
   };
 
   await owner.$executeRawUnsafe(`
@@ -91,7 +100,7 @@ export async function seedTwoCustomers(databaseUrl?: string): Promise<TwoCustome
     await owner.$executeRawUnsafe(`
       INSERT INTO users (id, tenant_id, kind, customer_id, email, full_name, status, created_at, updated_at)
       VALUES ('${c.clientUserId}', '${tenantId}', 'CLIENT', '${c.id}',
-              'cl-${c.clientUserId.slice(-12)}@example.fr', 'Contact ${c.name}', 'ACTIVE', now(), now())
+              '${c.clientEmail}', 'Contact ${c.name}', 'ACTIVE', now(), now())
     `);
   }
 
@@ -116,5 +125,14 @@ export async function seedTwoCustomers(databaseUrl?: string): Promise<TwoCustome
   }
 
   await owner.$disconnect();
-  return { tenantId, amUserId, amBUserId, adminUserId, customerA: a, customerB: b };
+  return {
+    tenantId,
+    tenantSlug: `lsi-${tenantId.slice(-12)}`,
+    amUserId,
+    amEmail: `am-a-${amUserId.slice(-12)}@lsi.fr`,
+    amBUserId,
+    adminUserId,
+    customerA: a,
+    customerB: b,
+  };
 }

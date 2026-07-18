@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
 import { SessionService, type Session } from './session.service.js';
+import { SESSION_COOKIE } from './cookie.js';
 
 export interface ScopedRequest {
   session?: Session;
@@ -56,12 +57,13 @@ export class ScopeGuard implements CanActivate {
   }
 
   private readSessionCookie(req: ScopedRequest): string | undefined {
-    // __Host- : le préfixe interdit au cookie d'être posé par un sous-domaine
-    // et impose Secure + Path=/ (§13.1).
-    const fromCookie = req.cookies?.['__Host-lsi_sess'];
+    // Cookie de session (nom centralisé : __Host-lsi_sess en prod, lsi_sess
+    // en dev — voir cookie.ts). Le préfixe __Host- interdit qu'un
+    // sous-domaine le pose et impose Secure + Path=/ (§13.1).
+    const fromCookie = req.cookies?.[SESSION_COOKIE];
     if (fromCookie) return fromCookie;
 
-    // Utilisé par les tests d'intégration ; en production le cookie est seul.
+    // Utilisé par certains tests ; en production le cookie est seul.
     const h = req.headers['x-lsi-session'];
     return typeof h === 'string' ? h : undefined;
   }

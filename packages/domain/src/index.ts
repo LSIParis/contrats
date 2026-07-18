@@ -13,3 +13,4 @@ export * from './contract/state-machine.js';
 export * from './reminder/planning.js';
 export * from './signature/e-signature-provider.port.js';
 export * from './documents/document-renderer.port.js';
+export * from './notifications/email-sender.port.js';

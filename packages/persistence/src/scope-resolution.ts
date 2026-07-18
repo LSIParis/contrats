@@ -34,6 +34,29 @@ export interface ResolvedUserScope {
   readonly kind: 'INTERNAL' | 'CLIENT';
 }
 
+/** Résout l'id du tenant par son slug (déploiement mono-tenant). */
+export async function findTenantBySlug(slug: string): Promise<string | null> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { app_find_tenant_by_slug: string | null }[]
+  >`SELECT app_find_tenant_by_slug(${slug})`;
+  return rows[0]?.app_find_tenant_by_slug ?? null;
+}
+
+/**
+ * Trouve un utilisateur ACTIF par email, pour amorcer un login (magic link).
+ * Ne renvoie que l'id et le kind. Null si aucun compte actif.
+ */
+export async function findLoginUser(
+  tenantId: string,
+  email: string,
+): Promise<{ userId: string; kind: 'INTERNAL' | 'CLIENT' } | null> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { user_id: string; kind: 'INTERNAL' | 'CLIENT' }[]
+  >`SELECT * FROM app_find_login_user(${tenantId}::uuid, ${email}::text)`;
+  const r = rows[0];
+  return r ? { userId: r.user_id, kind: r.kind } : null;
+}
+
 /**
  * Retourne le scope + les rôles d'un utilisateur actif, ou null s'il
  * n'existe pas / est désactivé.

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
@@ -9,6 +10,9 @@ async function bootstrap() {
   // webhook refuserait TOUT en production — ou pire, si on l'avait fait
   // porter sur le JSON reparsé, il accepterait des corps falsifiés.
   const app = await NestFactory.create(AppModule, { rawBody: true });
+
+  // Parse les cookies : le guard lit le cookie de session (§13.1).
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({

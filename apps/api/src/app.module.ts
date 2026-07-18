@@ -4,6 +4,10 @@ import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { ScopeGuard } from './auth/scope.guard.js';
 import { SessionService } from './auth/session.service.js';
 import { RedisProvider } from './auth/redis.provider.js';
+import { MagicLinkService } from './auth/magic-link.service.js';
+import { PortalAuthController } from './auth/portal-auth.controller.js';
+import { EMAIL_SENDER } from './notifications/email.token.js';
+import { BrevoSender } from './notifications/brevo.sender.js';
 import { Public } from './auth/public.decorator.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
@@ -26,11 +30,18 @@ class HealthController {
 }
 
 @Module({
-  controllers: [ContractsController, DocusealWebhookController, HealthController],
+  controllers: [
+    ContractsController,
+    DocusealWebhookController,
+    PortalAuthController,
+    HealthController,
+  ],
   providers: [
     ContractsService,
     RedisProvider,
     SessionService,
+    MagicLinkService,
+    { provide: EMAIL_SENDER, useClass: BrevoSender },
     DocusealWebhookService,
     DocusealAdapter,
     SendForSignatureService,

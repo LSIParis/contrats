@@ -25,6 +25,8 @@ export {
 } from './webhook-scope-lookup.js';
 export {
   resolveUserScope,
+  findLoginUser,
+  findTenantBySlug,
   type ResolvedUserScope,
   type ResolvedRole,
 } from './scope-resolution.js';
