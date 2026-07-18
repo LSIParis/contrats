@@ -11,6 +11,8 @@ import { BrevoSender } from './notifications/brevo.sender.js';
 import { OidcAuthService } from './auth/oidc-auth.service.js';
 import { InternalAuthController } from './auth/internal-auth.controller.js';
 import { MeController } from './auth/me.controller.js';
+import { DashboardController } from './read/dashboard.controller.js';
+import { DashboardService } from './read/dashboard.service.js';
 import { OIDC_PROVIDER } from './auth/oidc.port.js';
 import { EntraOidcProvider } from './auth/oidc-entra.adapter.js';
 import { Public } from './auth/public.decorator.js';
@@ -52,10 +54,12 @@ class HealthController {
     PortalAuthController,
     InternalAuthController,
     MeController,
+    DashboardController,
     HealthController,
   ],
   providers: [
     ContractsService,
+    DashboardService,
     RedisProvider,
     SessionService,
     MagicLinkService,
