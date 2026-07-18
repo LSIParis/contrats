@@ -106,9 +106,12 @@ services:
       APP_ORIGIN: https://contrats.lsi-maintenance.fr
       PORTAL_URL: https://contrats.lsi-maintenance.fr
     ports:
-      # Publié pour que nginx-pm (sur Docker 01) puisse proxifier vers l'API.
-      # ⚠ À RESTREINDRE par pare-feu à l'IP de nginx-pm — voir README.
-      - '${API_PORT:-3001}:3001'
+      # Lié UNIQUEMENT à l'IP du tunnel WireGuard (10.99.0.2 par défaut).
+      # L'API n'est donc joignable QUE par nginx-pm via le tunnel chiffré,
+      # JAMAIS sur l'IP publique de Legal. Le conteneur lsi-wireguard doit
+      # être up (il crée l'interface wg0 qui porte cette IP) — voir
+      # deploy/wireguard/README.md.
+      - '${WG_BIND_IP:-10.99.0.2}:${API_PORT:-3001}:3001'
 
 volumes:
   pgdata:
