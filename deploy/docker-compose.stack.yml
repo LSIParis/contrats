@@ -124,7 +124,16 @@ services:
       DOCUSEAL_WEBHOOK_SECRET: ${DOCUSEAL_WEBHOOK_SECRET}
       GOTENBERG_URL: http://gotenberg:3000
       APP_ORIGIN: https://contrats.lsi-maintenance.fr
+      APP_URL: https://contrats.lsi-maintenance.fr
       PORTAL_URL: https://contrats.lsi-maintenance.fr
+      # Auth (Phase B)
+      DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-lsi}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-contrats@lsi-maintenance.fr}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-LSI Maintenance}
     ports:
       # Lié UNIQUEMENT à l'IP du tunnel WireGuard (10.99.0.2 par défaut).
       # L'API n'est donc joignable QUE par nginx-pm via le tunnel chiffré,
