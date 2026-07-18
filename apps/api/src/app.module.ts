@@ -1,5 +1,7 @@
 import { Module, Controller, Get } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'node:path';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { ScopeGuard } from './auth/scope.guard.js';
 import { SessionService } from './auth/session.service.js';
@@ -50,6 +52,16 @@ class HealthController {
 }
 
 @Module({
+  imports: [
+    ServeStaticModule.forRoot({
+      // Le bundle Vite ; en dev il peut être absent (Vite sert lui-même) —
+      // ServeStatic renvoie alors 404 sur les routes SPA, ce qui est sans effet
+      // puisque le dev passe par le serveur Vite (proxy /v1 → 3001).
+      rootPath: join(process.cwd(), 'apps/web/dist'),
+      // JAMAIS capturer l'API ni le healthcheck avec le repli index.html.
+      exclude: ['/v1*', '/health'],
+    }),
+  ],
   controllers: [
     ContractsController,
     DocusealWebhookController,

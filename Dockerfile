@@ -34,12 +34,15 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/persistence/package.json ./packages/persistence/
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 RUN pnpm install --frozen-lockfile
 
 # ---- génération du client Prisma -------------------------------------
 FROM deps AS build
 COPY . .
 RUN pnpm --filter @lsi/persistence exec prisma generate
+# Build du SPA : servi même origine par NestJS (ServeStaticModule, app.module.ts).
+RUN pnpm --filter @lsi/web build
 
 # ---- image finale -----------------------------------------------------
 FROM base AS runtime
