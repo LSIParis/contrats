@@ -3,10 +3,15 @@ import { Queue, Worker } from 'bullmq';
 import { systemScope } from '@lsi/persistence';
 import { ProofCaptureService } from '../signature/proof-capture.service.js';
 import { bullConnection } from './bullmq-job-queue.js';
-import { QUEUE_NAME, type CaptureProofJob } from './job-queue.port.js';
+import { QUEUE_NAME, type CaptureProofJob, type SendReminderJob } from './job-queue.port.js';
 import { ReconciliationService } from './reconciliation.service.js';
+import { LifecycleService } from './lifecycle.service.js';
+import { ReminderDispatchService } from './reminder-dispatch.service.js';
+import { ReminderSendService } from './reminder-send.service.js';
 
 const RECONCILE_EVERY_MS = 60 * 60 * 1_000; // horaire
+const LIFECYCLE_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien
+const DISPATCH_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien (UC-08)
 
 /**
  * Worker BullMQ embarqué. (§11.6, §12.3)
@@ -19,6 +24,10 @@ const RECONCILE_EVERY_MS = 60 * 60 * 1_000; // horaire
  * Deux jobs :
  *   - capture-proof       : télécharge et stocke la preuve d'une signature.
  *   - reconcile-signatures: filet EC-06, réenfile les captures oubliées.
+ *   - lifecycle-sweep     : active/expire les contrats à échéance (RM-06/07)
+ *     et matérialise les rappels (RM-23).
+ *   - dispatch-reminders  : découvre les rappels dus et enfile leurs envois.
+ *   - send-reminder       : envoie un rappel (interne / client / escalade).
  */
 @Injectable()
 export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -29,6 +38,9 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly proof: ProofCaptureService,
     private readonly reconciliation: ReconciliationService,
+    private readonly lifecycle: LifecycleService,
+    private readonly dispatch: ReminderDispatchService,
+    private readonly reminderSend: ReminderSendService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -53,6 +65,21 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
           case 'reconcile-signatures':
             await this.reconciliation.run();
             return;
+          case 'lifecycle-sweep':
+            await this.lifecycle.run(new Date());
+            return;
+          case 'dispatch-reminders':
+            await this.dispatch.run();
+            return;
+          case 'send-reminder': {
+            const d = job.data as SendReminderJob;
+            await this.reminderSend.send(
+              systemScope(d.tenantId, d.customerId),
+              d.reminderId,
+              new Date(),
+            );
+            return;
+          }
           default:
             this.log.warn(`job inconnu ignoré : ${job.name}`);
         }
@@ -72,8 +99,18 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
       {},
       { repeat: { every: RECONCILE_EVERY_MS }, jobId: 'reconcile-hourly' },
     );
+    await this.scheduler.add(
+      'lifecycle-sweep',
+      {},
+      { repeat: { every: LIFECYCLE_EVERY_MS }, jobId: 'lifecycle-daily' },
+    );
+    await this.scheduler.add(
+      'dispatch-reminders',
+      {},
+      { repeat: { every: DISPATCH_EVERY_MS }, jobId: 'dispatch-daily' },
+    );
 
-    this.log.log('worker démarré (capture-proof + réconciliation horaire)');
+    this.log.log('worker démarré (capture + réconciliation + cycle de vie + rappels)');
   }
 
   async onModuleDestroy(): Promise<void> {

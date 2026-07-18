@@ -40,6 +40,35 @@ export interface TwoCustomerFixture {
 }
 
 /**
+ * Attribue le rôle MSP_ADMIN à un utilisateur. (tests d'escalade)
+ *
+ * Idempotent : rôle créé à la demande (UNIQUE tenant+code), lien créé sans
+ * doublon. Écrit avec le rôle propriétaire, comme le reste des seeds.
+ */
+export async function assignAdminRole(
+  tenantId: string,
+  userId: string,
+  databaseUrl?: string,
+): Promise<void> {
+  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const roleId = uuidv7();
+  await owner.$executeRawUnsafe(`
+    INSERT INTO roles (id, tenant_id, code, label)
+    VALUES ('${roleId}', '${tenantId}', 'MSP_ADMIN', 'Administrateur')
+    ON CONFLICT (tenant_id, code) DO NOTHING
+  `);
+  const rows = await owner.$queryRawUnsafe<{ id: string }[]>(
+    `SELECT id FROM roles WHERE tenant_id='${tenantId}' AND code='MSP_ADMIN' LIMIT 1`,
+  );
+  await owner.$executeRawUnsafe(`
+    INSERT INTO user_roles (tenant_id, user_id, role_id)
+    VALUES ('${tenantId}', '${userId}', '${rows[0].id}')
+    ON CONFLICT (user_id, role_id) DO NOTHING
+  `);
+  await owner.$disconnect();
+}
+
+/**
  * Deux clients aux portefeuilles DISJOINTS.
  *
  * C'est la disjonction qui rend les tests d'isolation significatifs : si les

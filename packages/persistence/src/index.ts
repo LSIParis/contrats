@@ -25,6 +25,12 @@ export {
 } from './webhook-scope-lookup.js';
 export { findSignaturesNeedingProof } from './reconciliation-lookup.js';
 export {
+  findContractsToActivate,
+  findContractsToExpire,
+  type ScopeRef,
+} from './lifecycle-lookup.js';
+export { findDueReminders, type DueReminderRef } from './scheduler-lookup.js';
+export {
   resolveUserScope,
   findLoginUser,
   findTenantBySlug,

@@ -30,6 +30,9 @@ import { JOB_QUEUE } from './jobs/job-queue.port.js';
 import { BullMqJobQueue } from './jobs/bullmq-job-queue.js';
 import { NoOpJobQueue } from './jobs/noop-job-queue.js';
 import { ReconciliationService } from './jobs/reconciliation.service.js';
+import { LifecycleService } from './jobs/lifecycle.service.js';
+import { ReminderDispatchService } from './jobs/reminder-dispatch.service.js';
+import { ReminderSendService } from './jobs/reminder-send.service.js';
 import { SignatureWorkerService } from './jobs/signature-worker.service.js';
 
 @Controller()
@@ -62,6 +65,9 @@ class HealthController {
     SendForSignatureService,
     ProofCaptureService,
     ReconciliationService,
+    LifecycleService,
+    ReminderDispatchService,
+    ReminderSendService,
     // Le worker est TOUJOURS instancié mais ne démarre sa plomberie BullMQ
     // que si WORKER_ENABLED=true : en test/dev il ne touche pas Redis.
     SignatureWorkerService,

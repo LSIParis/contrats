@@ -1,7 +1,12 @@
 import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
-import { QUEUE_NAME, type CaptureProofJob, type JobQueue } from './job-queue.port.js';
+import {
+  QUEUE_NAME,
+  type CaptureProofJob,
+  type JobQueue,
+  type SendReminderJob,
+} from './job-queue.port.js';
 
 /**
  * Connexion Redis dédiée à BullMQ.
@@ -38,6 +43,18 @@ export class BullMqJobQueue implements JobQueue, OnModuleDestroy {
       // IDEMPOTENCE : un seul job de capture par signature_request. Le webhook
       // ET la réconciliation peuvent l'enfiler ; BullMQ déduplique par jobId.
       jobId: `capture:${data.signatureRequestId}`,
+    });
+  }
+
+  async enqueueSendReminder(data: SendReminderJob): Promise<void> {
+    await this.queue.add('send-reminder', data, {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 10_000 },
+      removeOnComplete: 500,
+      removeOnFail: 1_000,
+      // IDEMPOTENCE : un seul envoi enfilé par rappel et par passage. Le
+      // marquage SENT en base est la garantie finale contre le doublon.
+      jobId: `reminder:${data.reminderId}`,
     });
   }
 

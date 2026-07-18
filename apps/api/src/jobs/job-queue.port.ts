@@ -8,6 +8,12 @@ export interface CaptureProofJob {
   customerId: string;
 }
 
+export interface SendReminderJob {
+  reminderId: string;
+  tenantId: string;
+  customerId: string;
+}
+
 /**
  * Producteur de jobs. (§11.6, §12.3)
  *
@@ -16,4 +22,5 @@ export interface CaptureProofJob {
  */
 export interface JobQueue {
   enqueueCaptureProof(data: CaptureProofJob): Promise<void>;
+  enqueueSendReminder(data: SendReminderJob): Promise<void>;
 }

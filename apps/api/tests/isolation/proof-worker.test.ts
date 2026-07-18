@@ -4,7 +4,12 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createHmac } from 'node:crypto';
 import { AppModule } from '../../src/app.module.js';
-import { JOB_QUEUE, type CaptureProofJob, type JobQueue } from '../../src/jobs/job-queue.port.js';
+import {
+  JOB_QUEUE,
+  type CaptureProofJob,
+  type JobQueue,
+  type SendReminderJob,
+} from '../../src/jobs/job-queue.port.js';
 import { ReconciliationService } from '../../src/jobs/reconciliation.service.js';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 import { adminScope, withScope, uuidv7 } from '@lsi/persistence';
@@ -17,8 +22,12 @@ const SECRET = 'test-webhook-secret';
  */
 class RecordingQueue implements JobQueue {
   readonly jobs: CaptureProofJob[] = [];
+  readonly reminderJobs: SendReminderJob[] = [];
   async enqueueCaptureProof(data: CaptureProofJob): Promise<void> {
     this.jobs.push(data);
+  }
+  async enqueueSendReminder(data: SendReminderJob): Promise<void> {
+    this.reminderJobs.push(data);
   }
 }
 
