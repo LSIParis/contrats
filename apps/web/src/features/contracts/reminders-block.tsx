@@ -1,4 +1,5 @@
 import { Card } from '../../ui/card.js';
+import { reminderStatusLabel } from '../../lib/labels.js';
 export interface Reminder { kind: string; offsetDays: number; dueAt: string; status: string; late: boolean; }
 export function RemindersBlock({ reminders }: { reminders: Reminder[] }) {
   return (
@@ -10,7 +11,7 @@ export function RemindersBlock({ reminders }: { reminders: Reminder[] }) {
           {reminders.map((r, i) => (
             <li key={i} className="flex justify-between">
               <span>J-{r.offsetDays} · {new Date(r.dueAt).toLocaleDateString('fr-FR')}</span>
-              <span className={r.late ? 'text-red-600' : 'text-gray-600'}>{r.status}{r.late ? ' (retard)' : ''}</span>
+              <span className={r.late ? 'text-red-600' : 'text-gray-600'}>{reminderStatusLabel(r.status)}{r.late ? ' (retard)' : ''}</span>
             </li>
           ))}
         </ul>

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useDashboard } from '../../lib/queries.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Card } from '../../ui/card.js';
+import { contractStatusLabel } from '../../lib/labels.js';
 import { ExpiringColumns } from './expiring.js';
 
 export function DashboardPage() {
@@ -15,7 +16,9 @@ export function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {Object.entries(q.data.countsByStatus).map(([status, n]) => (
           <Link key={status} to={`/contracts?status=${status}`}>
-            <Card title={status}><div className="text-3xl font-bold">{n}</div></Card>
+            <Card title={contractStatusLabel(status)}>
+              <div className="text-3xl font-bold">{n}</div>
+            </Card>
           </Link>
         ))}
         <Card title="Rappels en attente">

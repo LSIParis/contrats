@@ -1,4 +1,5 @@
 import { Card } from '../../ui/card.js';
+import { signerStatusLabel, partyLabel } from '../../lib/labels.js';
 
 export interface Signer { party: string; fullName: string; status: string; signedAt: string | null; }
 export interface SignatureData { status: string; signers: Signer[]; }
@@ -12,8 +13,8 @@ export function SignatureBlock({ data }: { data: SignatureData | null }) {
         <ul className="space-y-1 text-sm">
           {data.signers.map((s, i) => (
             <li key={i} className="flex justify-between">
-              <span>{s.fullName} <span className="text-gray-400">({s.party})</span></span>
-              <span className="font-medium">{s.status}{s.signedAt ? ` · ${new Date(s.signedAt).toLocaleDateString('fr-FR')}` : ''}</span>
+              <span>{s.fullName} <span className="text-gray-400">({partyLabel(s.party)})</span></span>
+              <span className="font-medium">{signerStatusLabel(s.status)}{s.signedAt ? ` · ${new Date(s.signedAt).toLocaleDateString('fr-FR')}` : ''}</span>
             </li>
           ))}
         </ul>

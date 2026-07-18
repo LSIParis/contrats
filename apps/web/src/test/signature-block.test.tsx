@@ -12,8 +12,10 @@ test('rend chaque signataire avec son statut', () => {
   );
   expect(screen.getByText('Marc D.')).toBeInTheDocument();
   expect(screen.getByText('J. Dupont')).toBeInTheDocument();
-  expect(screen.getByText(/SIGNED/)).toBeInTheDocument();
-  expect(screen.getByText(/SENT/)).toBeInTheDocument();
+  // Statuts affichés en français, pas en valeurs d'enum brutes.
+  expect(screen.getByText(/Signé/)).toBeInTheDocument();
+  expect(screen.getByText(/Envoyé/)).toBeInTheDocument();
+  expect(screen.queryByText(/SIGNED|SENT/)).not.toBeInTheDocument();
 });
 
 test('sans demande de signature, affiche un état vide', () => {
