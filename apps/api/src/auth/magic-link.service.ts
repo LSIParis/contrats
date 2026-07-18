@@ -64,7 +64,11 @@ export class MagicLinkService {
     const payload: MagicPayload = { userId: user.userId, tenantId };
     await this.redis.set(this.key(this.hash(token)), JSON.stringify(payload), 'EX', TOKEN_TTL_SECONDS);
 
-    const link = `${process.env.PORTAL_URL ?? 'https://contrats.lsi-maintenance.fr'}/portal/verify?token=${token}`;
+    // Le lien pointe DIRECTEMENT vers l'endpoint API de vérification (pas
+    // encore de frontend). Quand le portail existera (Phase E), il pointera
+    // vers une page qui gère le token proprement.
+    const base = process.env.APP_URL ?? 'https://contrats.lsi-maintenance.fr';
+    const link = `${base}/v1/portal/auth/verify?token=${token}`;
     await this.email.send({
       to: email,
       subject: 'Votre lien de connexion — LSI Maintenance',
