@@ -1,7 +1,7 @@
 import { Module, Controller, Get } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { ScopeGuard } from './auth/scope.guard.js';
 import { SessionService } from './auth/session.service.js';
@@ -57,7 +57,19 @@ class HealthController {
       // Le bundle Vite ; en dev il peut être absent (Vite sert lui-même) —
       // ServeStatic renvoie alors 404 sur les routes SPA, ce qui est sans effet
       // puisque le dev passe par le serveur Vite (proxy /v1 → 3001).
-      rootPath: join(process.cwd(), 'apps/web/dist'),
+      //
+      // ATTENTION : résolu depuis `import.meta.url` (l'emplacement RÉEL de ce
+      // fichier), JAMAIS depuis `process.cwd()`. En production, le CMD du
+      // Dockerfile est `pnpm --filter @lsi/api exec node ... src/main.ts` —
+      // `pnpm --filter <pkg> exec` lance le process avec cwd = le dossier du
+      // package (`/app/apps/api`), PAS la racine du repo. Un `join(cwd(),
+      // 'apps/web/dist')` visait donc `/app/apps/api/apps/web/dist`, qui
+      // n'existe pas : le build réel est le dossier frère `/app/apps/web/dist`.
+      // Résultat en prod : le SPA n'était JAMAIS servi (chaque route non-/v1
+      // tombait sur un sendFile d'un chemin absent). `import.meta.url` pointe
+      // sur ce fichier source (`.../apps/api/src/app.module.ts`, exécuté via
+      // SWC) et sa résolution relative est indépendante du cwd du process.
+      rootPath: fileURLToPath(new URL('../../web/dist', import.meta.url)),
       // JAMAIS capturer l'API ni le healthcheck avec le repli index.html.
       //
       // ATTENTION : `@nestjs/serve-static@4.0.2` compile `exclude` avec

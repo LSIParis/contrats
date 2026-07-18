@@ -2,20 +2,32 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { AppModule } from '../../src/app.module.js';
 
 // `apps/web/dist` (le chemin lu par ServeStaticModule, cf. app.module.ts) —
 // on y dépose un index.html minimal pour que le repli SPA ait quelque chose
 // à servir, sans dépendre d'un build préalable de apps/web.
 //
-// IMPORTANT : le loader ServeStatic capture le chemin du fichier index AU
-// MOMENT de son enregistrement (onModuleInit), pas à chaque requête. Le
-// fichier doit donc déjà exister AVANT de bootstrapper l'app.
-const distDir = join(process.cwd(), 'apps/web/dist');
-const indexPath = join(distDir, 'index.html');
+// Résolu depuis `import.meta.url` de CE fichier de test, PAS depuis
+// `process.cwd()` : app.module.ts calcule désormais son `rootPath` de la
+// même façon (relatif à son propre `import.meta.url`), justement pour être
+// indépendant du cwd du process (cf. commentaire dans app.module.ts —
+// `pnpm --filter <pkg> exec` déplace le cwd vers le dossier du package en
+// prod). Ce test doit viser le MÊME dossier réel que le module, quel que
+// soit le cwd depuis lequel vitest est lancé.
+// Ce fichier vit en `apps/api/tests/isolation/` : 3 niveaux au-dessus
+// (isolation → tests → api) mène à `apps/`, d'où `apps/web/dist`.
+const distDir = fileURLToPath(new URL('../../../web/dist', import.meta.url));
+const indexPath = fileURLToPath(new URL('../../../web/dist/index.html', import.meta.url));
 const indexPreexisted = existsSync(indexPath);
+// Un vrai build Vite peut déjà être présent (apps/web/dist/index.html) : on
+// ne le détruit JAMAIS. On sauvegarde son contenu pour le restaurer tel
+// quel après le test, plutôt que de le remplacer définitivement par notre
+// marqueur.
+const originalIndexContent = indexPreexisted ? readFileSync(indexPath, 'utf8') : null;
 
 // Le plus haut ancêtre absent qu'il faudra créer (ex: `apps/web` voire
 // `apps` si on tourne depuis apps/api) — c'est celui-là (et lui seul) qu'on
@@ -47,7 +59,9 @@ afterAll(async () => {
   await app.close();
   if (firstMissingAncestor) {
     rmSync(firstMissingAncestor, { recursive: true, force: true });
-  } else if (!indexPreexisted) {
+  } else if (originalIndexContent !== null) {
+    writeFileSync(indexPath, originalIndexContent);
+  } else {
     rmSync(indexPath, { force: true });
   }
 });
