@@ -60,9 +60,11 @@ export async function assignAdminRole(
   const rows = await owner.$queryRawUnsafe<{ id: string }[]>(
     `SELECT id FROM roles WHERE tenant_id='${tenantId}' AND code='MSP_ADMIN' LIMIT 1`,
   );
+  const roleRow = rows[0];
+  if (!roleRow) throw new Error('rôle MSP_ADMIN introuvable après insertion');
   await owner.$executeRawUnsafe(`
     INSERT INTO user_roles (tenant_id, user_id, role_id)
-    VALUES ('${tenantId}', '${userId}', '${rows[0].id}')
+    VALUES ('${tenantId}', '${userId}', '${roleRow.id}')
     ON CONFLICT (user_id, role_id) DO NOTHING
   `);
   await owner.$disconnect();
