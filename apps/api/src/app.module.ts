@@ -59,7 +59,16 @@ class HealthController {
       // puisque le dev passe par le serveur Vite (proxy /v1 → 3001).
       rootPath: join(process.cwd(), 'apps/web/dist'),
       // JAMAIS capturer l'API ni le healthcheck avec le repli index.html.
-      exclude: ['/v1*', '/health'],
+      //
+      // ATTENTION : `@nestjs/serve-static@4.0.2` compile `exclude` avec
+      // `path-to-regexp@0.2.5` (Express 4). Dans CETTE version, un `*` nu
+      // (pas rattaché à un `:nom` ou `(...)`) est un ASTÉRISQUE LITTÉRAL,
+      // pas un joker — `/v1*` ne matche donc RIEN (ni `/v1`, ni `/v1/x`) et
+      // ne fait JAMAIS ce qu'on croit lire. C'est un piège classé « looks
+      // right, does nothing » : ne JAMAIS « simplifier » en `/v1*`.
+      // `/v1/:path*` (paramètre nommé + `*`) matche bien `/v1`, `/v1/x` et
+      // `/v1/x/y/z` — vérifié avec `pathToRegexp('/v1/:path*').exec(...)`.
+      exclude: ['/v1/:path*', '/health'],
     }),
   ],
   controllers: [
