@@ -11,6 +11,8 @@
     "start:dev": "node --watch --import @swc-node/register/esm-register src/main.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
+    "@aws-sdk/s3-request-presigner": "^3.1090.0",
     "@lsi/domain": "workspace:*",
     "@lsi/persistence": "workspace:*",
     "@nestjs/common": "^10.4.15",
@@ -28,13 +30,14 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.15",
-    "@testcontainers/postgresql": "^10.13.2",
+    "@testcontainers/postgresql": "^10.28.0",
     "@testcontainers/redis": "^12.0.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/node": "^22.9.0",
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
+    "testcontainers": "^10.13.2",
     "typescript": "^5.6.3",
     "unplugin-swc": "^1.5.9",
     "vitest": "^2.1.5"

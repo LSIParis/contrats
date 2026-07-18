@@ -22,7 +22,9 @@ import { SendForSignatureService } from './signature/send-for-signature.service.
 import { ESIGNATURE_PROVIDER } from './signature/provider.token.js';
 import { DOCUMENT_RENDERER } from './documents/renderer.token.js';
 import { GotenbergRenderer } from './documents/gotenberg.renderer.js';
-import { ObjectStorage } from './documents/object-storage.js';
+import { DOCUMENT_STORAGE } from './documents/document-storage.port.js';
+import { S3Storage } from './documents/s3-storage.js';
+import { InMemoryStorage } from './documents/in-memory-storage.js';
 
 @Controller()
 class HealthController {
@@ -52,7 +54,12 @@ class HealthController {
     DocusealWebhookService,
     DocusealAdapter,
     SendForSignatureService,
-    ObjectStorage,
+    {
+      // S3 si les identifiants sont fournis (prod), sinon in-memory (tests,
+      // dev sans MinIO). Le service d'envoi dépend du port, pas de l'impl.
+      provide: DOCUMENT_STORAGE,
+      useFactory: () => (process.env.S3_ACCESS_KEY ? new S3Storage() : new InMemoryStorage()),
+    },
     // Les services dépendent des PORTS, pas des adaptateurs : c'est ce qui
     // rend le changement de provider possible sans toucher au métier (§11.1),
     // et ce qui permet de tester la logique d'envoi sans DocuSeal ni Chromium.

@@ -19,7 +19,7 @@ import {
 } from '@lsi/domain';
 import { ESIGNATURE_PROVIDER } from './provider.token.js';
 import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
-import { ObjectStorage } from '../documents/object-storage.js';
+import { DOCUMENT_STORAGE, type DocumentStorage } from '../documents/document-storage.port.js';
 import type { SendForSignatureDto } from '../contracts/dto/send-for-signature.dto.js';
 
 /**
@@ -48,7 +48,7 @@ export class SendForSignatureService {
   constructor(
     @Inject(ESIGNATURE_PROVIDER) private readonly provider: ESignatureProvider,
     @Inject(DOCUMENT_RENDERER) private readonly renderer: DocumentRenderer,
-    private readonly storage: ObjectStorage,
+    @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
   ) {}
 
   async send(scope: Scope, contractId: string, dto: SendForSignatureDto, idempotencyKey: string, now: Date) {
