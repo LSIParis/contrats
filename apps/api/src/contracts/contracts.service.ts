@@ -89,7 +89,50 @@ export class ContractsService {
       // pour cette session. Le comportement sûr est le comportement par
       // défaut — on n'a pas à y penser (RM-30).
       if (!c) throw new NotFoundException('Contrat introuvable');
-      return c;
+
+      const sigReq = await tx.signatureRequest.findFirst({
+        where: { contractId: id },
+        orderBy: { createdAt: 'desc' },
+      });
+      const signers = await tx.contractSigner.findMany({
+        where: { contractId: id },
+        orderBy: { signingOrder: 'asc' },
+        select: { party: true, fullName: true, status: true, signedAt: true },
+      });
+      const reminders = await tx.reminder.findMany({
+        where: { contractId: id },
+        orderBy: { offsetDays: 'desc' },
+        select: { kind: true, offsetDays: true, dueAt: true, status: true, sentAt: true, late: true },
+      });
+      // signature_events n'a PAS de contract_id — on relie par la demande de
+      // signature (vérifié dans le schéma).
+      const events = sigReq
+        ? await tx.signatureEvent.findMany({
+            where: { signatureRequestId: sigReq.id },
+            orderBy: { occurredAt: 'asc' },
+            select: { eventType: true, occurredAt: true, submitterEmail: true },
+          })
+        : [];
+
+      const timeline = [
+        c.createdAt && { at: c.createdAt, type: 'CREATED', label: 'Contrat créé' },
+        c.signedAt && { at: c.signedAt, type: 'SIGNED', label: 'Signé' },
+        c.activatedAt && { at: c.activatedAt, type: 'ACTIVATED', label: 'Activé' },
+        ...events.map((e) => ({
+          at: e.occurredAt, type: e.eventType,
+          label: `${e.eventType}${e.submitterEmail ? ` — ${e.submitterEmail}` : ''}`,
+        })),
+      ]
+        .filter((x): x is { at: Date; type: string; label: string } => Boolean(x))
+        .sort((a, b) => a.at.getTime() - b.at.getTime());
+
+      return {
+        contract: c,
+        customer: c.customer,
+        signatureRequest: sigReq ? { status: sigReq.status, signers } : null,
+        reminders,
+        timeline,
+      };
     });
   }
 
@@ -195,7 +238,9 @@ export class ContractsService {
   }
 
   async allowedActions(scope: Scope, id: string) {
-    const c = await this.findOne(scope, id);
+    // findOne renvoie désormais la fiche enrichie ({ contract, ... }) — on
+    // extrait le contrat brut pour construire le snapshot du domaine.
+    const { contract: c } = await this.findOne(scope, id);
     return allowedEvents(this.toSnapshot({ ...c, signers: [], attachments: [], amendments: [] }, null));
   }
 
