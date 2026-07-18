@@ -56,4 +56,11 @@ describe('GET /v1/reminders', () => {
     expect(refs).toContain('LSI-REM-A');
     expect(refs).not.toContain('LSI-REM-B');
   });
+
+  test('status invalide : 400, pas un 500 PrismaClientValidationError', async () => {
+    await request(app.getHttpServer())
+      .get('/v1/reminders?status=NOT_A_STATUS')
+      .set('x-lsi-session', 'sess-am-a')
+      .expect(400);
+  });
 });

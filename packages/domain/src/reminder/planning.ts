@@ -12,7 +12,22 @@
  */
 
 export type ReminderKind = 'EXPIRY' | 'NOTICE_DEADLINE';
-export type ReminderStatus = 'PENDING' | 'SKIPPED_OBSOLETE';
+
+/**
+ * Redéfini ici plutôt qu'importé du client Prisma, comme CONTRACT_STATUSES
+ * (§ contract.types.ts) : le schéma de base est un détail de persistance,
+ * pas la source de vérité métier. Les valeurs sont identiques au enum
+ * Prisma `ReminderStatus`.
+ */
+export const REMINDER_STATUSES = [
+  'PENDING',
+  'SENT',
+  'SKIPPED_OBSOLETE',
+  'CANCELLED',
+  'FAILED',
+] as const;
+
+export type ReminderStatus = (typeof REMINDER_STATUSES)[number];
 
 /** Les offsets du dossier. J-90 interne, J-60 +client, J-30 +escalade (RM-27). */
 export const EXPIRY_OFFSETS = [90, 60, 30] as const;

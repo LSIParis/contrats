@@ -2,6 +2,7 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { type Scope } from '@lsi/persistence';
 import { CurrentScope } from '../auth/current-scope.decorator.js';
 import { RemindersReadService } from './reminders.service.js';
+import { ListRemindersDto } from './dto/list-reminders.dto.js';
 
 /**
  * Source de données de l'écran rappels et du widget cockpit.
@@ -14,7 +15,7 @@ export class RemindersController {
   constructor(private readonly reminders: RemindersReadService) {}
 
   @Get()
-  list(@CurrentScope() scope: Scope, @Query('status') status?: string) {
-    return this.reminders.list(scope, status);
+  list(@CurrentScope() scope: Scope, @Query() query: ListRemindersDto) {
+    return this.reminders.list(scope, query.status);
   }
 }
