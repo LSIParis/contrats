@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { withScope, uuidv7, type Scope } from '@lsi/persistence';
 import {
   applyEvent,
@@ -8,6 +8,11 @@ import {
   type ContractEvent,
   type ContractSnapshot,
 } from '@lsi/domain';
+import {
+  DOCUMENT_STORAGE,
+  assertKeyMatchesScope,
+  type DocumentStorage,
+} from '../documents/document-storage.port.js';
 import type { CreateContractDto } from './dto/create-contract.dto.js';
 import type { ListContractsDto } from './dto/list-contracts.dto.js';
 
@@ -24,6 +29,8 @@ import type { ListContractsDto } from './dto/list-contracts.dto.js';
  */
 @Injectable()
 export class ContractsService {
+  constructor(@Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage) {}
+
   async create(scope: Scope, dto: CreateContractDto, now: Date) {
     return withScope(scope, async (tx) => {
       // Le customerId du DTO est un FILTRE, pas un scope. On le vérifie
@@ -235,6 +242,34 @@ export class ContractsService {
         },
       });
     });
+  }
+
+  /**
+   * URL présignée (courte durée) vers la preuve PDF signée. (§10.7)
+   *
+   * On récupère la clé ET le scope objet (tenant + customer) depuis la
+   * `signature_request`, jamais depuis le DTO/l'appelant : c'est la seule
+   * source fiable pour construire l'ObjectScope attendu par le stockage.
+   */
+  async signedDocumentUrl(scope: Scope, id: string): Promise<{ url: string }> {
+    const found = await withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!c) return null; // hors scope : RLS a déjà filtré → 404
+      const sr = await tx.signatureRequest.findFirst({
+        where: { contractId: id, signedPdfObjectKey: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: { signedPdfObjectKey: true, tenantId: true, customerId: true },
+      });
+      return sr?.signedPdfObjectKey
+        ? { key: sr.signedPdfObjectKey, tenantId: sr.tenantId, customerId: sr.customerId }
+        : null;
+    });
+    if (!found) throw new NotFoundException('Aucune preuve signée disponible');
+
+    const objScope = { tenantId: found.tenantId, customerId: found.customerId };
+    assertKeyMatchesScope(found.key, objScope); // refuse une clé hors du scope
+    const url = await this.storage.presignedGetUrl(found.key, objScope, 300); // TTL 5 min
+    return { url };
   }
 
   async allowedActions(scope: Scope, id: string) {

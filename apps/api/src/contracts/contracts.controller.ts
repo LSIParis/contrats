@@ -67,6 +67,12 @@ export class ContractsController {
     return this.contracts.findOne(scope, id);
   }
 
+  @Get(':id/signed-document')
+  async signedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    // URL présignée à durée courte : jamais d'URL S3 durable en base (§10.7).
+    return this.contracts.signedDocumentUrl(scope, id);
+  }
+
   @Get(':id/allowed-actions')
   async allowed(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
     // Permet à l'interface de désactiver les bons boutons sans dupliquer
