@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../lib/api.js';
@@ -24,9 +25,22 @@ async function downloadSigned(id: string) {
 export function ContractDetailPage() {
   const { id } = useParams<{ id: string }>();
   const q = useQuery({ queryKey: ['contract', id], queryFn: () => apiGet<Detail>(`/v1/contracts/${id}`) });
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   if (q.isLoading) return <Spinner />;
   if (q.error || !q.data) return <p className="text-red-600">Contrat introuvable.</p>;
   const { contract, customer } = q.data;
+  const canDownloadSigned = q.data.signatureRequest?.status === 'COMPLETED';
+
+  async function handleDownload() {
+    if (!id) return;
+    setDownloadError(null);
+    try {
+      await downloadSigned(id);
+    } catch {
+      setDownloadError('Document signé indisponible.');
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -39,7 +53,12 @@ export function ContractDetailPage() {
             {contract.endDate ? new Date(contract.endDate).toLocaleDateString('fr-FR') : '—'}
           </p>
         </div>
-        <Button onClick={() => id && downloadSigned(id)}>Télécharger le signé</Button>
+        {canDownloadSigned && (
+          <div className="flex flex-col items-end gap-1">
+            <Button onClick={handleDownload}>Télécharger le signé</Button>
+            {downloadError && <p className="text-sm text-red-600">{downloadError}</p>}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
