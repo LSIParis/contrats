@@ -13,21 +13,28 @@ export interface ScopeRef {
  * on cherche DE QUEL scope relève chaque contrat à faire évoluer. Ne renvoient
  * que des identifiants, jamais de contenu — le traitement se fait ensuite dans
  * le scope résolu, sous RLS.
+ *
+ * Deux fonctions distinctes plutôt qu'un nom paramétré : le tag `$queryRaw`
+ * paramètre la limite, et le nom de la fonction reste un littéral — jamais
+ * d'interpolation de chaîne (§13.3).
  */
-async function discover(fn: string, limit: number): Promise<ScopeRef[]> {
-  // ::int car Prisma passe un number JS en bigint, et la fonction attend int.
-  const rows = await unsafeUnscopedClient.$queryRawUnsafe<
-    { id: string; tenant_id: string; customer_id: string }[]
-  >(`SELECT * FROM ${fn}($1::int)`, limit);
-  return rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, customerId: r.customer_id }));
+function toRef(r: { id: string; tenant_id: string; customer_id: string }): ScopeRef {
+  return { id: r.id, tenantId: r.tenant_id, customerId: r.customer_id };
 }
 
 /** Signés dont la date de début est atteinte (RM-06). */
-export function findContractsToActivate(limit = 500): Promise<ScopeRef[]> {
-  return discover('app_find_contracts_to_activate', limit);
+export async function findContractsToActivate(limit = 500): Promise<ScopeRef[]> {
+  // ::int car Prisma passe un number JS en bigint, et la fonction attend int.
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_contracts_to_activate(${limit}::int)`;
+  return rows.map(toRef);
 }
 
 /** Actifs dont le terme est dépassé (RM-07). */
-export function findContractsToExpire(limit = 500): Promise<ScopeRef[]> {
-  return discover('app_find_contracts_to_expire', limit);
+export async function findContractsToExpire(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_contracts_to_expire(${limit}::int)`;
+  return rows.map(toRef);
 }
