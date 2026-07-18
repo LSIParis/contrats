@@ -23,3 +23,8 @@ export {
   resolveWebhookScope,
   type ResolvedWebhookScope,
 } from './webhook-scope-lookup.js';
+export {
+  resolveUserScope,
+  type ResolvedUserScope,
+  type ResolvedRole,
+} from './scope-resolution.js';
