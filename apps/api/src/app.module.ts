@@ -22,6 +22,8 @@ import { EntraOidcProvider } from './auth/oidc-entra.adapter.js';
 import { Public } from './auth/public.decorator.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
+import { ContentController } from './contracts/content.controller.js';
+import { ContentService } from './contracts/content.service.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
@@ -87,6 +89,7 @@ class HealthController {
   ],
   controllers: [
     ContractsController,
+    ContentController,
     CustomersController,
     DocusealWebhookController,
     PortalAuthController,
@@ -98,6 +101,7 @@ class HealthController {
   ],
   providers: [
     ContractsService,
+    ContentService,
     CustomersService,
     DashboardService,
     RemindersReadService,

@@ -28,7 +28,8 @@
     "ioredis": "^5.11.1",
     "openid-client": "^6.8.4",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sanitize-html": "^2.17.6"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.15",
@@ -37,6 +38,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/node": "^22.9.0",
+    "@types/sanitize-html": "^2.16.1",
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
     "testcontainers": "^10.13.2",
