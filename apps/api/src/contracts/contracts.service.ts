@@ -104,7 +104,12 @@ export class ContractsService {
       const signers = await tx.contractSigner.findMany({
         where: { contractId: id },
         orderBy: { signingOrder: 'asc' },
-        select: { party: true, fullName: true, status: true, signedAt: true },
+        select: { id: true, party: true, fullName: true, email: true, signingOrder: true, status: true, signedAt: true },
+      });
+      const approval = await tx.contractApproval.findFirst({
+        where: { contractId: id },
+        orderBy: { submittedAt: 'desc' },
+        select: { submittedByUserId: true, decision: true, reason: true, decidedByUserId: true },
       });
       const reminders = await tx.reminder.findMany({
         where: { contractId: id },
@@ -136,6 +141,11 @@ export class ContractsService {
       return {
         contract: c,
         customer: c.customer,
+        signers,
+        approval,
+        // Conservé pour le composant SignatureBlock du cockpit, qui lit
+        // signatureRequest.signers — on ne le casse pas, on réutilise le
+        // même tableau plutôt que de le dupliquer avec un select différent.
         signatureRequest: sigReq ? { status: sigReq.status, signers } : null,
         reminders,
         timeline,
@@ -297,28 +307,15 @@ export class ContractsService {
   }
 
   async allowedActions(scope: Scope, id: string) {
-    // Lookup allégé (une seule requête) : on n'a besoin que du contrat brut
-    // pour construire le snapshot du domaine. Ne PAS appeler findOne ici —
-    // sa version enrichie (customer/signatureRequest/reminders/timeline)
-    // coûte 3-4 requêtes inutiles pour ce seul besoin.
-    const c = await this.getContractOrThrow(scope, id);
-    return allowedEvents(this.toSnapshot({ ...c, signers: [], attachments: [], amendments: [] }, null));
-  }
-
-  /**
-   * Charge le contrat brut (avec son client) et lève une 404 si la ligne est
-   * masquée par la RLS. RLS a déjà filtré : hors scope, la ligne n'existe
-   * simplement pas pour cette session. Le comportement sûr est le
-   * comportement par défaut — on n'a pas à y penser (RM-30).
-   */
-  private async getContractOrThrow(scope: Scope, id: string) {
     return withScope(scope, async (tx) => {
+      // On charge les VRAIS signataires : sinon la garde SUBMIT (LSI+client)
+      // ne serait jamais satisfaite et « Soumettre » n'apparaîtrait jamais.
       const c = await tx.contract.findUnique({
         where: { id },
-        include: { customer: { select: { id: true, name: true } } },
+        include: { signers: { select: { party: true } } },
       });
       if (!c) throw new NotFoundException('Contrat introuvable');
-      return c;
+      return allowedEvents(this.toSnapshot({ ...c, attachments: [], amendments: [] }, null));
     });
   }
 
