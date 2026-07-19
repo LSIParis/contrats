@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   withScope, createCustomer, CustomerSirenConflict, resolveUserScope,
   type Scope,
@@ -49,5 +49,46 @@ export class CustomersService {
         select: { id: true, name: true, siren: true, country: true },
       }),
     );
+  }
+
+  list(scope: Scope) {
+    return withScope(scope, async (tx) => {
+      const rows = await tx.customer.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true, name: true, siren: true, country: true, status: true,
+          _count: { select: { contracts: true } },
+        },
+      });
+      return {
+        items: rows.map((c) => ({
+          id: c.id, name: c.name, siren: c.siren, country: c.country,
+          status: c.status, contractCount: c._count.contracts,
+        })),
+      };
+    });
+  }
+
+  findOne(scope: Scope, id: string) {
+    return withScope(scope, async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: { id },
+        select: {
+          id: true, name: true, legalName: true, siren: true, vatNumber: true,
+          addressLine1: true, addressLine2: true, postalCode: true, city: true,
+          country: true, status: true,
+        },
+      });
+      if (!customer) throw new NotFoundException('Client introuvable');
+      const contacts = await tx.customerContact.findMany({
+        where: { customerId: id },
+        orderBy: [{ isPrimary: 'desc' }, { lastName: 'asc' }],
+        select: {
+          id: true, firstName: true, lastName: true, email: true,
+          phone: true, jobTitle: true, isPrimary: true,
+        },
+      });
+      return { customer, contacts };
+    });
   }
 }
