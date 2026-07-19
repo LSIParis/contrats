@@ -209,6 +209,25 @@ export class DocusealAdapter implements ESignatureProvider {
     return { signedPdf, auditTrail };
   }
 
+  async remindSubmitter(providerSubmitterId: string): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/submitters/${providerSubmitterId}`, {
+      method: 'PUT',
+      headers: { 'X-Auth-Token': this.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ send_email: true }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new ProviderError(`relance échouée (${res.status})`, res.status >= 500);
+  }
+
+  async revokeSubmission(providerSubmissionId: string): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/submissions/${providerSubmissionId}`, {
+      method: 'DELETE',
+      headers: { 'X-Auth-Token': this.apiKey },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new ProviderError(`révocation échouée (${res.status})`, res.status >= 500);
+  }
+
   private async fetchBinary(url: string): Promise<Buffer> {
     const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new ProviderError(`Téléchargement ${res.status} : ${url.slice(0, 80)}`, res.status >= 500);

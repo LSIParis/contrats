@@ -32,6 +32,8 @@ import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
 import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
 import { DocusealAdapter } from './signature/docuseal.adapter.js';
 import { SendForSignatureService } from './signature/send-for-signature.service.js';
+import { SignatureActionsController } from './signature/signature-actions.controller.js';
+import { SignatureActionsService } from './signature/signature-actions.service.js';
 import { ESIGNATURE_PROVIDER } from './signature/provider.token.js';
 import { DOCUMENT_RENDERER } from './documents/renderer.token.js';
 import { GotenbergRenderer } from './documents/gotenberg.renderer.js';
@@ -95,6 +97,7 @@ class HealthController {
     CustomersController,
     SignersController,
     DocusealWebhookController,
+    SignatureActionsController,
     PortalAuthController,
     InternalAuthController,
     MeController,
@@ -118,6 +121,7 @@ class HealthController {
     DocusealWebhookService,
     DocusealAdapter,
     SendForSignatureService,
+    SignatureActionsService,
     ProofCaptureService,
     ReconciliationService,
     LifecycleService,

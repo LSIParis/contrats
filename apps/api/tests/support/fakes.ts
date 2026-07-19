@@ -22,12 +22,16 @@ export class FakeProvider implements ESignatureProvider {
   readonly name = 'DOCUSEAL' as const;
 
   readonly calls: CreateSubmissionCommand[] = [];
+  readonly reminded: string[] = [];
+  readonly revoked: string[] = [];
   private failure: string | null = null;
   private counter = 0;
   private readonly created = new Map<string, ProviderSubmission>();
 
   reset(): void {
     this.calls.length = 0;
+    this.reminded.length = 0;
+    this.revoked.length = 0;
     this.failure = null;
     this.created.clear();
   }
@@ -60,6 +64,24 @@ export class FakeProvider implements ESignatureProvider {
 
   async findSubmissionByExternalId(externalId: string): Promise<ProviderSubmission | null> {
     return this.created.get(externalId) ?? null;
+  }
+
+  async remindSubmitter(providerSubmitterId: string): Promise<void> {
+    if (this.failure) {
+      const msg = this.failure;
+      this.failure = null;
+      throw new ProviderError(msg, true);
+    }
+    this.reminded.push(providerSubmitterId);
+  }
+
+  async revokeSubmission(providerSubmissionId: string): Promise<void> {
+    if (this.failure) {
+      const msg = this.failure;
+      this.failure = null;
+      throw new ProviderError(msg, true);
+    }
+    this.revoked.push(providerSubmissionId);
   }
 
   async downloadSignedDocuments(providerSubmissionId: string): Promise<{ signedPdf: Buffer; auditTrail: Buffer | null }> {
