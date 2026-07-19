@@ -85,7 +85,7 @@ export function allowedEvents(c: ContractSnapshot): ContractEventType[] {
   return TRANSITIONS[c.status].filter((e) => {
     switch (e) {
       case 'SUBMIT_FOR_REVIEW':
-        return c.hasLsiSigner && c.hasClientSigner && c.hasRequiredAttachments && !!c.startDate;
+        return c.hasLsiSigner && c.hasClientSigner && c.hasRequiredAttachments && !!c.startDate && !!c.currentVersionId;
       case 'SEND_FOR_SIGNATURE':
         return c.approvedVersionId !== null && c.approvedVersionId === c.currentVersionId;
       case 'EXPIRE':
@@ -141,6 +141,12 @@ export function applyEvent(
       }
       if (!c.startDate) {
         throw new BusinessRuleError('La date de début est obligatoire.', 'RM-08');
+      }
+      if (!c.currentVersionId) {
+        throw new BusinessRuleError(
+          'Le contrat doit avoir un contenu rédigé avant d\'être soumis.',
+          'RM-11',
+        );
       }
       return { ...c, status: 'IN_REVIEW', submittedByUserId: event.actorUserId };
     }
