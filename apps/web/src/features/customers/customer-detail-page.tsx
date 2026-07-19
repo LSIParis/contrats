@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../lib/api.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Card } from '../../ui/card.js';
+import { AddContactForm } from './add-contact-form.js';
 
 interface Contact { id: string; firstName: string; lastName: string; email: string; phone: string | null; jobTitle: string | null; isPrimary: boolean; }
 interface CustomerDetail {
@@ -38,6 +39,7 @@ export function CustomerDetailPage() {
             ))}
           </ul>
         )}
+        <AddContactForm customerId={customer.id} />
       </Card>
     </div>
   );
