@@ -9,6 +9,7 @@ export function AppShell() {
         <div className="mb-6 font-semibold">LSI Contrats</div>
         <ul className="space-y-2">
           <li><Link to="/dashboard">Tableau de bord</Link></li>
+          <li><Link to="/customers">Clients</Link></li>
           <li><Link to="/contracts">Contrats</Link></li>
           <li><Link to="/reminders">Rappels</Link></li>
         </ul>

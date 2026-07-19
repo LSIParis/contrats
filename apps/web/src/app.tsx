@@ -4,6 +4,8 @@ import { AppShell } from './shell/app-shell.js';
 import { DashboardPage } from './features/dashboard/dashboard-page.js';
 import { ContractsPage } from './features/contracts/contracts-page.js';
 import { ContractDetailPage } from './features/contracts/contract-detail-page.js';
+import { CustomersPage } from './features/customers/customers-page.js';
+import { CustomerDetailPage } from './features/customers/customer-detail-page.js';
 
 export function App() {
   return (
@@ -13,6 +15,8 @@ export function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:id" element={<CustomerDetailPage />} />
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/contracts/:id" element={<ContractDetailPage />} />
             <Route path="/reminders" element={<div>Rappels</div>} />
