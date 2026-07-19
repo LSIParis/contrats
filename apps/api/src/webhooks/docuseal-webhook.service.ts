@@ -9,7 +9,19 @@ export type WebhookOutcome =
   | 'duplicate_ignored'
   | 'unknown_submission'
   | 'unsupported_event'
-  | 'rejected';
+  | 'rejected'
+  | 'closed_ignored';
+
+/**
+ * Statuts CLOS d'une signature_request : plus rien ne doit les rouvrir.
+ *
+ * REVOKED est le cas déclencheur (revoke ⇄ webhook en vol), mais un webhook
+ * tardif sur n'importe quel statut définitivement clos doit être inerte pour
+ * la même raison — CREATING/SENT/PARTIALLY_COMPLETED restent volontairement
+ * hors de cet ensemble : ce sont les statuts ACTIFS que le webhook doit
+ * justement pouvoir faire progresser.
+ */
+const CLOSED_REQUEST_STATUSES = new Set(['REVOKED', 'DECLINED', 'EXPIRED', 'COMPLETED', 'FAILED']);
 
 /**
  * Traitement des webhooks DocuSeal. (§11.4)
@@ -117,6 +129,31 @@ export class DocusealWebhookService {
       } catch (e: any) {
         if (e?.code === 'P2002') return { status: 'duplicate_ignored' as const, captureJob: null };
         throw e;
+      }
+
+      // Garde : un webhook déjà en vol pour une demande qui vient d'être
+      // CLOSE (typiquement REVOKED entre-temps par un utilisateur) ne doit
+      // RIEN modifier. Sans cette garde, un FORM_COMPLETED tardif sur une
+      // demande REVOKED repasserait le signataire à SIGNED et la demande à
+      // PARTIALLY_COMPLETED/COMPLETED — ré-entrant dans l'index partiel
+      // unique signature_requests_one_active et bloquant tout renvoi
+      // ultérieur sans qu'une révocation ne soit plus jamais possible.
+      // L'événement reste journalisé ci-dessus (piste d'audit) ; seul
+      // l'effet métier est court-circuité.
+      const current = await tx.signatureRequest.findUnique({
+        where: { id: sigReq.signatureRequestId },
+        select: { status: true },
+      });
+      if (current && CLOSED_REQUEST_STATUSES.has(current.status)) {
+        this.log.warn(
+          `webhook ignoré : demande ${sigReq.signatureRequestId} déjà ${current.status} ` +
+            `(événement ${event.kind} tardif)`,
+        );
+        await tx.signatureEvent.updateMany({
+          where: { providerEventId: event.eventId },
+          data: { processedAt: new Date() },
+        });
+        return { status: 'closed_ignored' as const, captureJob: null };
       }
 
       const captureJob = await this.applyBusinessEffect(tx, sigReq, event);

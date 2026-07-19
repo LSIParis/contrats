@@ -425,6 +425,91 @@ describe('§11.5 — effets métier', () => {
   });
 });
 
+// ===========================================================================
+// Revue finale phase-e-suivi-signatures — résurrection par webhook tardif
+// ===========================================================================
+
+describe('révocation — un webhook tardif ne doit pas ressusciter la demande', () => {
+  /**
+   * Reproduit l'état laissé par POST /v1/contracts/:id/signature/revoke :
+   * demande REVOKED (providerSubmissionId CONSERVÉ — la résolution de scope
+   * en dépend), signataires remis à PENDING, contrat repassé à APPROVED.
+   *
+   * Un FORM_COMPLETED déjà en vol pour cette submission peut arriver APRÈS
+   * la révocation. Sans garde, applyBusinessEffect ne regarde pas le statut
+   * courant de la demande : il repasserait le signataire à SIGNED et la
+   * demande à PARTIALLY_COMPLETED/COMPLETED — ré-entrant dans l'index
+   * partiel unique signature_requests_one_active et bloquant tout renvoi
+   * ultérieur (409 SIGNATURE_ALREADY_IN_PROGRESS) sans qu'une révocation ne
+   * soit plus jamais possible depuis le front (bouton masqué hors
+   * PENDING_SIGNATURE/PARTIALLY_SIGNED).
+   */
+  async function revokeState() {
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      Promise.all([
+        tx.signatureRequest.update({
+          where: { id: subA.requestId },
+          data: { status: 'REVOKED' },
+        }),
+        tx.contractSigner.updateMany({
+          where: { contractId: subA.contractId },
+          data: { status: 'PENDING', providerSubmitterId: null, providerSubmitterSlug: null },
+        }),
+        tx.contract.update({
+          where: { id: subA.contractId },
+          data: { status: 'APPROVED' },
+        }),
+      ]),
+    );
+  }
+
+  test('un FORM_COMPLETED tardif sur une demande REVOKED est un no-op', async () => {
+    await revokeState();
+
+    const res = await post(formEvent());
+    expect(res.status).toBe(200); // jamais de 5xx : DocuSeal réessaierait 48 h pour rien
+
+    const [c, req, signers] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id: subA.contractId } }),
+      await tx.signatureRequest.findUnique({ where: { id: subA.requestId } }),
+      await tx.contractSigner.findMany({ where: { contractId: subA.contractId } }),
+    ]);
+
+    expect(c!.status).toBe('APPROVED');
+    expect(req!.status).toBe('REVOKED');
+    const client = signers.find((s) => s.party === 'CLIENT')!;
+    expect(client.status).toBe('PENDING');
+    expect(client.signedAt).toBeNull();
+    expect(client.providerSubmitterId).toBeNull();
+  });
+
+  test('un FORM_DECLINED tardif sur une demande déjà EXPIRED est aussi un no-op', async () => {
+    // Garde défensive : toute demande CLOSE (pas seulement REVOKED) doit
+    // rester inerte face à un webhook tardif.
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.signatureRequest.update({ where: { id: subA.requestId }, data: { status: 'EXPIRED' } }),
+    );
+
+    const res = await post(
+      formEvent(
+        { event_type: 'form.declined' },
+        { status: 'declined', decline_reason: 'Tarif trop élevé', declined_at: '2026-07-17T14:00:00Z' },
+      ),
+    );
+    expect(res.status).toBe(200);
+
+    const [c, req, signers] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id: subA.contractId } }),
+      await tx.signatureRequest.findUnique({ where: { id: subA.requestId } }),
+      await tx.contractSigner.findMany({ where: { contractId: subA.contractId } }),
+    ]);
+
+    expect(c!.status).toBe('PENDING_SIGNATURE'); // inchangé
+    expect(req!.status).toBe('EXPIRED'); // pas re-basculé en DECLINED
+    expect(signers.find((s) => s.party === 'CLIENT')!.status).toBe('SENT'); // inchangé
+  });
+});
+
 describe('journalisation', () => {
   test('chaque événement traité laisse un signature_event avec son payload brut', async () => {
     await post(formEvent());
