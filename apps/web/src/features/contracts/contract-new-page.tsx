@@ -6,6 +6,7 @@ import { Spinner } from '../../ui/spinner.js';
 import { Field } from '../../ui/field.js';
 import { Input } from '../../ui/input.js';
 import { Select } from '../../ui/select.js';
+import { contractCategoryLabel, billingFrequencyLabel } from '../../lib/labels.js';
 
 interface CustomerRow { id: string; name: string; }
 
@@ -54,6 +55,7 @@ export function ContractNewPage() {
   });
 
   if (custs.isLoading) return <Spinner />;
+  if (custs.error || !custs.data) return <p className="text-red-600">Erreur de chargement.</p>;
   const customers = custs.data?.items ?? [];
   const error = m.error instanceof ApiError ? m.error.message : m.error ? 'Erreur.' : undefined;
   const ready = form.customerId && form.title.trim();
@@ -70,7 +72,7 @@ export function ContractNewPage() {
       <Field label="Titre" htmlFor="title"><Input id="title" value={form.title} onChange={set('title')} required /></Field>
       <Field label="Catégorie" htmlFor="cat">
         <Select id="cat" value={form.category} onChange={set('category')}>
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          {CATEGORIES.map((c) => <option key={c} value={c}>{contractCategoryLabel(c)}</option>)}
         </Select>
       </Field>
       <div className="flex gap-3">
@@ -83,7 +85,7 @@ export function ContractNewPage() {
       </div>
       <Field label="Facturation" htmlFor="bf">
         <Select id="bf" value={form.billingFrequency} onChange={set('billingFrequency')}>
-          {FREQ.map((f) => <option key={f} value={f}>{f}</option>)}
+          {FREQ.map((f) => <option key={f} value={f}>{billingFrequencyLabel(f)}</option>)}
         </Select>
       </Field>
       {error && <p className="text-sm text-red-600">{error}</p>}

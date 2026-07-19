@@ -44,7 +44,24 @@ const PARTY_FR: Record<string, string> = {
   CLIENT: 'Client',
 };
 
+const CONTRACT_CATEGORY_FR: Record<string, string> = {
+  MAINTENANCE: 'Maintenance',
+  SUPPORT: 'Support',
+  HOSTING: 'Hébergement',
+  SLA: 'Niveau de service (SLA)',
+  OTHER: 'Autre',
+};
+
+const BILLING_FREQUENCY_FR: Record<string, string> = {
+  MONTHLY: 'Mensuelle',
+  QUARTERLY: 'Trimestrielle',
+  YEARLY: 'Annuelle',
+  ONE_OFF: 'Ponctuelle',
+};
+
 export const contractStatusLabel = (s: string): string => CONTRACT_STATUS_FR[s] ?? s;
 export const signerStatusLabel = (s: string): string => SIGNER_STATUS_FR[s] ?? s;
 export const reminderStatusLabel = (s: string): string => REMINDER_STATUS_FR[s] ?? s;
 export const partyLabel = (s: string): string => PARTY_FR[s] ?? s;
+export const contractCategoryLabel = (s: string): string => CONTRACT_CATEGORY_FR[s] ?? s;
+export const billingFrequencyLabel = (s: string): string => BILLING_FREQUENCY_FR[s] ?? s;

@@ -34,6 +34,8 @@ test('crée un contrat (montant € → centimes) et redirige', async () => {
   vi.stubGlobal('fetch', fetchMock as never);
   wrap();
   await waitFor(() => expect(screen.getByDisplayValue('Dupont SAS')).toBeInTheDocument());
+  expect(screen.getByRole('option', { name: 'Maintenance' })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'MAINTENANCE' })).not.toBeInTheDocument();
   await userEvent.type(screen.getByLabelText(/Titre/), 'Maintenance 2026');
   await userEvent.type(screen.getByLabelText(/Montant/), '1500,50');
   await userEvent.click(screen.getByRole('button', { name: /Créer/ }));
