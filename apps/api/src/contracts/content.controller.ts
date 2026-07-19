@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { type Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
@@ -32,5 +33,19 @@ export class ContentController {
     @Param('versionId', ParseUUIDPipe) versionId: string,
   ) {
     return this.content.getVersion(scope, id, versionId);
+  }
+
+  @Get(':id/preview.pdf')
+  async preview(
+    @CurrentScope() scope: Scope,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
+    // La méthode lève AVANT d'écrire dans `res` (404/422) : le filtre
+    // d'exception de Nest répond alors normalement.
+    const pdf = await this.content.previewPdf(scope, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="apercu.pdf"');
+    res.send(pdf);
   }
 }

@@ -1,11 +1,20 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { withScope, uuidv7, type Scope } from '@lsi/persistence';
-import { EDITABLE_STATUSES } from '@lsi/domain';
+import { EDITABLE_STATUSES, type DocumentRenderer } from '@lsi/domain';
 import { sanitizeContractHtml } from '../documents/html-sanitizer.js';
+import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
 import type { SaveContentDto } from './dto/save-content.dto.js';
 
 @Injectable()
 export class ContentService {
+  constructor(@Inject(DOCUMENT_RENDERER) private readonly renderer: DocumentRenderer) {}
+
   async saveContent(scope: Scope, id: string, dto: SaveContentDto) {
     return withScope(scope, async (tx) => {
       const c = await tx.contract.findUnique({
@@ -68,6 +77,25 @@ export class ContentService {
       });
       if (!v) throw new NotFoundException('Version introuvable');
       return v;
+    });
+  }
+
+  /** Rendu PDF de la version courante — via Gotenberg (aperçu, non signé). */
+  async previewPdf(scope: Scope, id: string): Promise<Buffer> {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({
+        where: { id },
+        select: { id: true, title: true, currentVersionId: true },
+      });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      if (!c.currentVersionId) throw new UnprocessableEntityException('Aucune version à prévisualiser');
+      const version = await tx.contractVersion.findUnique({
+        where: { id: c.currentVersionId },
+        select: { bodyHtml: true },
+      });
+      if (!version) throw new UnprocessableEntityException('Version introuvable');
+      const rendered = await this.renderer.render({ html: version.bodyHtml, documentTitle: c.title });
+      return rendered.pdf;
     });
   }
 }
