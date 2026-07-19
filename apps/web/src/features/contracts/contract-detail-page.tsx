@@ -13,6 +13,7 @@ import { SignersBlock, type Signer } from './signers-block.js';
 import { Timeline, type Event } from './timeline.js';
 import { WorkflowActions } from './workflow-actions.js';
 import { SendForSignature } from './send-for-signature.js';
+import { SignatureActions } from './signature-actions.js';
 
 interface Detail {
   contract: {
@@ -111,6 +112,7 @@ export function ContractDetailPage() {
         signers={q.data.signers}
         editable={['DRAFT', 'CHANGES_REQUESTED'].includes(contract.status)}
       />
+      <SignatureActions contractId={contract.id} status={contract.status} roles={me.data?.roles ?? []} />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
         <RemindersBlock reminders={q.data.reminders} />
