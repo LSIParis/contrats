@@ -26,6 +26,8 @@ import { ContentController } from './contracts/content.controller.js';
 import { ContentService } from './contracts/content.service.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
+import { SignersController } from './contracts/signers.controller.js';
+import { SignersService } from './contracts/signers.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
 import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
 import { DocusealAdapter } from './signature/docuseal.adapter.js';
@@ -91,6 +93,7 @@ class HealthController {
     ContractsController,
     ContentController,
     CustomersController,
+    SignersController,
     DocusealWebhookController,
     PortalAuthController,
     InternalAuthController,
@@ -103,6 +106,7 @@ class HealthController {
     ContractsService,
     ContentService,
     CustomersService,
+    SignersService,
     DashboardService,
     RemindersReadService,
     RedisProvider,
