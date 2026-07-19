@@ -13,11 +13,15 @@ export async function apiGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  opts?: { headers?: Record<string, string> },
+): Promise<T> {
   const res = await fetch(path, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    headers: { 'content-type': 'application/json', accept: 'application/json', ...(opts?.headers ?? {}) },
     body: JSON.stringify(body),
   });
   if (res.status === 401) throw new Unauthorized();

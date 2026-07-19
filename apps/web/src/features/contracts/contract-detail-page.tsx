@@ -12,6 +12,7 @@ import { RemindersBlock, type Reminder } from './reminders-block.js';
 import { SignersBlock, type Signer } from './signers-block.js';
 import { Timeline, type Event } from './timeline.js';
 import { WorkflowActions } from './workflow-actions.js';
+import { SendForSignature } from './send-for-signature.js';
 
 interface Detail {
   contract: {
@@ -86,6 +87,12 @@ export function ContractDetailPage() {
         roles={me.data?.roles ?? []}
         currentUserId={me.data?.userId ?? ''}
         approval={q.data.approval}
+      />
+      <SendForSignature
+        contractId={contract.id}
+        signers={q.data.signers}
+        allowedActions={allowed.data?.allowedActions ?? []}
+        roles={me.data?.roles ?? []}
       />
       <Card title="Contenu">
         <div className="flex flex-wrap gap-3 text-sm">
