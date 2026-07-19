@@ -229,6 +229,30 @@ export class ContractsService {
         throw e;
       }
 
+      // Persistance des approbations (RM-10). Le domaine a déjà tranché : sur
+      // APPROVE/REQUEST_CHANGES, il lève si l'acteur est le soumetteur, donc
+      // on n'atteint l'update que pour un valideur distinct (le CHECK base
+      // `decided_by <> submitted_by` est le filet).
+      if (event.type === 'SUBMIT_FOR_REVIEW') {
+        await tx.contractApproval.create({
+          data: {
+            id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId: id,
+            versionId: c.currentVersionId!, // garanti par la règle domaine (RM-11)
+            submittedByUserId: event.actorUserId, decision: 'PENDING', submittedAt: now,
+          },
+        });
+      } else if (event.type === 'APPROVE' && approval) {
+        await tx.contractApproval.update({
+          where: { id: approval.id },
+          data: { decision: 'APPROVED', decidedByUserId: event.actorUserId, decidedAt: now },
+        });
+      } else if (event.type === 'REQUEST_CHANGES' && approval) {
+        await tx.contractApproval.update({
+          where: { id: approval.id },
+          data: { decision: 'CHANGES_REQUESTED', decidedByUserId: event.actorUserId, decidedAt: now, reason: event.reason },
+        });
+      }
+
       return tx.contract.update({
         where: { id },
         data: {
