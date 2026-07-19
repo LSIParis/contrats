@@ -239,6 +239,22 @@ export class ContractsService {
         throw e;
       }
 
+      // Fail-closed RM-10 : un contrat legacy peut être passé en IN_REVIEW /
+      // CHANGES_REQUESTED AVANT que la persistance de contract_approvals
+      // n'existe — il n'a donc AUCUNE ligne PENDING. Sans ce garde-fou,
+      // `approval` est null, le snapshot domaine reçoit
+      // submittedByUserId = null, la garde RM-10 (soumetteur ≠ valideur) ne
+      // se déclenche jamais, ET le `&& approval` ci-dessous empêche toute
+      // écriture — une APPROVED silencieuse, sans séparation des tâches. On
+      // refuse plutôt que d'autoriser une auto-approbation muette. Ce throw
+      // précède toute mutation : la transaction withScope l'annule proprement.
+      if ((event.type === 'APPROVE' || event.type === 'REQUEST_CHANGES') && !approval) {
+        throw new ConflictException({
+          code: 'RM-10',
+          detail: 'Aucune demande de validation en cours pour ce contrat.',
+        });
+      }
+
       // Persistance des approbations (RM-10). Le domaine a déjà tranché : sur
       // APPROVE/REQUEST_CHANGES, il lève si l'acteur est le soumetteur, donc
       // on n'atteint l'update que pour un valideur distinct (le CHECK base

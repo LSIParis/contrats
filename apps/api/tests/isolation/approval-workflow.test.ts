@@ -56,6 +56,42 @@ beforeAll(async () => {
   contractId = await prepare();
 });
 
+/**
+ * Contrat « legacy » : passé directement en IN_REVIEW (comme le ferait une
+ * ligne de données antérieure à l'introduction de contract_approvals), SANS
+ * aucune ligne contract_approval. Reproduit l'état qu'aucun SUBMIT via l'API
+ * ne peut plus produire aujourd'hui, mais que d'anciennes données peuvent
+ * contenir.
+ */
+async function prepareLegacyInReview(): Promise<string> {
+  const id = uuidv7();
+  const now = new Date();
+  await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+    await tx.contract.create({
+      data: {
+        id, tenantId: fx.tenantId, customerId: fx.customerA.id, reference: `LSI-WFL-${id.slice(-8)}`,
+        title: 'WF legacy', type: 'MAIN', status: 'IN_REVIEW', category: 'MAINTENANCE', currency: 'EUR',
+        billingFrequency: 'MONTHLY', ownerUserId: fx.amUserId, startDate: new Date('2026-08-01'),
+        createdAt: now, updatedAt: now, createdByUserId: fx.amUserId, updatedByUserId: fx.amUserId,
+      },
+    });
+    const v = await tx.contractVersion.create({
+      data: { id: uuidv7(), tenantId: fx.tenantId, customerId: fx.customerA.id, contractId: id,
+        versionNumber: 1, bodyHtml: '<p>Contenu</p>', variables: {}, createdAt: now, createdByUserId: fx.amUserId },
+      select: { id: true },
+    });
+    await tx.contract.update({ where: { id }, data: { currentVersionId: v.id } });
+    await tx.contractSigner.createMany({
+      data: [
+        { id: uuidv7(), tenantId: fx.tenantId, customerId: fx.customerA.id, contractId: id, party: 'LSI', fullName: 'Marc', email: 'marc@lsi.fr', signingOrder: 0, createdAt: now, updatedAt: now },
+        { id: uuidv7(), tenantId: fx.tenantId, customerId: fx.customerA.id, contractId: id, party: 'CLIENT', fullName: 'Jean', email: 'jean@c.fr', signingOrder: 1, createdAt: now, updatedAt: now },
+      ],
+    });
+    // Volontairement AUCUNE ligne contract_approval : c'est le cas legacy.
+  });
+  return id;
+}
+
 describe('workflow d’approbation', () => {
   test('soumission → IN_REVIEW + contract_approval PENDING', async () => {
     await request(app.getHttpServer()).post(`/v1/contracts/${contractId}/submit`).set('x-lsi-session', 'sess-am').expect(201);
@@ -79,5 +115,22 @@ describe('workflow d’approbation', () => {
     expect(c!.status).toBe('APPROVED');
     expect(approval!.decision).toBe('APPROVED');
     expect(approval!.decidedByUserId).toBe(fx.adminUserId);
+  });
+
+  test('fail-closed RM-10 : contrat legacy IN_REVIEW sans contract_approval → 409 (pas d’auto-approbation silencieuse)', async () => {
+    const legacyId = await prepareLegacyInReview();
+
+    await request(app.getHttpServer())
+      .post(`/v1/contracts/${legacyId}/approve`)
+      .set('x-lsi-session', 'sess-admin')
+      .expect(409);
+
+    const [c, approval] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id: legacyId }, select: { status: true } }),
+      await tx.contractApproval.findFirst({ where: { contractId: legacyId } }),
+    ]);
+    // Ni mutation de statut, ni écriture d'approbation : le throw précède tout.
+    expect(c!.status).toBe('IN_REVIEW');
+    expect(approval).toBeNull();
   });
 });
