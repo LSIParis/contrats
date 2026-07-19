@@ -34,6 +34,27 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) throw new Unauthorized();
+  if (!res.ok) {
+    let message = `Erreur ${res.status}`;
+    try {
+      const b = await res.json();
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? message);
+    } catch {
+      /* corps non-JSON : on garde le message par défaut */
+    }
+    throw new ApiError(res.status, message);
+  }
+  return res.json() as Promise<T>;
+}
+
 export function login(): void {
   window.location.href = '/v1/auth/login';
 }
