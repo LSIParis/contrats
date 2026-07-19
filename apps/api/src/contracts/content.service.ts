@@ -22,10 +22,11 @@ export class ContentService {
         select: { id: true, tenantId: true, customerId: true, status: true },
       });
       if (!c) throw new NotFoundException('Contrat introuvable');
-      if (!EDITABLE_STATUSES.includes(c.status as (typeof EDITABLE_STATUSES)[number])) {
+      const EDITABLE_OR_APPROVED = [...EDITABLE_STATUSES, 'APPROVED'] as const;
+      if (!EDITABLE_OR_APPROVED.includes(c.status as (typeof EDITABLE_OR_APPROVED)[number])) {
         throw new ConflictException({
           code: 'RM-04',
-          detail: 'Le contenu ne peut être édité que sur un brouillon ou un contrat renvoyé pour modification.',
+          detail: 'Le contenu ne peut être édité que sur un brouillon, un contrat renvoyé, ou un contrat approuvé (qui repasse alors en brouillon).',
         });
       }
 
@@ -47,7 +48,12 @@ export class ContentService {
       });
       await tx.contract.update({
         where: { id },
-        data: { currentVersionId: version.id, updatedAt: now, updatedByUserId: scope.userId },
+        data: {
+          currentVersionId: version.id,
+          // RM-11 : éditer après validation invalide la validation.
+          ...(c.status === 'APPROVED' ? { status: 'DRAFT', approvedVersionId: null } : {}),
+          updatedAt: now, updatedByUserId: scope.userId,
+        },
       });
       return version;
     });
