@@ -13,4 +13,10 @@ export class SignatureActionsController {
     assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
     return this.actions.remind(scope, id);
   }
+
+  @Post(':id/signature/revoke')
+  revoke(@CurrentScope() scope: Scope, @CurrentSession() session: Session, @Param('id', ParseUUIDPipe) id: string) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.actions.revoke(scope, id);
+  }
 }

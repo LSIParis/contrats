@@ -81,3 +81,31 @@ describe('POST /v1/contracts/:id/signature/remind', () => {
     await request(app.getHttpServer()).post(`/v1/contracts/${id}/signature/remind`).set('x-lsi-session', 'sess-am-b').expect(404);
   });
 });
+
+describe('POST /v1/contracts/:id/signature/revoke', () => {
+  test('révoque : provider archivé, demande REVOKED, contrat APPROVED, signataires PENDING', async () => {
+    const { id, submissionId } = await seedInProgress();
+    await request(app.getHttpServer()).post(`/v1/contracts/${id}/signature/revoke`).set('x-lsi-session', 'sess-am').expect(201);
+    expect(provider.revoked).toContain(submissionId);
+    const [c, req, signers] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id }, select: { status: true } }),
+      await tx.signatureRequest.findFirst({ where: { contractId: id }, orderBy: { createdAt: 'desc' }, select: { status: true } }),
+      await tx.contractSigner.findMany({ where: { contractId: id }, select: { status: true, providerSubmitterId: true } }),
+    ]);
+    expect(c!.status).toBe('APPROVED');
+    expect(req!.status).toBe('REVOKED');
+    expect(signers.every((s) => s.status === 'PENDING' && s.providerSubmitterId === null)).toBe(true);
+  });
+
+  test('échec provider → 502, rien ne bouge', async () => {
+    const { id } = await seedInProgress();
+    provider.failNext('DocuSeal indisponible');
+    await request(app.getHttpServer()).post(`/v1/contracts/${id}/signature/revoke`).set('x-lsi-session', 'sess-am').expect(502);
+    const c = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => tx.contract.findUnique({ where: { id }, select: { status: true } }));
+    expect(c!.status).toBe('PENDING_SIGNATURE'); // inchangé
+  });
+
+  test('sans demande active → 409', async () => {
+    await request(app.getHttpServer()).post(`/v1/contracts/${fx.customerA.contractId}/signature/revoke`).set('x-lsi-session', 'sess-am').expect(409);
+  });
+});
