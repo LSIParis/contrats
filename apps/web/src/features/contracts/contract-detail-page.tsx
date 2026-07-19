@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../lib/api.js';
+import { useMe } from '../../lib/queries.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Button } from '../../ui/button.js';
 import { Card } from '../../ui/card.js';
@@ -10,6 +11,7 @@ import { SignatureBlock, type SignatureData } from './signature-block.js';
 import { RemindersBlock, type Reminder } from './reminders-block.js';
 import { SignersBlock, type Signer } from './signers-block.js';
 import { Timeline, type Event } from './timeline.js';
+import { WorkflowActions } from './workflow-actions.js';
 
 interface Detail {
   contract: {
@@ -37,6 +39,11 @@ async function downloadSigned(id: string) {
 export function ContractDetailPage() {
   const { id } = useParams<{ id: string }>();
   const q = useQuery({ queryKey: ['contract', id], queryFn: () => apiGet<Detail>(`/v1/contracts/${id}`) });
+  const allowed = useQuery({
+    queryKey: ['allowed-actions', id],
+    queryFn: () => apiGet<{ allowedActions: string[] }>(`/v1/contracts/${id}/allowed-actions`),
+  });
+  const me = useMe();
   const [downloadError, setDownloadError] = useState<string | null>(null);
   if (q.isLoading) return <Spinner />;
   if (q.error || !q.data) return <p className="text-red-600">Contrat introuvable.</p>;
@@ -72,6 +79,14 @@ export function ContractDetailPage() {
           </div>
         )}
       </div>
+      <WorkflowActions
+        contractId={contract.id}
+        status={contract.status}
+        allowedActions={allowed.data?.allowedActions ?? []}
+        roles={me.data?.roles ?? []}
+        currentUserId={me.data?.userId ?? ''}
+        approval={q.data.approval}
+      />
       <Card title="Contenu">
         <div className="flex flex-wrap gap-3 text-sm">
           {['DRAFT', 'CHANGES_REQUESTED'].includes(contract.status) && (
