@@ -37,3 +37,4 @@ export {
   type ResolvedUserScope,
   type ResolvedRole,
 } from './scope-resolution.js';
+export { createCustomer, CustomerSirenConflict, type NewCustomerInput } from './customer-write.js';
