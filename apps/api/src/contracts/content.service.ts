@@ -43,4 +43,31 @@ export class ContentService {
       return version;
     });
   }
+
+  async listVersions(scope: Scope, id: string) {
+    return withScope(scope, async (tx) => {
+      // Le contrat doit être dans le scope, sinon 404 (RLS l'a déjà masqué).
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      const items = await tx.contractVersion.findMany({
+        where: { contractId: id },
+        orderBy: { versionNumber: 'desc' },
+        select: { id: true, versionNumber: true, changeSummary: true, createdAt: true },
+      });
+      return { items };
+    });
+  }
+
+  async getVersion(scope: Scope, id: string, versionId: string) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      const v = await tx.contractVersion.findFirst({
+        where: { id: versionId, contractId: id },
+        select: { id: true, versionNumber: true, bodyHtml: true, createdAt: true },
+      });
+      if (!v) throw new NotFoundException('Version introuvable');
+      return v;
+    });
+  }
 }
