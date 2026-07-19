@@ -52,8 +52,8 @@ const TRANSITIONS: Record<ContractStatus, readonly ContractEventType[]> = {
   CHANGES_REQUESTED: ['EDIT_CONTENT', 'SUBMIT_FOR_REVIEW', 'CANCEL'],
   // RM-11 : éditer un APPROVED le renvoie en DRAFT et invalide la validation.
   APPROVED: ['EDIT_CONTENT', 'SEND_FOR_SIGNATURE', 'CANCEL'],
-  PENDING_SIGNATURE: ['SIGNER_SIGNED', 'SIGNER_DECLINED', 'CANCEL'],
-  PARTIALLY_SIGNED: ['SIGNER_SIGNED', 'SIGNER_DECLINED', 'CANCEL'],
+  PENDING_SIGNATURE: ['SIGNER_SIGNED', 'SIGNER_DECLINED', 'REVOKE_SIGNATURE', 'CANCEL'],
+  PARTIALLY_SIGNED: ['SIGNER_SIGNED', 'SIGNER_DECLINED', 'REVOKE_SIGNATURE', 'CANCEL'],
   // RM-05 : plus aucune édition. RM-22 : plus d'annulation, seule la résiliation.
   SIGNED: ['ACTIVATE', 'TERMINATE'],
   ACTIVE: ['EXPIRE', 'TERMINATE', 'MARK_RENEWED'],
@@ -107,7 +107,7 @@ export function assertCanAmend(parent: ContractSnapshot): void {
   }
   if (parent.openAmendmentExists) {
     throw new BusinessRuleError(
-      'Un avenant est déjà en cours sur ce contrat. Terminez-le ou annulez-le avant d’en créer un autre.',
+      'Un avenant est déjà en cours sur ce contrat. Terminez-le ou annulez-le avant d\'en créer un autre.',
       'RM-19',
     );
   }
@@ -127,7 +127,7 @@ export function applyEvent(
     case 'SUBMIT_FOR_REVIEW': {
       if (!c.hasLsiSigner || !c.hasClientSigner) {
         throw new BusinessRuleError(
-          'Un contrat doit avoir au moins un signataire côté LSI et un côté client avant d’être soumis.',
+          'Un contrat doit avoir au moins un signataire côté LSI et un côté client avant d\'être soumis.',
           'RM-12',
         );
       }
@@ -191,7 +191,7 @@ export function applyEvent(
     // -----------------------------------------------------------------
     case 'SEND_FOR_SIGNATURE': {
       if (c.approvedVersionId === null) {
-        throw new BusinessRuleError('Ce contrat n’a pas de validation interne.', 'RM-09');
+        throw new BusinessRuleError('Ce contrat n\'a pas de validation interne.', 'RM-09');
       }
       if (c.approvedVersionId !== c.currentVersionId) {
         throw new BusinessRuleError(
@@ -202,6 +202,13 @@ export function applyEvent(
       // Le passage effectif n'est acté qu'après acquittement du provider
       // (EC-04) : la couche applicative n'appelle applyEvent qu'ensuite.
       return { ...c, status: 'PENDING_SIGNATURE' };
+    }
+
+    // -----------------------------------------------------------------
+    case 'REVOKE_SIGNATURE': {
+      // Révoquer DÉFAIT l'envoi : le contrat redevient approuvé (envoyable),
+      // sa validation reste valable. Ce n'est PAS annuler le contrat (§6.13).
+      return { ...c, status: 'APPROVED' };
     }
 
     // -----------------------------------------------------------------
@@ -232,12 +239,12 @@ export function applyEvent(
     case 'EXPIRE': {
       if (!c.endDate) {
         throw new BusinessRuleError(
-          'Un contrat à durée indéterminée n’expire pas. Il doit être résilié.',
+          'Un contrat à durée indéterminée n\'expire pas. Il doit être résilié.',
           'EC-13',
         );
       }
       if (c.endDate >= now) {
-        throw new BusinessRuleError('Le contrat n’a pas atteint son terme.', 'RM-07');
+        throw new BusinessRuleError('Le contrat n\'a pas atteint son terme.', 'RM-07');
       }
       // RM-07 : un successeur signé transforme l'expiration en renouvellement.
       return { ...c, status: c.hasSignedSuccessor ? 'RENEWED' : 'EXPIRED' };
@@ -250,7 +257,7 @@ export function applyEvent(
     // -----------------------------------------------------------------
     case 'CANCEL': {
       if (!event.reason.trim()) {
-        throw new BusinessRuleError('Un motif d’annulation est obligatoire.', 'RM-22');
+        throw new BusinessRuleError('Un motif d\'annulation est obligatoire.', 'RM-22');
       }
       return { ...c, status: 'CANCELLED' };
     }
@@ -267,8 +274,8 @@ export function applyEvent(
       if (!respectsNotice) {
         if (!event.isAdmin) {
           throw new BusinessRuleError(
-            `Le préavis de ${c.noticePeriodDays} jours n’est pas respecté : ` +
-              `la date d’effet ne peut pas précéder le ${minDate.toISOString().slice(0, 10)}. ` +
+            `Le préavis de ${c.noticePeriodDays} jours n'est pas respecté : ` +
+              `la date d'effet ne peut pas précéder le ${minDate.toISOString().slice(0, 10)}. ` +
               `Seul un administrateur peut y déroger.`,
             'RM-20',
           );

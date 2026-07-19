@@ -192,4 +192,10 @@ export interface ESignatureProvider {
 
   /** Traduit le payload du provider vers notre vocabulaire. */
   parseWebhook(payload: unknown): NormalizedSignatureEvent | null;
+
+  /** Relance : renvoie l'email d'invitation à un signataire (PUT /submitters/{id}). */
+  remindSubmitter(providerSubmitterId: string): Promise<void>;
+
+  /** Révocation : archive la submission chez le provider (DELETE /submissions/{id}). */
+  revokeSubmission(providerSubmissionId: string): Promise<void>;
 }

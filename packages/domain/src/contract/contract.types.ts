@@ -86,6 +86,7 @@ export type ContractEvent =
   | { type: 'REQUEST_CHANGES'; actorUserId: string; reason: string }
   | { type: 'EDIT_CONTENT'; actorUserId: string }
   | { type: 'SEND_FOR_SIGNATURE'; actorUserId: string }
+  | { type: 'REVOKE_SIGNATURE'; actorUserId: string }
   /** Émis par le SYSTEM sur webhook vérifié uniquement (RM-14). */
   | { type: 'SIGNER_SIGNED'; allSigned: boolean }
   | { type: 'SIGNER_DECLINED'; reason: string }
