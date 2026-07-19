@@ -71,8 +71,14 @@ export class SendForSignatureService {
       // RLS a filtré : hors scope, la ligne n'existe pas pour cette session.
       if (!contract) throw new NotFoundException('Contrat introuvable');
 
-      const hasLsi = dto.signers.some((s) => s.party === 'LSI');
-      const hasClient = dto.signers.some((s) => s.party === 'CLIENT');
+      // Les signataires sont DÉFINIS sur le contrat (bloc Signataires) — on les
+      // lit, on ne les redemande plus. Ordre = signingOrder (RM-13).
+      const signers = await tx.contractSigner.findMany({
+        where: { contractId },
+        orderBy: { signingOrder: 'asc' },
+      });
+      const hasLsi = signers.some((s) => s.party === 'LSI');
+      const hasClient = signers.some((s) => s.party === 'CLIENT');
       if (!hasLsi || !hasClient) {
         // 422 : la requête est bien formée, mais viole une règle métier.
         throw new UnprocessableEntityException({
@@ -91,30 +97,6 @@ export class SendForSignatureService {
         where: { id: contract.currentVersionId! },
       });
       if (!version) throw new UnprocessableEntityException('Aucune version à envoyer');
-
-      // Les signataires sont créés maintenant : leurs id servent d'external_id
-      // et doivent exister avant l'appel au provider (§11.3).
-      await tx.contractSigner.deleteMany({ where: { contractId, status: 'PENDING' } });
-      const signers = await Promise.all(
-        dto.signers.map((s) =>
-          tx.contractSigner.create({
-            data: {
-              id: uuidv7(),
-              tenantId: scope.tenantId,
-              customerId: contract.customerId,
-              contractId,
-              party: s.party,
-              contactId: s.contactId ?? null,
-              fullName: s.fullName,
-              email: s.email,
-              signingOrder: s.signingOrder,
-              status: 'PENDING',
-              createdAt: now,
-              updatedAt: now,
-            },
-          }),
-        ),
-      );
 
       let sigReq;
       try {
@@ -157,7 +139,7 @@ export class SendForSignatureService {
     // contre l'EE réelle). On annexe donc un bloc de signature avec une
     // balise {{Signature;role=…}} par signataire — le rôle DOIT correspondre
     // au roleLabel du submitter (§11.3).
-    const withSignatureBlock = version.bodyHtml + this.buildSignatureBlock(dto.signers);
+    const withSignatureBlock = version.bodyHtml + this.buildSignatureBlock(signers);
 
     const rendered = await this.renderer.render({
       html: withSignatureBlock,
@@ -183,30 +165,27 @@ export class SendForSignatureService {
       }),
     );
 
-    const submitters: SubmitterCommand[] = [...dto.signers]
+    const submitters: SubmitterCommand[] = [...signers]
       .sort((a, b) => a.signingOrder - b.signingOrder)
-      .map((s) => {
-        const row = signers.find((x) => x.email === s.email)!;
-        return {
-          party: s.party,
-          roleLabel: this.roleLabel(s.party), // même valeur que la balise du doc
-          externalId: row.id, // ← clé de rapprochement des webhooks (§11.5)
-          fullName: s.fullName,
-          email: s.email,
-          signingOrder: s.signingOrder,
-          requireEmail2fa: s.requireEmail2fa ?? s.party === 'CLIENT',
-          // AUCUN champ pré-rempli.
-          //
-          // DocuSeal rejette (422 « Unknown field ») tout champ de
-          // submitters[].fields qui n'existe pas dans le document — découvert
-          // contre l'EE réelle. Et c'était de toute façon redondant : la
-          // référence et le montant sont IMPRIMÉS dans le corps du contrat
-          // (donc déjà immuables et visibles). Les redoubler en champs
-          // DocuSeal n'ajoutait rien. Le seul champ interactif est la
-          // signature, qui vient de la balise {{Signature;...}} du document.
-          fields: [],
-        };
-      });
+      .map((s) => ({
+        party: s.party,
+        roleLabel: this.roleLabel(s.party), // même valeur que la balise du doc
+        externalId: s.id, // ← clé de rapprochement des webhooks (§11.5)
+        fullName: s.fullName,
+        email: s.email,
+        signingOrder: s.signingOrder,
+        requireEmail2fa: s.party === 'CLIENT', // défaut : 2FA côté client
+        // AUCUN champ pré-rempli.
+        //
+        // DocuSeal rejette (422 « Unknown field ») tout champ de
+        // submitters[].fields qui n'existe pas dans le document — découvert
+        // contre l'EE réelle. Et c'était de toute façon redondant : la
+        // référence et le montant sont IMPRIMÉS dans le corps du contrat
+        // (donc déjà immuables et visibles). Les redoubler en champs
+        // DocuSeal n'ajoutait rien. Le seul champ interactif est la
+        // signature, qui vient de la balise {{Signature;...}} du document.
+        fields: [],
+      }));
 
     let submission;
     try {

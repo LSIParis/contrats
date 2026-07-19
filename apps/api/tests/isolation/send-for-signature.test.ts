@@ -48,8 +48,17 @@ beforeAll(async () => {
   });
 });
 
-/** Un contrat APPROVED, prêt à partir. Neuf à chaque test. */
-async function seedApprovedContract(over: Record<string, unknown> = {}) {
+/**
+ * Un contrat APPROVED, prêt à partir, avec ses signataires DÉFINIS
+ * (`ContractSigner`). Neuf à chaque test.
+ */
+async function seedApprovedContract(
+  over: Record<string, unknown> = {},
+  signers: { party: 'LSI' | 'CLIENT'; fullName: string; email: string; signingOrder: number }[] = [
+    { party: 'LSI', fullName: 'Marc D.', email: 'direction@lsi.fr', signingOrder: 0 },
+    { party: 'CLIENT', fullName: 'J. Dupont', email: 'j.dupont@dupont.fr', signingOrder: 1 },
+  ],
+) {
   const id = uuidv7();
   const vId = uuidv7();
   const now = new Date();
@@ -93,22 +102,28 @@ async function seedApprovedContract(over: Record<string, unknown> = {}) {
         createdByUserId: fx.amUserId,
       },
     });
+    if (signers.length) {
+      await tx.contractSigner.createMany({
+        data: signers.map((s) => ({
+          id: uuidv7(),
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          contractId: id,
+          party: s.party,
+          fullName: s.fullName,
+          email: s.email,
+          signingOrder: s.signingOrder,
+          status: 'PENDING',
+          createdAt: now,
+          updatedAt: now,
+        })),
+      });
+    }
   });
   return { id, versionId: vId };
 }
 
-const body = () => ({
-  signers: [
-    { party: 'LSI', fullName: 'Marc D.', email: 'direction@lsi.fr', signingOrder: 0 },
-    {
-      party: 'CLIENT',
-      fullName: 'J. Dupont',
-      email: 'j.dupont@dupont.fr',
-      signingOrder: 1,
-      requireEmail2fa: true,
-    },
-  ],
-});
+const body = () => ({}); // défauts serveur ; ni signers, ni options
 
 function send(id: string, payload: unknown = body(), idem = uuidv7()) {
   return request(app.getHttpServer())
@@ -159,17 +174,19 @@ describe('RM-11 — la validation porte sur une version', () => {
 
 describe('RM-12 — signataires obligatoires', () => {
   test('envoyer sans signataire client → 422', async () => {
-    const res = await send(contractId, {
-      signers: [{ party: 'LSI', fullName: 'Marc D.', email: 'direction@lsi.fr', signingOrder: 0 }],
-    });
+    const { id } = await seedApprovedContract({}, [
+      { party: 'LSI', fullName: 'Marc D.', email: 'direction@lsi.fr', signingOrder: 0 },
+    ]);
+    const res = await send(id);
     expect(res.status).toBe(422);
     expect(provider.calls).toHaveLength(0);
   });
 
   test('envoyer sans signataire LSI → 422', async () => {
-    const res = await send(contractId, {
-      signers: [{ party: 'CLIENT', fullName: 'J. Dupont', email: 'j@d.fr', signingOrder: 0 }],
-    });
+    const { id } = await seedApprovedContract({}, [
+      { party: 'CLIENT', fullName: 'J. Dupont', email: 'j@d.fr', signingOrder: 0 },
+    ]);
+    const res = await send(id);
     expect(res.status).toBe(422);
   });
 });
