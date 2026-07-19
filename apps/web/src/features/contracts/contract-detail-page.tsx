@@ -1,16 +1,25 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../lib/api.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Button } from '../../ui/button.js';
+import { Card } from '../../ui/card.js';
 import { StatusBadge } from '../../ui/badge.js';
 import { SignatureBlock, type SignatureData } from './signature-block.js';
 import { RemindersBlock, type Reminder } from './reminders-block.js';
 import { Timeline, type Event } from './timeline.js';
 
 interface Detail {
-  contract: { reference: string; title: string; status: string; startDate: string | null; endDate: string | null };
+  contract: {
+    id: string;
+    reference: string;
+    title: string;
+    status: string;
+    currentVersionId: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  };
   customer: { name: string };
   signatureRequest: SignatureData | null;
   reminders: Reminder[];
@@ -60,6 +69,18 @@ export function ContractDetailPage() {
           </div>
         )}
       </div>
+      <Card title="Contenu">
+        <div className="flex flex-wrap gap-3 text-sm">
+          {['DRAFT', 'CHANGES_REQUESTED'].includes(contract.status) && (
+            <Link to={`/contracts/${contract.id}/edit`} className="text-lsi hover:underline">Éditer le contenu</Link>
+          )}
+          {contract.currentVersionId && (
+            <a href={`/v1/contracts/${contract.id}/preview.pdf`} target="_blank" rel="noopener" className="text-lsi hover:underline">Aperçu PDF</a>
+          )}
+          <Link to={`/contracts/${contract.id}/versions`} className="text-lsi hover:underline">Historique</Link>
+          {!contract.currentVersionId && <span className="text-gray-400">Aucun contenu rédigé.</span>}
+        </div>
+      </Card>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
         <RemindersBlock reminders={q.data.reminders} />
