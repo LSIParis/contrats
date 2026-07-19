@@ -1,9 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  withScope, createCustomer, CustomerSirenConflict, resolveUserScope,
+  withScope, createCustomer, CustomerSirenConflict, resolveUserScope, uuidv7,
   type Scope,
 } from '@lsi/persistence';
 import { SessionService, type Session } from '../auth/session.service.js';
+import { CreateContactDto } from './dto/create-contact.dto.js';
 
 @Injectable()
 export class CustomersService {
@@ -89,6 +90,30 @@ export class CustomersService {
         },
       });
       return { customer, contacts };
+    });
+  }
+
+  // Ajoute un contact à un client (scopé, 404 hors scope ; 409 email dupliqué).
+  async addContact(scope: Scope, customerId: string, dto: CreateContactDto) {
+    return withScope(scope, async (tx) => {
+      // Le client doit être dans le scope, sinon 404 (RLS l'a déjà masqué).
+      const c = await tx.customer.findUnique({ where: { id: customerId }, select: { id: true, tenantId: true } });
+      if (!c) throw new NotFoundException('Client introuvable');
+      try {
+        return await tx.customerContact.create({
+          data: {
+            id: uuidv7(), tenantId: c.tenantId, customerId,
+            firstName: dto.firstName, lastName: dto.lastName, email: dto.email,
+            phone: dto.phone ?? null, jobTitle: dto.jobTitle ?? null,
+            isPrimary: dto.isPrimary ?? false,
+            createdAt: new Date(), updatedAt: new Date(),
+          },
+          select: { id: true, firstName: true, lastName: true, email: true, isPrimary: true },
+        });
+      } catch (e: any) {
+        if (e?.code === 'P2002') throw new ConflictException('Un contact avec cet email existe déjà pour ce client');
+        throw e;
+      }
     });
   }
 }
