@@ -55,6 +55,21 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(path, { method: 'DELETE', credentials: 'same-origin', headers: { accept: 'application/json' } });
+  if (res.status === 401) throw new Unauthorized();
+  if (!res.ok) {
+    let message = `Erreur ${res.status}`;
+    try {
+      const b = await res.json();
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? message);
+    } catch {
+      /* corps non-JSON : on garde le message par défaut */
+    }
+    throw new ApiError(res.status, message);
+  }
+}
+
 export function login(): void {
   window.location.href = '/v1/auth/login';
 }

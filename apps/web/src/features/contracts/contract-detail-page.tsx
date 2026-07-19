@@ -8,6 +8,7 @@ import { Card } from '../../ui/card.js';
 import { StatusBadge } from '../../ui/badge.js';
 import { SignatureBlock, type SignatureData } from './signature-block.js';
 import { RemindersBlock, type Reminder } from './reminders-block.js';
+import { SignersBlock, type Signer } from './signers-block.js';
 import { Timeline, type Event } from './timeline.js';
 
 interface Detail {
@@ -24,6 +25,8 @@ interface Detail {
   signatureRequest: SignatureData | null;
   reminders: Reminder[];
   timeline: Event[];
+  signers: Signer[];
+  approval: { submittedByUserId: string; decision: string; reason: string | null; decidedByUserId: string | null } | null;
 }
 
 async function downloadSigned(id: string) {
@@ -81,6 +84,11 @@ export function ContractDetailPage() {
           {!contract.currentVersionId && <span className="text-gray-400">Aucun contenu rédigé.</span>}
         </div>
       </Card>
+      <SignersBlock
+        contractId={contract.id}
+        signers={q.data.signers}
+        editable={['DRAFT', 'CHANGES_REQUESTED'].includes(contract.status)}
+      />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
         <RemindersBlock reminders={q.data.reminders} />
