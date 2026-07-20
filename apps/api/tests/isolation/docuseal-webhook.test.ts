@@ -739,6 +739,76 @@ describe('avenant — report au parent à la signature complète (RM-18, EC-12)'
     expect(reminders).toHaveLength(0);
   });
 
+  test('FORM_COMPLETED qui signe un avenant MONTANT-SEUL sur un parent ACTIVE à durée indéterminée reporte amountCents sans replanifier (revue finale)', async () => {
+    // Bug de revue finale : l'ancien code ne reportait (endDate/amountCents)
+    // QUE si `av.endDate` était renseigné. Un avenant montant-seul sur un
+    // parent à durée indéterminée (endDate NULL) a `av.endDate` NULL lui
+    // aussi (copié du parent à la création, cf. ContractsService.amend) :
+    // il tombait dans aucune branche et amountCents restait silencieusement
+    // non reporté. Le report doit être INCONDITIONNEL sur un parent ACTIVE
+    // ou SIGNED ; seul le REPLAN des rappels reste conditionné à
+    // ACTIVE + endDate présent.
+    const parentId = uuidv7();
+    const now = new Date();
+    const newAmountCents = 424242n;
+
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      await tx.contract.create({
+        data: {
+          id: parentId,
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          reference: `LSI-2026-${parentId.slice(-12)}`,
+          title: 'Contrat parent durée indéterminée (avenant montant-seul)',
+          type: 'MAIN',
+          status: 'ACTIVE',
+          category: 'MAINTENANCE',
+          currency: 'EUR',
+          billingFrequency: 'MONTHLY',
+          endDate: null, // durée indéterminée
+          amountCents: 500000n,
+          noticePeriodDays: 30,
+          reminderCycle: 0,
+          ownerUserId: fx.amUserId,
+          createdAt: now,
+          updatedAt: now,
+          createdByUserId: fx.amUserId,
+          updatedByUserId: fx.amUserId,
+        },
+      });
+
+      // Avenant montant-seul : endDate NULL (copié du parent, pas de
+      // changement de durée), seul amountCents change.
+      await tx.contract.update({
+        where: { id: subA.contractId },
+        data: {
+          type: 'AMENDMENT',
+          parentContractId: parentId,
+          endDate: null,
+          amountCents: newAmountCents,
+        },
+      });
+    });
+
+    const res = await post(formEvent());
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('processed');
+
+    const parent = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contract.findUnique({ where: { id: parentId } }),
+    );
+    // Le montant DOIT être reporté même sans endDate.
+    expect(parent!.amountCents).toBe(newAmountCents);
+    expect(parent!.endDate).toBeNull();
+    // Pas de replan : reminderCycle inchangé, aucun rappel créé/annulé.
+    expect(parent!.reminderCycle).toBe(0);
+
+    const reminders = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.reminder.findMany({ where: { contractId: parentId } }),
+    );
+    expect(reminders).toHaveLength(0);
+  });
+
   test('FORM_COMPLETED qui signe un avenant dont le parent est TERMINATED ne modifie pas le parent', async () => {
     const parentId = uuidv7();
     const now = new Date();

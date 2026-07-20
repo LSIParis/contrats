@@ -296,7 +296,15 @@ export class DocusealWebhookService {
               where: { id: av.parentContractId },
               select: { id: true, tenantId: true, customerId: true, status: true, noticePeriodDays: true, reminderCycle: true },
             });
-            if (parent) {
+            if (parent && (parent.status === 'ACTIVE' || parent.status === 'SIGNED')) {
+              // Le report (endDate/amountCents) est INCONDITIONNEL sur un
+              // parent ACTIVE ou SIGNED — y compris un avenant montant-seul
+              // (sans endDate) sur un parent ACTIVE : sans ce report,
+              // amountCents restait silencieusement non reporté (bug revue
+              // finale). Seul le REPLAN des rappels a une condition
+              // supplémentaire (ACTIVE + endDate présent) : un avenant qui
+              // ne touche pas l'échéance n'a aucune raison de bumper le
+              // cycle de rappels.
               if (parent.status === 'ACTIVE' && av.endDate) {
                 const { newCycle, reminders } = replanAfterEndDateChange(
                   { endDate: av.endDate, noticePeriodDays: parent.noticePeriodDays, reminderCycle: parent.reminderCycle },
@@ -310,18 +318,19 @@ export class DocusealWebhookService {
                     kind: d.kind, offsetDays: d.offsetDays, cycle: d.cycle, dueAt: d.dueAt, status: d.status, createdAt: now,
                   }});
                 }
-              } else if (parent.status === 'SIGNED') {
-                // Parent SIGNED mais pas encore ACTIVE : on reporte les
-                // champs, mais on ne replanifie PAS les rappels ici — ils
-                // sont posés à l'activation, sur la bonne date (celle déjà
-                // reportée).
+              } else {
+                // ACTIVE sans endDate (montant-seul), ou SIGNED (pas encore
+                // ACTIVE) : on reporte les champs, mais on ne replanifie PAS
+                // les rappels ici — soit ils sont posés à l'activation (sur
+                // la bonne date déjà reportée), soit l'échéance n'a pas
+                // changé et le cycle en cours reste valide.
                 await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, updatedAt: now } });
               }
-              // Sinon (parent TERMINATED/CANCELLED/EXPIRED/RENEWED/…) : le
-              // parent est dans un état TERMINAL — l'avenant ne s'applique
-              // plus à rien de significatif. On ne touche à rien plutôt que
-              // de réécrire endDate/amountCents sur un contrat clos.
             }
+            // Sinon (parent introuvable ou TERMINATED/CANCELLED/EXPIRED/
+            // RENEWED/…) : le parent est dans un état TERMINAL — l'avenant
+            // ne s'applique plus à rien de significatif. On ne touche à rien
+            // plutôt que de réécrire endDate/amountCents sur un contrat clos.
           }
         }
 

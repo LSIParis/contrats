@@ -29,6 +29,8 @@ async function makeContract(over: {
   signedAt?: Date | null;
   successorContractId?: string | null;
   reminderCycle?: number;
+  type?: string;
+  parentContractId?: string | null;
 }): Promise<string> {
   const id = uuidv7();
   const now = new Date();
@@ -40,7 +42,7 @@ async function makeContract(over: {
         customerId: fx.customerA.id,
         reference: `LSI-2026-${id.slice(-12)}`,
         title: 'Contrat cycle de vie',
-        type: 'MAIN',
+        type: (over.type as any) ?? 'MAIN',
         status: over.status as any,
         category: 'MAINTENANCE',
         currency: 'EUR',
@@ -52,6 +54,7 @@ async function makeContract(over: {
         signedAt: over.signedAt ?? null,
         successorContractId: over.successorContractId ?? null,
         reminderCycle: over.reminderCycle ?? 0,
+        parentContractId: over.parentContractId ?? null,
         createdAt: now,
         updatedAt: now,
         createdByUserId: fx.amUserId,
@@ -139,6 +142,71 @@ describe('RM-06 / RM-23 — activation automatique', () => {
 
     expect((await getContract(id))!.status).toBe('SIGNED');
     expect(await reminders(id)).toHaveLength(0);
+  });
+});
+
+// ===========================================================================
+// Revue finale phase-e-avenants — un avenant ne s'active jamais seul
+// ===========================================================================
+
+describe("avenant — ne s'active jamais de façon autonome (rappels en double)", () => {
+  test("un AVENANT signé dont la date de début est atteinte RESTE SIGNED et ne matérialise aucun rappel", async () => {
+    // startDate = celle du parent, donc souvent PASSÉE ; type filtré nulle
+    // part côté SQL (app_find_contracts_to_activate ne connaît que
+    // status+start_date) — c'est ICI, dans le job, que le type doit
+    // court-circuiter l'activation. Sans la garde, l'avenant serait ACTIVÉ
+    // et poserait SES PROPRES rappels J-90/60/30 → doublon avec ceux du
+    // parent (RM-18 les reporte déjà sur le parent à la signature).
+    const parentId = await makeContract({
+      status: 'ACTIVE',
+      startDate: new Date(Date.now() - 400 * DAY),
+      endDate: new Date(Date.now() + 200 * DAY),
+    });
+    const amendmentId = await makeContract({
+      type: 'AMENDMENT',
+      parentContractId: parentId,
+      status: 'SIGNED',
+      startDate: new Date(Date.now() - 2 * DAY), // dans le passé, comme le parent
+      endDate: new Date(Date.now() + 120 * DAY),
+    });
+
+    await lifecycle.run(new Date());
+
+    const av = await getContract(amendmentId);
+    expect(av!.status).toBe('SIGNED');
+    expect(av!.activatedAt).toBeNull();
+    expect(await reminders(amendmentId)).toHaveLength(0);
+  });
+
+  test('preuve que la garde est spécifique au type : un contrat MAIN SIGNED dans le même run continue de s’activer et de recevoir ses rappels', async () => {
+    const parentId = await makeContract({
+      status: 'ACTIVE',
+      startDate: new Date(Date.now() - 400 * DAY),
+      endDate: new Date(Date.now() + 200 * DAY),
+    });
+    const amendmentId = await makeContract({
+      type: 'AMENDMENT',
+      parentContractId: parentId,
+      status: 'SIGNED',
+      startDate: new Date(Date.now() - 2 * DAY),
+      endDate: new Date(Date.now() + 120 * DAY),
+    });
+    const mainId = await makeContract({
+      status: 'SIGNED',
+      startDate: new Date(Date.now() - 2 * DAY),
+      endDate: new Date(Date.now() + 120 * DAY),
+    });
+
+    await lifecycle.run(new Date());
+
+    expect((await getContract(amendmentId))!.status).toBe('SIGNED');
+    expect(await reminders(amendmentId)).toHaveLength(0);
+
+    const main = await getContract(mainId);
+    expect(main!.status).toBe('ACTIVE');
+    expect(main!.activatedAt).toBeTruthy();
+    const mainReminders = await reminders(mainId);
+    expect(mainReminders.map((r) => r.offsetDays)).toEqual([90, 60, 30]);
   });
 });
 

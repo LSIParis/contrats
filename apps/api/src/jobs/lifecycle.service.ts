@@ -43,6 +43,15 @@ export class LifecycleService {
       const ok = await withScope(systemScope(ref.tenantId, ref.customerId), async (tx) => {
         const c = await tx.contract.findUnique({ where: { id: ref.id } });
         if (!c || c.status !== 'SIGNED') return false;
+        // Un AVENANT ne doit jamais avoir de cycle de vie autonome : il
+        // modifie son parent (RM-18) et ne porte pas ses propres rappels.
+        // La découverte (SECURITY DEFINER) ne filtre que status+startDate,
+        // sans distinguer le type — c'est ICI qu'on l'exclut, avant
+        // activation ET avant matérialisation, sans quoi le client recevrait
+        // les rappels J-90/60/30 EN DOUBLE (les siens + ceux du parent).
+        // Un avenant signé REST en SIGNED : c'est le comportement MVP
+        // documenté (RM-19, slot d'avenant ouvert).
+        if (c.type === 'AMENDMENT') return false;
 
         let next;
         try {

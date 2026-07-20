@@ -24,7 +24,7 @@ export function AmendContract({ contractId, status, roles, openAmendment, amends
   const [endDate, setEndDate] = useState('');
   const [amount, setAmount] = useState('');
   const canAct = roles.some((r) => ADMIN_OR_AM.includes(r));
-  const amendable = (status === 'ACTIVE' || status === 'SIGNED') && !openAmendment;
+  const amendable = (status === 'ACTIVE' || status === 'SIGNED') && !openAmendment && !amends;
 
   const m = useMutation({
     mutationFn: () => apiPost<{ id: string }>(`/v1/contracts/${contractId}/amend`, {

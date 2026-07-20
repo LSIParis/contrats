@@ -35,3 +35,10 @@ test('bandeau parent pour un avenant', () => {
   expect(screen.getByText(/Avenant de/)).toBeInTheDocument();
   expect(screen.getByText(/LSI-2026-0001/)).toBeInTheDocument();
 });
+
+test('pas de bouton "Créer un avenant" sur un avenant lui-même (avenant-d’avenant non supporté)', () => {
+  // Un contrat qui EST un avenant (amends renseigné) est ACTIVE/SIGNED-able,
+  // mais ne doit jamais proposer de créer un avenant sur lui-même.
+  wrap(<AmendContract {...base} status="ACTIVE" amends={{ id: 'p1', reference: 'LSI-2026-0001' }} />);
+  expect(screen.queryByRole('button', { name: /Créer un avenant/ })).not.toBeInTheDocument();
+});
