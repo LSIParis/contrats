@@ -16,11 +16,17 @@ export class SignersService {
         throw new ConflictException({ code: 'RM-04', detail: 'Les signataires ne se modifient que sur un brouillon.' });
       }
       const now = new Date();
+      // Normalisation identique au parcours users.service.ts#create : le
+      // portail résout son propre signataire par égalité stricte sur l'email
+      // de session (lui-même lowercased à la création). Sans normalisation
+      // ici, un email saisi en casse mixte ('Nathalie.Durand@x.com') ne
+      // matcherait jamais l'utilisateur portail correspondant.
+      const normalizedEmail = dto.email.trim().toLowerCase();
       try {
         return await tx.contractSigner.create({
           data: {
             id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId,
-            party: dto.party, fullName: dto.fullName, email: dto.email,
+            party: dto.party, fullName: dto.fullName, email: normalizedEmail,
             signingOrder: dto.signingOrder ?? 0, contactId: dto.contactId ?? null,
             createdAt: now, updatedAt: now,
           },

@@ -51,8 +51,12 @@ export class PortalService {
         where: { contractId: id }, orderBy: { signingOrder: 'asc' },
         select: { party: true, fullName: true, status: true, signedAt: true },
       });
+      // Match insensible à la casse : l'email du user portail est lowercasé
+      // à la création (users.service.ts), mais des signataires plus anciens
+      // (créés avant la normalisation en écriture) peuvent porter une casse
+      // mixte. Sans `mode: 'insensitive'`, la résolution échoue silencieusement.
       const mine = email
-        ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email }, select: { status: true } })
+        ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email: { equals: email, mode: 'insensitive' } }, select: { status: true } })
         : null;
       const mySignature = mine ? { status: mine.status } : null;
       return { ...this.base(c), signers, mySignature };
@@ -63,11 +67,14 @@ export class PortalService {
     const email = await this.emailOf(scope, scope.userId);
     return withScope(scope, async (tx) => {
       const c = await tx.contract.findUnique({ where: { id }, select: { id: true, status: true } });
-      if (!c || !CLIENT_VISIBLE_STATUSES.includes(c.status)) throw new NotFoundException('Contrat introuvable'); // RLS → 404 hors scope ; 404 si statut interne
+      // Message 404 unifié avec le cas « pas signataire » ci-dessous : aucun
+      // oracle ne doit permettre de distinguer hors-scope / statut interne de
+      // in-scope-mais-pas-signataire.
+      if (!c || !CLIENT_VISIBLE_STATUSES.includes(c.status)) throw new NotFoundException('Contrat introuvable');
       const signer = email
-        ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email }, select: { status: true, providerSubmitterSlug: true } })
+        ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email: { equals: email, mode: 'insensitive' } }, select: { status: true, providerSubmitterSlug: true } })
         : null;
-      if (!signer) throw new NotFoundException('Vous n’êtes pas signataire de ce contrat.');
+      if (!signer) throw new NotFoundException('Contrat introuvable');
       if (!SIGN_PENDING.includes(signer.status) || !signer.providerSubmitterSlug) {
         throw new ConflictException({ code: 'NO_PENDING_SIGNATURE', detail: 'Aucune signature en attente pour vous sur ce contrat.' });
       }

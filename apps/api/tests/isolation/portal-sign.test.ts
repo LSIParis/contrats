@@ -73,6 +73,34 @@ describe('signature in-portal', () => {
     expect(JSON.stringify(detail.body)).not.toContain('slug-xyz');
   });
 
+  test('statut VIEWED (en attente) → /sign redirige aussi (302)', async () => {
+    const id = await seedSignableContract('VIEWED', 'slug-viewed');
+    const res = await get(`/v1/portal/contracts/${id}/sign`).expect(302);
+    expect(res.headers.location).toContain('/s/slug-viewed');
+  });
+
+  test('email signataire en casse mixte → match insensible à la casse', async () => {
+    const id = uuidv7(); const now = new Date();
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      await tx.contract.create({ data: {
+        id, tenantId: fx.tenantId, customerId: fx.customerA.id, reference: `LSI-SG-${id.slice(-8)}`,
+        title: 'À signer (casse mixte)', type: 'MAIN', status: 'PENDING_SIGNATURE', category: 'MAINTENANCE',
+        currency: 'EUR', billingFrequency: 'MONTHLY', ownerUserId: fx.amUserId,
+        startDate: new Date('2026-01-01'), endDate: new Date('2026-12-31'),
+        createdAt: now, updatedAt: now, createdByUserId: fx.amUserId, updatedByUserId: fx.amUserId } });
+      // Signataire seedé DIRECTEMENT avec une casse mixte (contourne la
+      // normalisation en écriture) pour prouver le match insensible en lecture.
+      await tx.contractSigner.create({ data: {
+        id: uuidv7(), tenantId: fx.tenantId, customerId: fx.customerA.id, contractId: id, party: 'CLIENT',
+        fullName: 'Nathalie', email: 'Signer-A@Example.com', signingOrder: 1, status: 'SENT',
+        providerSubmitterSlug: 'slug-mixed', createdAt: now, updatedAt: now } });
+    });
+    const detail = await get(`/v1/portal/contracts/${id}`).expect(200);
+    expect(detail.body.mySignature).toMatchObject({ status: 'SENT' });
+    const res = await get(`/v1/portal/contracts/${id}/sign`).expect(302);
+    expect(res.headers.location).toContain('/s/slug-mixed');
+  });
+
   test('déjà signé → /sign 409', async () => {
     const id = await seedSignableContract('SIGNED', 'slug-done');
     await get(`/v1/portal/contracts/${id}/sign`).expect(409);
