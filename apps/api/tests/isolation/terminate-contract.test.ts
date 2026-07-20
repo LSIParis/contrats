@@ -70,6 +70,17 @@ describe('POST /v1/contracts/:id/terminate', () => {
     expect(canc[0]).toMatchObject({ type: 'TERMINATION', initiatedBy: 'CLIENT', noticeRespected: true });
   });
 
+  test('frontière exacte du préavis (30 j) SANS admin → succès, noticeRespected=true', async () => {
+    // effectiveDate = today + noticePeriodDays (30j), exactement la valeur que
+    // le FRONT pré-remplit par défaut. La comparaison doit se faire en JOURS
+    // (UTC), pas en instants : sinon minuit < now+30j et la frontière est
+    // refusée à tort (régression corrigée : isNoticeRespected).
+    const id = await seedActive();
+    const res = await term(id, { reason: 'Fin de collaboration', effectiveDate: plus(30), initiatedBy: 'CLIENT' }, 'sess-am').expect(201);
+    expect(res.body.status).toBe('TERMINATED');
+    expect(res.body.noticeRespected).toBe(true);
+  });
+
   test('motif vide → 409 RM-20, rien ne bouge', async () => {
     const id = await seedActive();
     await term(id, { reason: '', effectiveDate: plus(31), initiatedBy: 'LSI' }).expect(400); // MinLength -> 400 validation

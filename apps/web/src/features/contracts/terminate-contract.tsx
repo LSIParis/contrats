@@ -27,7 +27,6 @@ export function TerminateContract({
   const isAdmin = roles.includes('MSP_ADMIN');
   const canAct = allowedActions.includes('TERMINATE') && roles.some((r) => ADMIN_OR_AM.includes(r));
   const beforeNotice = effectiveDate < plusDays(notice);
-  const needsOverride = beforeNotice; // le serveur refuse si non-admin ; le champ n'apparaît que pour l'admin
 
   const m = useMutation({
     mutationFn: () => apiPost(`/v1/contracts/${contractId}/terminate`, {

@@ -219,6 +219,20 @@ describe('RM-20 — résiliation et préavis', () => {
     ).toThrow(/préavis/i);
   });
 
+  test('la frontière exacte (aujourd\'hui + préavis) est ACCEPTÉE pour un non-admin', () => {
+    // TODAY = 2026-07-16T10:00:00Z (heure de jour non nulle) + 90 jours de
+    // préavis ⇒ frontière = 2026-10-14 (minuit UTC). La comparaison doit
+    // porter sur des JOURS, pas des instants : sinon minuit < 10h et la
+    // date pile au bord du préavis est refusée à tort (régression).
+    const c = draft({ status: 'ACTIVE', noticePeriodDays: 90 });
+    const r = applyEvent(
+      c,
+      { type: 'TERMINATE', actorUserId: 'u1', reason: 'fin', effectiveDate: new Date('2026-10-14'), isAdmin: false },
+      TODAY,
+    );
+    expect(r.status).toBe('TERMINATED');
+  });
+
   test('un MSP_ADMIN peut déroger, mais seulement avec une justification', () => {
     const c = draft({ status: 'ACTIVE', noticePeriodDays: 90 });
     expect(() =>

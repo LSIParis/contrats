@@ -74,6 +74,11 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
+/** Minuit UTC du jour de `d`. Neutralise l'heure de `now` pour une comparaison en JOURS. */
+function startOfUtcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
 /**
  * RM-20 : le préavis est-il respecté ? Source UNIQUE, en UTC (via `addDays`).
  *
@@ -81,13 +86,19 @@ function addDays(d: Date, n: number): Date {
  * la garde TERMINATE ci-dessous doivent trancher IDENTIQUEMENT — sinon, près
  * d'une frontière de jour dans un process non-UTC, la ligne persistée peut
  * contredire la décision d'admission. D'où l'export.
+ *
+ * `effectiveDate` vient d'un `<input type=date>` : minuit UTC du jour choisi.
+ * La règle métier compare des JOURS ("date d'effet ≥ aujourd'hui + préavis"),
+ * pas des instants — `now` est donc ramené à minuit UTC avant d'ajouter le
+ * préavis, sinon la frontière exacte (aujourd'hui + préavis) est rejetée à
+ * tort dès que `now` a une heure de jour non nulle.
  */
 export function isNoticeRespected(
   noticePeriodDays: number | null,
   effectiveDate: Date,
   now: Date,
 ): boolean {
-  return effectiveDate >= addDays(now, noticePeriodDays ?? 0);
+  return effectiveDate >= addDays(startOfUtcDay(now), noticePeriodDays ?? 0);
 }
 
 /**
@@ -288,7 +299,7 @@ export function applyEvent(
 
       if (!respectsNotice) {
         if (!event.isAdmin) {
-          const minDate = addDays(now, c.noticePeriodDays ?? 0);
+          const minDate = addDays(startOfUtcDay(now), c.noticePeriodDays ?? 0);
           throw new BusinessRuleError(
             `Le préavis de ${c.noticePeriodDays} jours n'est pas respecté : ` +
               `la date d'effet ne peut pas précéder le ${minDate.toISOString().slice(0, 10)}. ` +

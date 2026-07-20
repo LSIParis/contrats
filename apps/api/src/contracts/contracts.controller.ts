@@ -179,7 +179,7 @@ export class ContractsController {
     return this.contracts.applyEvent(
       scope,
       id,
-      { type: 'CANCEL', actorUserId: session.userId, reason: dto.reason },
+      { type: 'CANCEL', actorUserId: session.userId, reason: dto.reason.trim() },
       new Date(),
     );
   }

@@ -342,9 +342,9 @@ export class ContractsService {
       await tx.cancellation.create({
         data: {
           id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId: id,
-          type: 'TERMINATION', reason: dto.reason, initiatedBy: dto.initiatedBy,
+          type: 'TERMINATION', reason: dto.reason.trim(), initiatedBy: dto.initiatedBy,
           effectiveDate, noticeRespected,
-          overrideReason: noticeRespected ? null : (dto.overrideReason ?? null),
+          overrideReason: noticeRespected ? null : (dto.overrideReason?.trim() ?? null),
           overrideByUserId: noticeRespected ? null : session.userId,
           createdByUserId: session.userId, createdAt: now,
         },
