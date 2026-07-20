@@ -54,10 +54,12 @@ describe('magic link — parcours nominal', () => {
     expect(cookie.toLowerCase()).toContain('httponly');
     expect(cookie.toLowerCase()).toContain('samesite=strict');
 
-    // Le cookie ouvre bien une session : une route protégée passe.
+    // Le cookie ouvre bien une session : une route protégée du PORTAIL passe.
+    // (`/v1/contracts`, interne, est désormais refusée à une session CLIENT —
+    // garde deny-by-default, Task 2 : voir client-portal-guard.test.ts.)
     const sid = cookie.match(/lsi_sess=([^;]+)/)![1];
     const me = await request(app.getHttpServer())
-      .get('/v1/contracts')
+      .get('/v1/portal/contracts')
       .set('Cookie', `lsi_sess=${sid}`);
     expect(me.status).toBe(200); // client authentifié, voit ses contrats
   });
@@ -68,12 +70,12 @@ describe('magic link — parcours nominal', () => {
     const res = await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`);
     const sid = (res.headers['set-cookie']![0]).match(/lsi_sess=([^;]+)/)![1];
 
-    // Il ne voit QUE les contrats de son customer (RM-31) : le contrat de
-    // customerA est visible, celui de customerB ne l'est pas.
-    const list = await request(app.getHttpServer()).get('/v1/contracts').set('Cookie', `lsi_sess=${sid}`);
-    const ids = list.body.data.map((c: any) => c.id);
-    expect(ids).toContain(fx.customerA.contractId);
-    expect(ids).not.toContain(fx.customerB.contractId);
+    // Il est épinglé à SON customer (RM-31) : /v1/portal/me, borné par le
+    // scope de session, renvoie le nom de customerA — jamais celui de
+    // customerB.
+    const me = await request(app.getHttpServer()).get('/v1/portal/me').set('Cookie', `lsi_sess=${sid}`);
+    expect(me.body.customerName).toBe(fx.customerA.name);
+    expect(me.body.customerName).not.toBe(fx.customerB.name);
   });
 });
 

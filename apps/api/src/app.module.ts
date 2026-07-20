@@ -28,6 +28,7 @@ import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
 import { PortalContractsController } from './portal/portal-contracts.controller.js';
 import { PortalService } from './portal/portal.service.js';
+import { ClientPortalGuard } from './portal/client-portal.guard.js';
 import { SignersController } from './contracts/signers.controller.js';
 import { SignersService } from './contracts/signers.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
@@ -166,6 +167,15 @@ class HealthController {
       // périmètre. Le pire mode de défaillance possible.
       provide: APP_GUARD,
       useClass: ScopeGuard,
+    },
+    {
+      // Deny-by-default pour les sessions CLIENT (§6.15, H11) : après
+      // ScopeGuard (qui pose req.session), confine toute session
+      // actorKind='CLIENT' à /v1/portal/*. L'ordre de déclaration des
+      // providers APP_GUARD EST l'ordre d'exécution — doit rester APRÈS
+      // ScopeGuard.
+      provide: APP_GUARD,
+      useClass: ClientPortalGuard,
     },
     {
       // Les montants sont des BigInt (centimes entiers) : sans cela,

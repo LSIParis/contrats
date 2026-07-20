@@ -50,12 +50,13 @@ describe('GET /v1/auth/me', () => {
     expect(res.body.customerId ?? null).toBeNull();
   });
 
-  test('utilisateur client : customerId épinglé', async () => {
-    const res = await request(app.getHttpServer())
+  test('utilisateur client : /v1/auth/me est interne → 403 (garde deny-by-default, Task 2)', async () => {
+    // Une session CLIENT n'atteint jamais la surface interne, même en
+    // lecture — /v1/auth/me est hors /v1/portal/*. L'équivalent client est
+    // GET /v1/portal/me (voir portal-contracts.test.ts).
+    await request(app.getHttpServer())
       .get('/v1/auth/me')
       .set('x-lsi-session', 'sess-client')
-      .expect(200);
-    expect(res.body.kind).toBe('CLIENT');
-    expect(res.body.customerId).toBe(fx.customerA.id);
+      .expect(403);
   });
 });
