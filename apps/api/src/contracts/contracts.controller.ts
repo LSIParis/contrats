@@ -18,6 +18,7 @@ import { SendForSignatureDto } from './dto/send-for-signature.dto.js';
 import { ListContractsDto } from './dto/list-contracts.dto.js';
 import { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import { RefuseRenewalDto } from './dto/refuse-renewal.dto.js';
+import { AmendContractDto } from './dto/amend-contract.dto.js';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
 import { IsString, MinLength } from 'class-validator';
@@ -188,6 +189,17 @@ export class ContractsController {
   ) {
     assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
     return this.contracts.refuseRenewal(scope, id, dto.reason, session, new Date());
+  }
+
+  @Post(':id/amend')
+  async amend(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AmendContractDto,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.amend(scope, id, dto, session, new Date());
   }
 
   @Post(':id/cancel')

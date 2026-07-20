@@ -5,6 +5,7 @@ import {
   allowedEvents,
   isNoticeRespected,
   assertCanRenew,
+  assertCanAmend,
   InvalidTransitionError,
   BusinessRuleError,
   type ContractEvent,
@@ -18,6 +19,7 @@ import {
 import type { CreateContractDto } from './dto/create-contract.dto.js';
 import type { ListContractsDto } from './dto/list-contracts.dto.js';
 import type { TerminateContractDto } from './dto/terminate-contract.dto.js';
+import type { AmendContractDto } from './dto/amend-contract.dto.js';
 import type { Session } from '../auth/session.service.js';
 
 /**
@@ -160,6 +162,17 @@ export class ContractsService {
         ? await tx.contract.findUnique({ where: { id: c.predecessorContractId }, select: { id: true, reference: true } })
         : null;
 
+      // Avenant (§6.12) : l'éventuel AMENDMENT non terminal porté par CE
+      // contrat (côté parent), et le parent que CE contrat amende, si l'un
+      // ou l'autre existe.
+      const openAmendment = await tx.contract.findFirst({
+        where: { parentContractId: id, type: 'AMENDMENT', status: { notIn: ['CANCELLED', 'DECLINED', 'TERMINATED', 'EXPIRED', 'RENEWED'] } },
+        select: { id: true, reference: true, status: true },
+      });
+      const amends = c.parentContractId
+        ? await tx.contract.findUnique({ where: { id: c.parentContractId }, select: { id: true, reference: true } })
+        : null;
+
       return {
         contract: c,
         customer: c.customer,
@@ -173,6 +186,8 @@ export class ContractsService {
         timeline,
         renewal,
         predecessor,
+        openAmendment,
+        amends,
       };
     });
   }
@@ -511,6 +526,61 @@ export class ContractsService {
         data: { successorContractId: null, updatedAt: now, updatedByUserId: session.userId },
       });
       return { status: 'REFUSED' as const };
+    });
+  }
+
+  /**
+   * Avenant (RM-17, RM-19, §6.12) : crée un contrat AMENDMENT DRAFT
+   * pré-rempli à partir du parent, lié par `parentContractId`.
+   *
+   * Comme `renew`, le domaine ne fait QUE la garde de statut (RM-17) et
+   * l'absence d'avenant déjà ouvert (RM-19, via `openAmendmentExists` du
+   * snapshot). L'unicité en base — `contracts_one_open_amendment` — reste
+   * le filet contre une course concurrente : le `catch` P2002 ci-dessous
+   * traduit ce filet en 409 applicatif plutôt que de laisser fuiter une
+   * erreur Prisma brute.
+   */
+  async amend(scope: Scope, id: string, dto: AmendContractDto, session: Session, now: Date) {
+    return withScope(scope, async (tx) => {
+      const parent = await tx.contract.findUnique({
+        where: { id },
+        include: { signers: { select: { party: true } }, attachments: { select: { id: true } }, amendments: { select: { status: true } } },
+      });
+      if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
+
+      try {
+        assertCanAmend(this.toSnapshot(parent, null));
+      } catch (e) {
+        if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
+        throw e;
+      }
+
+      const newId = uuidv7();
+      let amendment;
+      try {
+        amendment = await tx.contract.create({
+          data: {
+            id: newId, tenantId: parent.tenantId, customerId: parent.customerId,
+            reference: await this.nextReference(tx, parent.tenantId, now),
+            title: `${parent.title} — avenant`, type: 'AMENDMENT', status: 'DRAFT',
+            category: parent.category, currency: parent.currency, billingFrequency: parent.billingFrequency,
+            noticePeriodDays: parent.noticePeriodDays, startDate: parent.startDate,
+            endDate: dto.endDate ? new Date(dto.endDate) : parent.endDate,
+            amountCents: dto.amountCents !== undefined ? BigInt(dto.amountCents) : parent.amountCents,
+            parentContractId: parent.id, ownerUserId: session.userId,
+            createdAt: now, updatedAt: now, createdByUserId: session.userId, updatedByUserId: session.userId,
+          },
+        });
+      } catch (e: any) {
+        if (e?.code === 'P2002') {
+          throw new ConflictException({
+            code: 'AMENDMENT_ALREADY_OPEN',
+            detail: 'Un avenant est déjà en cours sur ce contrat.',
+          });
+        }
+        throw e;
+      }
+      return { id: newId, reference: amendment.reference };
     });
   }
 
