@@ -5,6 +5,9 @@ set -eu
 
 STAMP="$(date +%Y-%m-%dT%H%M)"
 TMP="/tmp/lsi_${STAMP}.dump"
+# Nettoie le dump temporaire quoi qu'il arrive (y compris si l'upload echoue) :
+# sinon les dumps s'accumulent dans /tmp au fil des reessais nocturnes.
+trap 'rm -f "$TMP"' EXIT
 
 echo "[backup] pg_dump ${STAMP}..."
 pg_dump -Fc -f "$TMP"            # PGHOST/PGUSER/PGPASSWORD/PGDATABASE via env

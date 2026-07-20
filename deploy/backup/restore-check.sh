@@ -3,6 +3,14 @@
 # compare quelques comptes au live. Prouve que le dump est exploitable.
 set -eu
 
+# La base jetable est TOUJOURS supprimee en sortie, quel que soit le resultat :
+# un pg_restore rate ne doit pas laisser d'orphelin sur le serveur live.
+cleanup() {
+  psql -c "DROP DATABASE IF EXISTS lsi_restore_check;" >/dev/null 2>&1 || true
+  rm -f /tmp/check.dump
+}
+trap cleanup EXIT
+
 LATEST="$(mc ls "wasabi/${WASABI_BUCKET}/pg/" | awk '{print $NF}' | sort | tail -1)"
 [ -n "$LATEST" ] || { echo "[restore-check] aucun dump trouve"; exit 1; }
 echo "[restore-check] dernier dump: ${LATEST}"
@@ -15,14 +23,20 @@ psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE lsi_restore_check;"
 # stoppe pas dessus, la comparaison de comptes ci-dessous fait foi.
 pg_restore --no-owner --no-privileges -d lsi_restore_check /tmp/check.dump || true
 
-LIVE="$(psql -tAc 'SELECT count(*) FROM contracts')"
-REST="$(psql -d lsi_restore_check -tAc 'SELECT count(*) FROM contracts')"
+# Les requetes de comptage ne doivent PAS tuer le script (busybox ash + set -e
+# avorte sur une substitution en echec, ce qui sauterait le cleanup) : on
+# capture, on laisse vide en cas d'echec, et le trap EXIT nettoie de toute facon.
+LIVE="$(psql -tAc 'SELECT count(*) FROM contracts' 2>/dev/null)" || LIVE=""
+REST="$(psql -d lsi_restore_check -tAc 'SELECT count(*) FROM contracts' 2>/dev/null)" || REST=""
 echo "[restore-check] contracts live=${LIVE} restored=${REST}"
 
-psql -v ON_ERROR_STOP=1 -c "DROP DATABASE lsi_restore_check;"
-rm -f /tmp/check.dump
-
-# Succes = la base restauree a un compte coherent (> 0 et = live).
-if [ -n "$REST" ] && [ "$REST" = "$LIVE" ] && [ -n "${UPTIME_RESTORE_PUSH_URL:-}" ]; then
-  curl -fsS -m 15 "${UPTIME_RESTORE_PUSH_URL}?status=up&msg=restore_ok_${REST}" >/dev/null 2>&1 || true
+# Succes = base restauree avec un compte coherent (non vide ET egal au live).
+if [ -n "$REST" ] && [ "$REST" = "$LIVE" ]; then
+  echo "[restore-check] OK"
+  if [ -n "${UPTIME_RESTORE_PUSH_URL:-}" ]; then
+    curl -fsS -m 15 "${UPTIME_RESTORE_PUSH_URL}?status=up&msg=restore_ok_${REST}" >/dev/null 2>&1 || true
+  fi
+else
+  echo "[restore-check] ECHEC : comptes incoherents (live=${LIVE} restored=${REST})"
+  exit 1
 fi

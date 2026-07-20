@@ -10,5 +10,11 @@ set -eu
 mc alias set local  "http://minio:9000"   "$S3_ACCESS_KEY"     "$S3_SECRET_KEY"
 mc alias set wasabi "$WASABI_ENDPOINT"     "$WASABI_ACCESS_KEY" "$WASABI_SECRET_KEY"
 
+# Surveillance non bloquante : on n'exige PAS UPTIME_PUSH_URL (une sauvegarde
+# vaut mieux qu'aucune), mais on avertit fort si elle est absente — sinon des
+# sauvegardes tourneraient sans aucun signal, ce qui viderait Uptime Kuma de
+# son role.
+[ -n "${UPTIME_PUSH_URL:-}" ] || echo "[backup] AVERTISSEMENT : UPTIME_PUSH_URL non defini — sauvegardes NON surveillees"
+
 echo "[backup] alias mc configures ; planificateur demarre (backup 02h00, restore-check le 1er 03h00)"
 exec supercronic /etc/crontab
