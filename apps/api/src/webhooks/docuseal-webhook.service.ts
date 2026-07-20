@@ -310,9 +310,17 @@ export class DocusealWebhookService {
                     kind: d.kind, offsetDays: d.offsetDays, cycle: d.cycle, dueAt: d.dueAt, status: d.status, createdAt: now,
                   }});
                 }
-              } else {
+              } else if (parent.status === 'SIGNED') {
+                // Parent SIGNED mais pas encore ACTIVE : on reporte les
+                // champs, mais on ne replanifie PAS les rappels ici — ils
+                // sont posés à l'activation, sur la bonne date (celle déjà
+                // reportée).
                 await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, updatedAt: now } });
               }
+              // Sinon (parent TERMINATED/CANCELLED/EXPIRED/RENEWED/…) : le
+              // parent est dans un état TERMINAL — l'avenant ne s'applique
+              // plus à rien de significatif. On ne touche à rien plutôt que
+              // de réécrire endDate/amountCents sur un contrat clos.
             }
           }
         }

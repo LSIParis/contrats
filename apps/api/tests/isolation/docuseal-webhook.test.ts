@@ -738,6 +738,68 @@ describe('avenant — report au parent à la signature complète (RM-18, EC-12)'
     );
     expect(reminders).toHaveLength(0);
   });
+
+  test('FORM_COMPLETED qui signe un avenant dont le parent est TERMINATED ne modifie pas le parent', async () => {
+    const parentId = uuidv7();
+    const now = new Date();
+    const oldEndDate = new Date('2026-08-01T00:00:00Z');
+    const rawNewEndDate = new Date(now.getTime() + 200 * 24 * 60 * 60 * 1000);
+    const newEndDate = new Date(Date.UTC(rawNewEndDate.getUTCFullYear(), rawNewEndDate.getUTCMonth(), rawNewEndDate.getUTCDate()));
+    const newAmountCents = 333444n;
+
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      // Le parent est déjà TERMINAL au moment où l'avenant finit de signer :
+      // son cycle de signature aura pris du temps pendant lequel le parent
+      // a été résilié. Le report ne doit alors PLUS avoir lieu.
+      await tx.contract.create({
+        data: {
+          id: parentId,
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          reference: `LSI-2026-${parentId.slice(-12)}`,
+          title: 'Contrat parent TERMINATED (avenant)',
+          type: 'MAIN',
+          status: 'TERMINATED',
+          category: 'MAINTENANCE',
+          currency: 'EUR',
+          billingFrequency: 'MONTHLY',
+          endDate: oldEndDate,
+          amountCents: 500000n,
+          noticePeriodDays: 30,
+          reminderCycle: 0,
+          ownerUserId: fx.amUserId,
+          createdAt: now,
+          updatedAt: now,
+          createdByUserId: fx.amUserId,
+          updatedByUserId: fx.amUserId,
+        },
+      });
+
+      await tx.contract.update({
+        where: { id: subA.contractId },
+        data: {
+          type: 'AMENDMENT',
+          parentContractId: parentId,
+          endDate: newEndDate,
+          amountCents: newAmountCents,
+        },
+      });
+    });
+
+    const res = await post(formEvent());
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('processed');
+
+    const parent = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contract.findUnique({ where: { id: parentId } }),
+    );
+    // Le parent TERMINAL reste inchangé : ni endDate ni amountCents ne sont
+    // réécrits par un avenant qui n'a plus de sens pour un contrat clos.
+    expect(parent!.endDate?.toISOString()).toBe(oldEndDate.toISOString());
+    expect(parent!.amountCents).toBe(500000n);
+    expect(parent!.reminderCycle).toBe(0);
+    expect(parent!.status).toBe('TERMINATED');
+  });
 });
 
 describe('journalisation', () => {
