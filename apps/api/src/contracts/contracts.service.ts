@@ -404,9 +404,18 @@ export class ContractsService {
         throw e;
       }
 
-      const existing = await tx.renewalRequest.findFirst({ where: { contractId: id, status: 'PENDING' } });
-      if (existing) {
-        throw new ConflictException({ code: 'RENEWAL_ALREADY_IN_PROGRESS', detail: 'Un renouvellement est déjà en cours pour ce contrat.' });
+      // Garde applicative : un seul successeur VIVANT par parent — pas
+      // seulement une RenewalRequest PENDING. Une fois le successeur signé,
+      // la RenewalRequest passe ACCEPTED (donc le `findFirst(PENDING)`
+      // d'origine ne la voit plus) mais `successorContractId` reste
+      // posé jusqu'à l'EXPIRE/RENEWED du parent — un second renouvellement
+      // écraserait ce lien avec un nouveau successeur DRAFT non signé, et le
+      // sweep de cycle de vie lirait CE successeur-là (non signé) pour
+      // décider EXPIRE au lieu de RENEWED, orphelinant le successeur signé.
+      // `refuseRenewal` remet ce champ à null, donc un refus autorise bien
+      // une tentative fraîche.
+      if (parent.successorContractId !== null) {
+        throw new ConflictException({ code: 'RENEWAL_ALREADY_IN_PROGRESS', detail: 'Un renouvellement est déjà en cours ou accepté pour ce contrat.' });
       }
 
       const start = parent.endDate ? new Date(parent.endDate.getTime() + 86400000) : now;
@@ -472,6 +481,25 @@ export class ContractsService {
       const rr = await tx.renewalRequest.findFirst({ where: { contractId: id, status: 'PENDING' } });
       if (!rr) {
         throw new ConflictException({ code: 'NO_PENDING_RENEWAL', detail: 'Aucun renouvellement en cours.' });
+      }
+
+      // Le successeur peut avoir progressé en signature pendant que la
+      // RenewalRequest reste PENDING (l'auto-acceptation ne se déclenche
+      // qu'à la signature complète, `allSigned`). Refuser ici délierait le
+      // parent tout en laissant la demande de signature du successeur suivre
+      // son cours — un signataire restant pourrait la compléter, aboutissant
+      // à un successeur pleinement signé dont le renouvellement est REFUSED.
+      // On bloque donc tant que le successeur est en signature ; un
+      // successeur déjà SIGNED correspond à une RenewalRequest ACCEPTED (pas
+      // PENDING), donc déjà écarté par le garde ci-dessus.
+      const successor = rr.newContractId
+        ? await tx.contract.findUnique({ where: { id: rr.newContractId }, select: { status: true } })
+        : null;
+      if (successor && (successor.status === 'PENDING_SIGNATURE' || successor.status === 'PARTIALLY_SIGNED')) {
+        throw new ConflictException({
+          code: 'SUCCESSOR_IN_SIGNATURE',
+          detail: "Le contrat successeur est déjà en signature ; révoquez d'abord sa demande de signature avant de refuser le renouvellement.",
+        });
       }
 
       await tx.renewalRequest.update({
@@ -545,7 +573,14 @@ export class ContractsService {
       // du modèle (ticket C-02). Aucune n'est obligatoire aujourd'hui.
       hasRequiredAttachments: true,
       openAmendmentExists: (c.amendments ?? []).some((a: any) => !OPEN.includes(a.status)),
-      hasSignedSuccessor: c.successorContractId !== null,
+      // `successorContractId` est désormais posé dès la création d'un
+      // successeur DRAFT non signé (cf. `renew`) : un lien existant ne veut
+      // PAS dire « signé ». La transition EXPIRE→RENEWED n'est décidée que
+      // par le sweep de cycle de vie (lifecycle.service.ts), qui construit
+      // son propre snapshot à partir du VRAI `signedAt` du successeur. Ce
+      // snapshot générique ne doit donc jamais prétendre à un successeur
+      // signé à partir d'un simple lien (cf. signature-actions.service.ts).
+      hasSignedSuccessor: false,
       signedAt: c.signedAt,
       activatedAt: c.activatedAt,
       terminatedAt: c.terminatedAt,

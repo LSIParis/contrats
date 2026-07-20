@@ -27,7 +27,8 @@ export function RenewContract({ contractId, status, roles, renewal, predecessor 
   });
 
   const errOf = (m: typeof create | typeof refuse) => (m.error instanceof ApiError ? m.error.message : m.error ? 'Erreur.' : undefined);
-  const renewable = (status === 'ACTIVE' || status === 'EXPIRED') && !renewal;
+  const renewable = (status === 'ACTIVE' || status === 'EXPIRED')
+    && (!renewal || renewal.status === 'REFUSED' || renewal.status === 'EXPIRED');
   const active = renewal && renewal.status === 'PENDING';
 
   return (

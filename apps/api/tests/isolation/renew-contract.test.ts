@@ -45,7 +45,7 @@ describe('POST /v1/contracts/:id/renew', () => {
     expect(newId).toBeTruthy();
     const [parent, succ, rr] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
       await tx.contract.findUnique({ where: { id }, select: { successorContractId: true } }),
-      await tx.contract.findUnique({ where: { id: newId }, select: { type: true, status: true, predecessorContractId: true, title: true, noticePeriodDays: true, startDate: true, endDate: true } }),
+      await tx.contract.findUnique({ where: { id: newId }, select: { type: true, status: true, predecessorContractId: true, title: true, noticePeriodDays: true, startDate: true, endDate: true, amountCents: true, currency: true, billingFrequency: true } }),
       await tx.renewalRequest.findFirst({ where: { contractId: id } }),
     ]);
     expect(parent!.successorContractId).toBe(newId);
@@ -53,6 +53,10 @@ describe('POST /v1/contracts/:id/renew', () => {
     expect(succ!.title).toContain('renouvellement');
     // début = fin du parent (2026-12-31) + 1 j = 2027-01-01
     expect(succ!.startDate?.toISOString().slice(0, 10)).toBe('2027-01-01');
+    // le successeur copie les conditions financières du parent (§6.12)
+    expect(succ!.amountCents).toBe(BigInt(120000));
+    expect(succ!.currency).toBe('EUR');
+    expect(succ!.billingFrequency).toBe('MONTHLY');
     expect(rr).toMatchObject({ status: 'PENDING', newContractId: newId, initiatedByUserId: fx.amUserId });
   });
 
@@ -65,6 +69,22 @@ describe('POST /v1/contracts/:id/renew', () => {
     const id = await seedActive();
     await renew(id).expect(201);
     await renew(id).expect(409);
+  });
+
+  test('successeur déjà ACCEPTED (signé) → un second renouvellement est bloqué (409)', async () => {
+    const id = await seedActive();
+    const newId = (await renew(id).expect(201)).body.id;
+    // Simule l'acceptation : le successeur est signé, la RenewalRequest
+    // passe ACCEPTED, mais `parent.successorContractId` reste posé — c'est
+    // justement ce lien qui doit bloquer un second renouvellement, pas
+    // l'état de la RenewalRequest (qui n'est plus PENDING).
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      await tx.renewalRequest.updateMany({ where: { contractId: id }, data: { status: 'ACCEPTED', decidedAt: new Date() } });
+    });
+    await renew(id).expect(409);
+    const parent = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contract.findUnique({ where: { id }, select: { successorContractId: true } }));
+    expect(parent!.successorContractId).toBe(newId);
   });
 
   test('rôle insuffisant → 403', async () => {
@@ -102,5 +122,29 @@ describe('POST /v1/contracts/:id/renew/refuse', () => {
   test('refuser sans renouvellement en cours → 409', async () => {
     const id = await seedActive();
     await request(app.getHttpServer()).post(`/v1/contracts/${id}/renew/refuse`).set('x-lsi-session', 'sess-am').send({ reason: 'x' }).expect(409);
+  });
+
+  test('IDOR : refuser le renouvellement d\'un contrat de B → 404', async () => {
+    const id = await seedActive({}, fx.customerB.id);
+    await request(app.getHttpServer()).post(`/v1/contracts/${id}/renew/refuse`).set('x-lsi-session', 'sess-am').send({ reason: 'x' }).expect(404);
+  });
+
+  test('successeur déjà en signature → refus bloqué (409, ne délie pas le parent)', async () => {
+    const id = await seedActive();
+    const newId = (await renew(id).expect(201)).body.id;
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      await tx.contract.update({ where: { id: newId }, data: { status: 'PENDING_SIGNATURE' } });
+    });
+    const res = await request(app.getHttpServer())
+      .post(`/v1/contracts/${id}/renew/refuse`).set('x-lsi-session', 'sess-am').send({ reason: 'trop tard' });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('SUCCESSOR_IN_SIGNATURE');
+    const [parent, rr] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id }, select: { successorContractId: true } }),
+      await tx.renewalRequest.findFirst({ where: { contractId: id } }),
+    ]);
+    // le parent reste lié et la demande reste PENDING : le refus n'a rien touché
+    expect(parent!.successorContractId).toBe(newId);
+    expect(rr!.status).toBe('PENDING');
   });
 });
