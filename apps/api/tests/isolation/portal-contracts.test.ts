@@ -7,6 +7,15 @@ import { SessionService } from '../../src/auth/session.service.js';
 import { adminScope, clientScope, withScope, uuidv7 } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
+// Vraies colonnes internes du modèle Contract (packages/persistence/prisma/schema.prisma)
+// qui ne doivent JAMAIS apparaître dans une réponse client — une régression
+// vers `return { ...c }` doit faire échouer ce test.
+const INTERNAL_CONTRACT_FIELDS = [
+  'ownerUserId', 'createdByUserId', 'updatedByUserId', 'tenantId', 'customerId',
+  'reminderCycle', 'parentContractId', 'predecessorContractId', 'successorContractId',
+  'approvedVersionId', 'currentVersionId', 'noticePeriodDays',
+] as const;
+
 let app: INestApplication;
 let fx: TwoCustomerFixture;
 let clientUserId: string;
@@ -48,8 +57,10 @@ describe('GET /v1/portal/contracts', () => {
     const statuses = res.body.items.map((c: any) => c.status);
     expect(statuses).toContain('ACTIVE');
     expect(statuses).not.toContain('DRAFT');
-    // projection client-safe : pas de champ interne
-    expect(res.body.items[0]).not.toHaveProperty('approval');
+    // projection client-safe : aucune des VRAIES colonnes internes de Contract
+    for (const field of INTERNAL_CONTRACT_FIELDS) {
+      expect(res.body.items[0]).not.toHaveProperty(field);
+    }
     expect(res.body.items[0]).toHaveProperty('reference');
   });
 
@@ -62,9 +73,10 @@ describe('GET /v1/portal/contracts', () => {
     const res = await get(`/v1/portal/contracts/${id}`).expect(200);
     expect(res.body).toMatchObject({ reference: expect.any(String), status: 'ACTIVE' });
     expect(res.body.signers[0]).toMatchObject({ party: 'CLIENT', status: 'SIGNED' });
-    expect(res.body).not.toHaveProperty('approval');
-    expect(res.body).not.toHaveProperty('timeline');
-    expect(res.body).not.toHaveProperty('reminders');
+    // aucune des VRAIES colonnes internes de Contract ne doit fuiter sur la fiche
+    for (const field of INTERNAL_CONTRACT_FIELDS) {
+      expect(res.body).not.toHaveProperty(field);
+    }
   });
 
   test('un contrat interne (DRAFT) du client → 404 côté portail', async () => {
