@@ -10,6 +10,7 @@ import { VersionsPage } from './features/contracts/versions-page.js';
 import { CustomersPage } from './features/customers/customers-page.js';
 import { CustomerNewPage } from './features/customers/customer-new-page.js';
 import { CustomerDetailPage } from './features/customers/customer-detail-page.js';
+import { UsersPage } from './features/users/users-page.js';
 import { PortalApp } from './portal/portal-app.js';
 
 function InternalRoutes() {
@@ -27,6 +28,7 @@ function InternalRoutes() {
         <Route path="/contracts/:id/versions" element={<VersionsPage />} />
         <Route path="/contracts/:id" element={<ContractDetailPage />} />
         <Route path="/reminders" element={<div>Rappels</div>} />
+        <Route path="/users" element={<UsersPage />} />
       </Route>
     </Routes>
   );

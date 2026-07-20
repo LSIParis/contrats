@@ -59,9 +59,25 @@ const BILLING_FREQUENCY_FR: Record<string, string> = {
   ONE_OFF: 'Ponctuelle',
 };
 
+const ROLE_FR: Record<string, string> = {
+  MSP_ADMIN: 'Administrateur',
+  ACCOUNT_MANAGER: 'Chargé de compte',
+  LEGAL_REVIEWER: 'Relecteur juridique',
+  TECHNICIAN: 'Technicien',
+  CLIENT_SIGNER: 'Signataire client',
+  CLIENT_VIEWER: 'Lecteur client',
+};
+
+const USER_KIND_FR: Record<string, string> = {
+  INTERNAL: 'Interne',
+  CLIENT: 'Client',
+};
+
 export const contractStatusLabel = (s: string): string => CONTRACT_STATUS_FR[s] ?? s;
 export const signerStatusLabel = (s: string): string => SIGNER_STATUS_FR[s] ?? s;
 export const reminderStatusLabel = (s: string): string => REMINDER_STATUS_FR[s] ?? s;
 export const partyLabel = (s: string): string => PARTY_FR[s] ?? s;
 export const contractCategoryLabel = (s: string): string => CONTRACT_CATEGORY_FR[s] ?? s;
 export const billingFrequencyLabel = (s: string): string => BILLING_FREQUENCY_FR[s] ?? s;
+export const roleLabel = (s: string): string => ROLE_FR[s] ?? s;
+export const userKindLabel = (s: string): string => USER_KIND_FR[s] ?? s;
