@@ -15,6 +15,7 @@ import { WorkflowActions } from './workflow-actions.js';
 import { SendForSignature } from './send-for-signature.js';
 import { SignatureActions } from './signature-actions.js';
 import { TerminateContract } from './terminate-contract.js';
+import { RenewContract } from './renew-contract.js';
 
 interface Detail {
   contract: {
@@ -33,6 +34,8 @@ interface Detail {
   timeline: Event[];
   signers: Signer[];
   approval: { submittedByUserId: string; decision: string; reason: string | null; decidedByUserId: string | null } | null;
+  renewal: { status: string; newContractId: string | null; refusalReason: string | null; successor: { reference: string; status: string } } | null;
+  predecessor: { id: string; reference: string } | null;
 }
 
 async function downloadSigned(id: string) {
@@ -121,6 +124,13 @@ export function ContractDetailPage() {
         noticePeriodDays={contract.noticePeriodDays}
         roles={me.data?.roles ?? []}
         allowedActions={allowed.data?.allowedActions ?? []}
+      />
+      <RenewContract
+        contractId={contract.id}
+        status={contract.status}
+        roles={me.data?.roles ?? []}
+        renewal={q.data.renewal}
+        predecessor={q.data.predecessor}
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
