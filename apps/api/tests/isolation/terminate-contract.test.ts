@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, test, expect, beforeAll } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -44,6 +44,7 @@ beforeAll(async () => {
   await s.put({ sessionId: 'sess-am', userId: fx.amUserId, tenantId: fx.tenantId, roles: ['ACCOUNT_MANAGER'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) });
   await s.put({ sessionId: 'sess-admin', userId: fx.adminUserId, tenantId: fx.tenantId, roles: ['MSP_ADMIN'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.adminUserId) });
   await s.put({ sessionId: 'sess-am-b', userId: fx.amBUserId, tenantId: fx.tenantId, roles: ['ACCOUNT_MANAGER'], scope: internalScope(fx.tenantId, [fx.customerB.id], fx.amBUserId) });
+  await s.put({ sessionId: 'sess-viewer', userId: fx.amUserId, tenantId: fx.tenantId, roles: ['LEGAL_REVIEWER'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) });
 });
 
 const term = (id: string, body: object, sess = 'sess-am') =>
@@ -105,6 +106,11 @@ describe('POST /v1/contracts/:id/terminate', () => {
   test('IDOR : contrat de B → 404', async () => {
     const id = await seedActive();
     await term(id, { reason: 'x', effectiveDate: plus(31), initiatedBy: 'LSI' }, 'sess-am-b').expect(404);
+  });
+
+  test('rôle non autorisé (LEGAL_REVIEWER) → 403', async () => {
+    const id = await seedActive();
+    await term(id, { reason: 'x', effectiveDate: plus(31), initiatedBy: 'LSI' }, 'sess-viewer').expect(403);
   });
 });
 

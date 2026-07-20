@@ -75,6 +75,22 @@ function addDays(d: Date, n: number): Date {
 }
 
 /**
+ * RM-20 : le préavis est-il respecté ? Source UNIQUE, en UTC (via `addDays`).
+ *
+ * Le service applicatif (persistance de `Cancellation.noticeRespected`) et
+ * la garde TERMINATE ci-dessous doivent trancher IDENTIQUEMENT — sinon, près
+ * d'une frontière de jour dans un process non-UTC, la ligne persistée peut
+ * contredire la décision d'admission. D'où l'export.
+ */
+export function isNoticeRespected(
+  noticePeriodDays: number | null,
+  effectiveDate: Date,
+  now: Date,
+): boolean {
+  return effectiveDate >= addDays(now, noticePeriodDays ?? 0);
+}
+
+/**
  * Les événements possibles dans l'état courant, gardes comprises.
  *
  * Alimente `allowed_transitions` dans les réponses d'erreur de l'API (§14.3),
@@ -268,11 +284,11 @@ export function applyEvent(
         throw new BusinessRuleError('Un motif de résiliation est obligatoire.', 'RM-20');
       }
 
-      const minDate = addDays(now, c.noticePeriodDays ?? 0);
-      const respectsNotice = event.effectiveDate >= minDate;
+      const respectsNotice = isNoticeRespected(c.noticePeriodDays, event.effectiveDate, now);
 
       if (!respectsNotice) {
         if (!event.isAdmin) {
+          const minDate = addDays(now, c.noticePeriodDays ?? 0);
           throw new BusinessRuleError(
             `Le préavis de ${c.noticePeriodDays} jours n'est pas respecté : ` +
               `la date d'effet ne peut pas précéder le ${minDate.toISOString().slice(0, 10)}. ` +

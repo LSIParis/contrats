@@ -3,6 +3,7 @@ import { withScope, uuidv7, type Scope } from '@lsi/persistence';
 import {
   applyEvent,
   allowedEvents,
+  isNoticeRespected,
   InvalidTransitionError,
   BusinessRuleError,
   type ContractEvent,
@@ -336,9 +337,7 @@ export class ContractsService {
         throw e;
       }
 
-      const noticeMin = new Date(now);
-      noticeMin.setDate(noticeMin.getDate() + (c.noticePeriodDays ?? 0));
-      const noticeRespected = effectiveDate >= noticeMin;
+      const noticeRespected = isNoticeRespected(c.noticePeriodDays, effectiveDate, now);
 
       await tx.cancellation.create({
         data: {
