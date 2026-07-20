@@ -4,6 +4,7 @@ import {
   applyEvent,
   allowedEvents,
   isNoticeRespected,
+  assertCanRenew,
   InvalidTransitionError,
   BusinessRuleError,
   type ContractEvent,
@@ -141,6 +142,24 @@ export class ContractsService {
         .filter((x): x is { at: Date; type: string; label: string } => Boolean(x))
         .sort((a, b) => a.at.getTime() - b.at.getTime());
 
+      // Renouvellement (§6.12) : la dernière demande de renouvellement DE ce
+      // contrat (côté parent) + son successeur, et le prédécesseur (côté
+      // successeur), si l'un ou l'autre existe.
+      const renewalRow = await tx.renewalRequest.findFirst({
+        where: { contractId: id },
+        orderBy: { initiatedAt: 'desc' },
+      });
+      let renewal = null;
+      if (renewalRow) {
+        const succ = renewalRow.newContractId
+          ? await tx.contract.findUnique({ where: { id: renewalRow.newContractId }, select: { reference: true, status: true } })
+          : null;
+        renewal = { status: renewalRow.status, newContractId: renewalRow.newContractId, refusalReason: renewalRow.refusalReason, successor: succ };
+      }
+      const predecessor = c.predecessorContractId
+        ? await tx.contract.findUnique({ where: { id: c.predecessorContractId }, select: { id: true, reference: true } })
+        : null;
+
       return {
         contract: c,
         customer: c.customer,
@@ -152,6 +171,8 @@ export class ContractsService {
         signatureRequest: sigReq ? { status: sigReq.status, signers } : null,
         reminders,
         timeline,
+        renewal,
+        predecessor,
       };
     });
   }
@@ -356,6 +377,63 @@ export class ContractsService {
       });
 
       return { status: 'TERMINATED' as const, effectiveDate: dto.effectiveDate, noticeRespected };
+    });
+  }
+
+  /**
+   * Renouvellement (RM-16, §6.12) : crée un contrat successeur DRAFT
+   * pré-rempli à partir du parent, et une RenewalRequest PENDING qui les lie.
+   *
+   * Comme `assertCanAmend`/avenant, le domaine ne fait QUE la garde de
+   * statut (RM-16) : l'unicité « un seul renouvellement en cours » est une
+   * contrainte applicative (une ligne PENDING existante), pas une règle
+   * portant sur le snapshot du contrat lui-même.
+   */
+  async renew(scope: Scope, id: string, session: Session, now: Date) {
+    return withScope(scope, async (tx) => {
+      const parent = await tx.contract.findUnique({
+        where: { id },
+        include: { signers: { select: { party: true } }, attachments: { select: { id: true } }, amendments: { select: { status: true } } },
+      });
+      if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
+
+      try {
+        assertCanRenew(this.toSnapshot(parent, null));
+      } catch (e) {
+        if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
+        throw e;
+      }
+
+      const existing = await tx.renewalRequest.findFirst({ where: { contractId: id, status: 'PENDING' } });
+      if (existing) {
+        throw new ConflictException({ code: 'RENEWAL_ALREADY_IN_PROGRESS', detail: 'Un renouvellement est déjà en cours pour ce contrat.' });
+      }
+
+      const start = parent.endDate ? new Date(parent.endDate.getTime() + 86400000) : now;
+      const end = parent.startDate && parent.endDate
+        ? new Date(start.getTime() + (parent.endDate.getTime() - parent.startDate.getTime()))
+        : null;
+
+      const newId = uuidv7();
+      const successor = await tx.contract.create({
+        data: {
+          id: newId, tenantId: parent.tenantId, customerId: parent.customerId,
+          reference: await this.nextReference(tx, parent.tenantId, now),
+          title: `${parent.title} (renouvellement)`, type: 'MAIN', status: 'DRAFT',
+          category: parent.category, currency: parent.currency, billingFrequency: parent.billingFrequency,
+          amountCents: parent.amountCents, noticePeriodDays: parent.noticePeriodDays,
+          predecessorContractId: parent.id, startDate: start, endDate: end,
+          ownerUserId: session.userId, createdAt: now, updatedAt: now, createdByUserId: session.userId, updatedByUserId: session.userId,
+        },
+      });
+      await tx.contract.update({ where: { id }, data: { successorContractId: newId, updatedAt: now } });
+      await tx.renewalRequest.create({
+        data: {
+          id: uuidv7(), tenantId: parent.tenantId, customerId: parent.customerId, contractId: id,
+          newContractId: newId, status: 'PENDING', initiatedByUserId: session.userId, initiatedAt: now,
+        },
+      });
+      return { id: newId, reference: successor.reference };
     });
   }
 

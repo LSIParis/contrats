@@ -168,6 +168,16 @@ export class ContractsController {
     return this.contracts.terminate(scope, id, dto, session, new Date());
   }
 
+  @Post(':id/renew')
+  async renew(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.renew(scope, id, session, new Date());
+  }
+
   @Post(':id/cancel')
   async cancel(
     @CurrentScope() scope: Scope,

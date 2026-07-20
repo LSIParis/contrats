@@ -140,6 +140,16 @@ export function assertCanAmend(parent: ContractSnapshot): void {
   }
 }
 
+/** RM-16 : un renouvellement ne porte que sur un contrat actif ou expiré. */
+export function assertCanRenew(parent: ContractSnapshot): void {
+  if (parent.status !== 'ACTIVE' && parent.status !== 'EXPIRED') {
+    throw new BusinessRuleError(
+      `Un renouvellement ne peut porter que sur un contrat actif ou expiré (statut actuel : ${parent.status}).`,
+      'RM-16',
+    );
+  }
+}
+
 export function applyEvent(
   c: ContractSnapshot,
   event: ContractEvent,
