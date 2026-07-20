@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { withScope, type Scope } from '@lsi/persistence';
 import type { ContractStatus } from '@lsi/domain';
+
+const SIGN_PENDING = ['SENT', 'VIEWED'];
+function docusealSignBase(): string {
+  return process.env.DOCUSEAL_SIGN_URL ?? (process.env.DOCUSEAL_URL ?? 'http://docuseal:3000/api').replace(/\/api\/?$/, '');
+}
 
 // Allow-list (deny-by-default) : un nouveau ContractStatus est masqué tant qu'il
 // n'est pas ajouté ici explicitement — inverse d'une deny-list qui l'exposerait
@@ -45,7 +50,28 @@ export class PortalService {
         where: { contractId: id }, orderBy: { signingOrder: 'asc' },
         select: { party: true, fullName: true, status: true, signedAt: true },
       });
-      return { ...this.base(c), signers };
+      const email = await this.emailOf(scope, scope.userId);
+      const mine = email
+        ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email }, select: { status: true } })
+        : null;
+      const mySignature = mine ? { status: mine.status } : null;
+      return { ...this.base(c), signers, mySignature };
+    });
+  }
+
+  async signRedirectUrl(scope: Scope, id: string): Promise<string> {
+    const email = await this.emailOf(scope, scope.userId);
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable'); // RLS → 404 hors scope
+      const signer = email
+        ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email }, select: { status: true, providerSubmitterSlug: true } })
+        : null;
+      if (!signer) throw new NotFoundException('Vous n’êtes pas signataire de ce contrat.');
+      if (!SIGN_PENDING.includes(signer.status) || !signer.providerSubmitterSlug) {
+        throw new ConflictException({ code: 'NO_PENDING_SIGNATURE', detail: 'Aucune signature en attente pour vous sur ce contrat.' });
+      }
+      return `${docusealSignBase()}/s/${signer.providerSubmitterSlug}`;
     });
   }
 

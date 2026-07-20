@@ -1,4 +1,5 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { type Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
@@ -16,6 +17,12 @@ export class PortalContractsController {
   @Get('contracts/:id')
   findOne(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
     return this.portal.findOne(scope, id);
+  }
+
+  @Get('contracts/:id/sign')
+  async sign(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const url = await this.portal.signRedirectUrl(scope, id);
+    res.redirect(302, url);
   }
 
   @Get('me')
