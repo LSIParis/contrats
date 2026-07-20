@@ -10,27 +10,42 @@ import { VersionsPage } from './features/contracts/versions-page.js';
 import { CustomersPage } from './features/customers/customers-page.js';
 import { CustomerNewPage } from './features/customers/customer-new-page.js';
 import { CustomerDetailPage } from './features/customers/customer-detail-page.js';
+import { PortalApp } from './portal/portal-app.js';
+
+function InternalRoutes() {
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/customers" element={<CustomersPage />} />
+        <Route path="/customers/new" element={<CustomerNewPage />} />
+        <Route path="/customers/:id" element={<CustomerDetailPage />} />
+        <Route path="/contracts" element={<ContractsPage />} />
+        <Route path="/contracts/new" element={<ContractNewPage />} />
+        <Route path="/contracts/:id/edit" element={<ContractEditPage />} />
+        <Route path="/contracts/:id/versions" element={<VersionsPage />} />
+        <Route path="/contracts/:id" element={<ContractDetailPage />} />
+        <Route path="/reminders" element={<div>Rappels</div>} />
+      </Route>
+    </Routes>
+  );
+}
 
 export function App() {
   return (
     <BrowserRouter>
-      <RequireAuth>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-            <Route path="/customers/new" element={<CustomerNewPage />} />
-            <Route path="/customers/:id" element={<CustomerDetailPage />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/contracts/new" element={<ContractNewPage />} />
-            <Route path="/contracts/:id/edit" element={<ContractEditPage />} />
-            <Route path="/contracts/:id/versions" element={<VersionsPage />} />
-            <Route path="/contracts/:id" element={<ContractDetailPage />} />
-            <Route path="/reminders" element={<div>Rappels</div>} />
-          </Route>
-        </Routes>
-      </RequireAuth>
+      <Routes>
+        <Route path="/portal/*" element={<PortalApp />} />
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <InternalRoutes />
+            </RequireAuth>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }
