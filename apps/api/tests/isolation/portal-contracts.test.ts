@@ -52,10 +52,12 @@ const get = (path: string, sess = 'sess-client') => request(app.getHttpServer())
 describe('GET /v1/portal/contracts', () => {
   test('liste les contrats partagés du client, sans les états internes', async () => {
     await seedContract('ACTIVE');
+    await seedContract('SIGNED'); // allow-list : doit apparaître comme ACTIVE
     await seedContract('DRAFT'); // interne, ne doit PAS apparaître
     const res = await get('/v1/portal/contracts').expect(200);
     const statuses = res.body.items.map((c: any) => c.status);
     expect(statuses).toContain('ACTIVE');
+    expect(statuses).toContain('SIGNED');
     expect(statuses).not.toContain('DRAFT');
     // projection client-safe : aucune des VRAIES colonnes internes de Contract
     for (const field of INTERNAL_CONTRACT_FIELDS) {
