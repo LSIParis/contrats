@@ -43,15 +43,17 @@ export class PortalAuthController {
 
   @Public()
   @Get('verify')
-  async verify(@Query('token') token: string, @Res({ passthrough: true }) res: Response) {
+  async verify(@Query('token') token: string, @Res() res: Response) {
+    const appUrl = process.env.APP_URL ?? 'https://contrats.lsi-maintenance.fr';
     const result = token ? await this.magic.verify(token) : null;
     if (!result) {
-      // 410 Gone : lien expiré ou déjà utilisé (§14.2).
-      res.status(410);
-      return { code: 'MAGIC_LINK_INVALID', message: 'Lien invalide ou expiré.' };
+      // Lien expiré ou déjà utilisé (§14.2) : redirection visible côté front,
+      // pas de JSON — le lien magique est ouvert par le navigateur (GET direct).
+      res.redirect(302, `${appUrl}/portal/login?error=lien`);
+      return;
     }
     setSessionCookie(res, result.sessionId, result.ttl);
-    return { message: 'Connecté.' };
+    res.redirect(302, `${appUrl}/portal/contracts`);
   }
 
   @Public()

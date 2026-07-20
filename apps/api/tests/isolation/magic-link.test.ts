@@ -47,7 +47,8 @@ describe('magic link — parcours nominal', () => {
     await request(app.getHttpServer()).post('/v1/portal/auth/request-link').send({ email: clientEmailA });
     const token = email.lastMagicToken()!;
 
-    const res = await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`).expect(200);
+    const res = await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`).expect(302);
+    expect(res.headers['location']).toContain('/portal/contracts');
     const cookie = res.headers['set-cookie']?.[0] ?? '';
     expect(cookie).toMatch(/lsi_sess=/);
     expect(cookie.toLowerCase()).toContain('httponly');
@@ -80,13 +81,15 @@ describe('magic link — sécurité', () => {
   test('usage unique : un token déjà consommé est refusé (410)', async () => {
     await request(app.getHttpServer()).post('/v1/portal/auth/request-link').send({ email: clientEmailA });
     const token = email.lastMagicToken()!;
-    await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`).expect(200);
+    await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`).expect(302);
     // Rejeu
-    await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`).expect(410);
+    const replay = await request(app.getHttpServer()).get(`/v1/portal/auth/verify?token=${token}`).expect(302);
+    expect(replay.headers['location']).toContain('/portal/login?error=lien');
   });
 
-  test('un token bidon est refusé (410)', async () => {
-    await request(app.getHttpServer()).get('/v1/portal/auth/verify?token=nimportequoi').expect(410);
+  test('un token bidon est refusé (redirection erreur)', async () => {
+    const res = await request(app.getHttpServer()).get('/v1/portal/auth/verify?token=nimportequoi').expect(302);
+    expect(res.headers['location']).toContain('/portal/login?error=lien');
   });
 
   test('pas d’oracle d’énumération : email inconnu → 200 identique, aucun email', async () => {
