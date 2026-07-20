@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { withScope, systemScope, resolveWebhookScope, uuidv7 } from '@lsi/persistence';
-import { applyEvent, type NormalizedSignatureEvent } from '@lsi/domain';
+import { applyEvent, replanAfterEndDateChange, type NormalizedSignatureEvent } from '@lsi/domain';
 import { DocusealAdapter } from '../signature/docuseal.adapter.js';
 import { JOB_QUEUE, type CaptureProofJob, type JobQueue } from '../jobs/job-queue.port.js';
 
@@ -281,6 +281,39 @@ export class DocusealWebhookService {
               where: { newContractId: sigReq.contractId, status: 'PENDING' },
               data: { status: 'ACCEPTED', decidedAt: now },
             });
+          }
+
+          // Avenant (§6.12, RM-18) : à la signature complète d'un avenant,
+          // reporter ses champs sur le parent + régénérer ses rappels (EC-12).
+          // Idempotent : l'événement webhook est dédupliqué (EC-05), donc ceci
+          // ne s'exécute qu'une fois.
+          const av = await tx.contract.findUnique({
+            where: { id: sigReq.contractId },
+            select: { type: true, parentContractId: true, endDate: true, amountCents: true },
+          });
+          if (av?.type === 'AMENDMENT' && av.parentContractId) {
+            const parent = await tx.contract.findUnique({
+              where: { id: av.parentContractId },
+              select: { id: true, tenantId: true, customerId: true, status: true, noticePeriodDays: true, reminderCycle: true },
+            });
+            if (parent) {
+              if (parent.status === 'ACTIVE' && av.endDate) {
+                const { newCycle, reminders } = replanAfterEndDateChange(
+                  { endDate: av.endDate, noticePeriodDays: parent.noticePeriodDays, reminderCycle: parent.reminderCycle },
+                  now,
+                );
+                await tx.reminder.updateMany({ where: { contractId: parent.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+                await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, reminderCycle: newCycle, updatedAt: now } });
+                for (const d of reminders) {
+                  await tx.reminder.create({ data: {
+                    id: uuidv7(), tenantId: parent.tenantId, customerId: parent.customerId, contractId: parent.id,
+                    kind: d.kind, offsetDays: d.offsetDays, cycle: d.cycle, dueAt: d.dueAt, status: d.status, createdAt: now,
+                  }});
+                }
+              } else {
+                await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, updatedAt: now } });
+              }
+            }
           }
         }
 

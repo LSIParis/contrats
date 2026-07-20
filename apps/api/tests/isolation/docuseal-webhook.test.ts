@@ -581,6 +581,165 @@ describe('renouvellement — acceptation automatique à la signature', () => {
   });
 });
 
+// ===========================================================================
+// Avenants — report au parent + replan des rappels à la signature (RM-18, EC-12)
+// ===========================================================================
+
+describe('avenant — report au parent à la signature complète (RM-18, EC-12)', () => {
+  test('FORM_COMPLETED qui signe un avenant reporte endDate/amountCents sur le parent ACTIVE et replanifie ses rappels', async () => {
+    const parentId = uuidv7();
+    const now = new Date();
+    const oldEndDate = new Date('2026-08-01T00:00:00Z');
+    // endDate est une colonne @db.Date : minuit UTC, sans quoi la comparaison
+    // après aller-retour en base échouerait sur l'heure tronquée.
+    const rawNewEndDate = new Date(now.getTime() + 200 * 24 * 60 * 60 * 1000);
+    const newEndDate = new Date(Date.UTC(rawNewEndDate.getUTCFullYear(), rawNewEndDate.getUTCMonth(), rawNewEndDate.getUTCDate()));
+    const newAmountCents = 987654n;
+
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      // Le parent : ACTIVE, avec des rappels PENDING sur l'ancienne échéance.
+      await tx.contract.create({
+        data: {
+          id: parentId,
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          reference: `LSI-2026-${parentId.slice(-12)}`,
+          title: 'Contrat parent (avenant)',
+          type: 'MAIN',
+          status: 'ACTIVE',
+          category: 'MAINTENANCE',
+          currency: 'EUR',
+          billingFrequency: 'MONTHLY',
+          endDate: oldEndDate,
+          amountCents: 500000n,
+          noticePeriodDays: 30,
+          reminderCycle: 0,
+          ownerUserId: fx.amUserId,
+          createdAt: now,
+          updatedAt: now,
+          createdByUserId: fx.amUserId,
+          updatedByUserId: fx.amUserId,
+        },
+      });
+
+      for (const offsetDays of [90, 60, 30]) {
+        await tx.reminder.create({
+          data: {
+            id: uuidv7(),
+            tenantId: fx.tenantId,
+            customerId: fx.customerA.id,
+            contractId: parentId,
+            kind: 'EXPIRY',
+            offsetDays,
+            cycle: 0,
+            dueAt: new Date(oldEndDate.getTime() - offsetDays * 24 * 60 * 60 * 1000),
+            status: 'PENDING',
+            createdAt: now,
+          },
+        });
+      }
+
+      // subA.contractId (seedé par beforeEach, PENDING_SIGNATURE, LSI déjà
+      // signé) DEVIENT l'avenant : c'est sa signature complète qui doit
+      // déclencher le report + le replan.
+      await tx.contract.update({
+        where: { id: subA.contractId },
+        data: {
+          type: 'AMENDMENT',
+          parentContractId: parentId,
+          endDate: newEndDate,
+          amountCents: newAmountCents,
+        },
+      });
+    });
+
+    // form.completed du CLIENT, dernier signataire restant → allSigned.
+    const res = await post(formEvent());
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('processed');
+
+    const parent = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contract.findUnique({ where: { id: parentId } }),
+    );
+    expect(parent!.endDate?.toISOString()).toBe(newEndDate.toISOString());
+    expect(parent!.amountCents).toBe(newAmountCents);
+    expect(parent!.reminderCycle).toBe(1);
+
+    const reminders = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.reminder.findMany({ where: { contractId: parentId }, orderBy: [{ cycle: 'asc' }, { offsetDays: 'desc' }] }),
+    );
+    const oldCycle = reminders.filter((r: any) => r.cycle === 0);
+    const newCycle = reminders.filter((r: any) => r.cycle === 1);
+
+    expect(oldCycle).toHaveLength(3);
+    for (const r of oldCycle) expect(r.status).toBe('CANCELLED');
+
+    expect(newCycle).toHaveLength(3);
+    for (const r of newCycle) expect(r.status).toBe('PENDING');
+    expect(newCycle.map((r: any) => r.offsetDays).sort()).toEqual([30, 60, 90]);
+  });
+
+  test("FORM_COMPLETED qui signe un avenant dont le parent est SIGNED (pas encore ACTIVE) reporte les champs sans toucher aux rappels", async () => {
+    const parentId = uuidv7();
+    const now = new Date();
+    const rawNewEndDate = new Date(now.getTime() + 200 * 24 * 60 * 60 * 1000);
+    const newEndDate = new Date(Date.UTC(rawNewEndDate.getUTCFullYear(), rawNewEndDate.getUTCMonth(), rawNewEndDate.getUTCDate()));
+    const newAmountCents = 111222n;
+
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      await tx.contract.create({
+        data: {
+          id: parentId,
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          reference: `LSI-2026-${parentId.slice(-12)}`,
+          title: 'Contrat parent SIGNED (avenant)',
+          type: 'MAIN',
+          status: 'SIGNED',
+          category: 'MAINTENANCE',
+          currency: 'EUR',
+          billingFrequency: 'MONTHLY',
+          endDate: new Date('2026-08-01T00:00:00Z'),
+          amountCents: 500000n,
+          noticePeriodDays: 30,
+          reminderCycle: 0,
+          ownerUserId: fx.amUserId,
+          createdAt: now,
+          updatedAt: now,
+          createdByUserId: fx.amUserId,
+          updatedByUserId: fx.amUserId,
+        },
+      });
+
+      await tx.contract.update({
+        where: { id: subA.contractId },
+        data: {
+          type: 'AMENDMENT',
+          parentContractId: parentId,
+          endDate: newEndDate,
+          amountCents: newAmountCents,
+        },
+      });
+    });
+
+    const res = await post(formEvent());
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('processed');
+
+    const parent = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contract.findUnique({ where: { id: parentId } }),
+    );
+    expect(parent!.endDate?.toISOString()).toBe(newEndDate.toISOString());
+    expect(parent!.amountCents).toBe(newAmountCents);
+    expect(parent!.reminderCycle).toBe(0); // pas de replan : rappels posés à l'activation
+
+    const reminders = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.reminder.findMany({ where: { contractId: parentId } }),
+    );
+    expect(reminders).toHaveLength(0);
+  });
+});
+
 describe('journalisation', () => {
   test('chaque événement traité laisse un signature_event avec son payload brut', async () => {
     await post(formEvent());
