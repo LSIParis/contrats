@@ -27,6 +27,23 @@ async function seedSignableContract(signerStatus: string, slug: string | null) {
   return id;
 }
 
+async function seedSignableContractB(signerStatus: string, slug: string | null) {
+  const id = uuidv7(); const now = new Date();
+  await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+    await tx.contract.create({ data: {
+      id, tenantId: fx.tenantId, customerId: fx.customerB.id, reference: `LSI-SG-${id.slice(-8)}`,
+      title: 'À signer (B)', type: 'MAIN', status: 'PENDING_SIGNATURE', category: 'MAINTENANCE',
+      currency: 'EUR', billingFrequency: 'MONTHLY', ownerUserId: fx.amBUserId,
+      startDate: new Date('2026-01-01'), endDate: new Date('2026-12-31'),
+      createdAt: now, updatedAt: now, createdByUserId: fx.amBUserId, updatedByUserId: fx.amBUserId } });
+    await tx.contractSigner.create({ data: {
+      id: uuidv7(), tenantId: fx.tenantId, customerId: fx.customerB.id, contractId: id, party: 'CLIENT',
+      fullName: 'Signataire B', email: fx.customerB.clientEmail, signingOrder: 1, status: signerStatus as any,
+      providerSubmitterSlug: slug, createdAt: now, updatedAt: now } });
+  });
+  return id;
+}
+
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = mod.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true })); await app.init();
@@ -72,5 +89,11 @@ describe('signature in-portal', () => {
     const res = await get(`/v1/portal/contracts/${id}`).expect(200);
     expect(res.body.mySignature).toBeNull();
     await get(`/v1/portal/contracts/${id}/sign`).expect(404);
+  });
+
+  test('contrat d’un autre client (customerB) → fiche et /sign 404 pour customerA', async () => {
+    const idB = await seedSignableContractB('SENT', 'slug-b');
+    await get(`/v1/portal/contracts/${idB}`).expect(404);
+    await get(`/v1/portal/contracts/${idB}/sign`).expect(404);
   });
 });

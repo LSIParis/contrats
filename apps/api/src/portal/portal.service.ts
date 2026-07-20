@@ -43,6 +43,7 @@ export class PortalService {
   }
 
   async findOne(scope: Scope, id: string) {
+    const email = await this.emailOf(scope, scope.userId);
     return withScope(scope, async (tx) => {
       const c = await tx.contract.findUnique({ where: { id }, select: CLIENT_SAFE_SELECT });
       if (!c || !CLIENT_VISIBLE_STATUSES.includes(c.status)) throw new NotFoundException('Contrat introuvable'); // RLS 404 hors scope ; 404 si non partagé
@@ -50,7 +51,6 @@ export class PortalService {
         where: { contractId: id }, orderBy: { signingOrder: 'asc' },
         select: { party: true, fullName: true, status: true, signedAt: true },
       });
-      const email = await this.emailOf(scope, scope.userId);
       const mine = email
         ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email }, select: { status: true } })
         : null;
@@ -62,8 +62,8 @@ export class PortalService {
   async signRedirectUrl(scope: Scope, id: string): Promise<string> {
     const email = await this.emailOf(scope, scope.userId);
     return withScope(scope, async (tx) => {
-      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
-      if (!c) throw new NotFoundException('Contrat introuvable'); // RLS → 404 hors scope
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true, status: true } });
+      if (!c || !CLIENT_VISIBLE_STATUSES.includes(c.status)) throw new NotFoundException('Contrat introuvable'); // RLS → 404 hors scope ; 404 si statut interne
       const signer = email
         ? await tx.contractSigner.findFirst({ where: { contractId: id, party: 'CLIENT', email }, select: { status: true, providerSubmitterSlug: true } })
         : null;
