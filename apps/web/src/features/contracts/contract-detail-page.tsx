@@ -16,6 +16,7 @@ import { SendForSignature } from './send-for-signature.js';
 import { SignatureActions } from './signature-actions.js';
 import { TerminateContract } from './terminate-contract.js';
 import { RenewContract } from './renew-contract.js';
+import { AmendContract } from './amend-contract.js';
 
 interface Detail {
   contract: {
@@ -36,6 +37,8 @@ interface Detail {
   approval: { submittedByUserId: string; decision: string; reason: string | null; decidedByUserId: string | null } | null;
   renewal: { status: string; newContractId: string | null; refusalReason: string | null; successor: { reference: string; status: string } } | null;
   predecessor: { id: string; reference: string } | null;
+  openAmendment: { id: string; reference: string; status: string } | null;
+  amends: { id: string; reference: string } | null;
 }
 
 async function downloadSigned(id: string) {
@@ -131,6 +134,13 @@ export function ContractDetailPage() {
         roles={me.data?.roles ?? []}
         renewal={q.data.renewal}
         predecessor={q.data.predecessor}
+      />
+      <AmendContract
+        contractId={contract.id}
+        status={contract.status}
+        roles={me.data?.roles ?? []}
+        openAmendment={q.data.openAmendment}
+        amends={q.data.amends}
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
