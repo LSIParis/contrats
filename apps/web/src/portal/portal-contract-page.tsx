@@ -26,7 +26,10 @@ interface PortalContractDetail {
   currency: string | null;
   billingFrequency: string | null;
   signers: PortalSigner[];
+  mySignature: { status: string } | null;
 }
+
+const PENDING_SIGNER_STATUSES = ['SENT', 'VIEWED'];
 
 function formatAmount(amountCents: number | null, currency: string | null): string {
   if (amountCents === null || !currency) return '—';
@@ -67,6 +70,14 @@ export function PortalContractPage() {
         <p className="text-sm text-gray-400">{formatAmount(c.amountCents, c.currency)}</p>
       </div>
       <Card title="Signataires">
+        {c.mySignature && PENDING_SIGNER_STATUSES.includes(c.mySignature.status) && (
+          <a
+            href={`/v1/portal/contracts/${id}/sign`}
+            className="mb-3 inline-block rounded bg-lsi px-4 py-2 text-sm text-white hover:bg-lsi-dark"
+          >
+            Signer le document
+          </a>
+        )}
         {c.signers.length === 0 ? (
           <p className="text-sm text-gray-400">Aucun signataire.</p>
         ) : (
