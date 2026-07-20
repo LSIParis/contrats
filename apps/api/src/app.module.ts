@@ -26,6 +26,8 @@ import { ContentController } from './contracts/content.controller.js';
 import { ContentService } from './contracts/content.service.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
+import { UsersController } from './users/users.controller.js';
+import { UsersService } from './users/users.service.js';
 import { PortalContractsController } from './portal/portal-contracts.controller.js';
 import { PortalService } from './portal/portal.service.js';
 import { ClientPortalGuard } from './portal/client-portal.guard.js';
@@ -98,6 +100,7 @@ class HealthController {
     ContractsController,
     ContentController,
     CustomersController,
+    UsersController,
     SignersController,
     PortalContractsController,
     DocusealWebhookController,
@@ -113,6 +116,7 @@ class HealthController {
     ContractsService,
     ContentService,
     CustomersService,
+    UsersService,
     SignersService,
     PortalService,
     DashboardService,
