@@ -1,0 +1,8 @@
+# Scripts exécutés dans un conteneur Linux : fins de ligne LF obligatoires
+# (un CR dans le shebang casse l'interpréteur).
+*.sh        text eol=lf
+entrypoint.sh text eol=lf
+backup.sh   text eol=lf
+restore-check.sh text eol=lf
+crontab     text eol=lf
+Dockerfile  text eol=lf
