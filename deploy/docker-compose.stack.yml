@@ -196,6 +196,33 @@ services:
       # deploy/wireguard/README.md.
       - '${WG_BIND_IP:-10.99.0.2}:${API_PORT:-3001}:3001'
 
+  # Sauvegardes quotidiennes PostgreSQL + MinIO vers Wasabi (SSE + object lock).
+  # Aucun port exposé : ne fait que sortir vers Wasabi + le push Uptime Kuma.
+  # Secrets WASABI_*/UPTIME_* uniquement dans l'env de la stack (dépôt public).
+  backup:
+    image: ghcr.io/lsiparis/contrats-backup:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      TZ: Europe/Paris
+      PGHOST: postgres
+      PGDATABASE: lsi_contrats
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      WASABI_ENDPOINT: https://s3.eu-west-2.wasabisys.com
+      WASABI_BUCKET: lsi-contrats
+      WASABI_ACCESS_KEY: ${WASABI_ACCESS_KEY}
+      WASABI_SECRET_KEY: ${WASABI_SECRET_KEY}
+      UPTIME_PUSH_URL: ${UPTIME_PUSH_URL}
+      UPTIME_RESTORE_PUSH_URL: ${UPTIME_RESTORE_PUSH_URL:-}
+
 volumes:
   pgdata:
   redisdata:
