@@ -34,7 +34,9 @@ echo "[restore-check] contracts live=${LIVE} restored=${REST}"
 if [ -n "$REST" ] && [ "$REST" = "$LIVE" ]; then
   echo "[restore-check] OK"
   if [ -n "${UPTIME_RESTORE_PUSH_URL:-}" ]; then
-    curl -fsS -m 15 "${UPTIME_RESTORE_PUSH_URL}?status=up&msg=restore_ok_${REST}" >/dev/null 2>&1 || true
+    # Enleve toute query deja presente avant d'ajouter la notre (cf. backup.sh).
+    base="${UPTIME_RESTORE_PUSH_URL%%[?]*}"
+    curl -fsS -m 15 "${base}?status=up&msg=restore_ok_${REST}" >/dev/null 2>&1 || true
   fi
 else
   echo "[restore-check] ECHEC : comptes incoherents (live=${LIVE} restored=${REST})"

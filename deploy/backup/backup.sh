@@ -21,7 +21,11 @@ mc mirror --overwrite "local/${S3_BUCKET}" "wasabi/${WASABI_BUCKET}/minio/"
 
 echo "[backup] succes -> heartbeat Uptime Kuma"
 # Le heartbeat ne doit pas faire echouer la sauvegarde : garde || echo.
+# On enleve toute query deja presente sur l'URL (l'utilisateur peut coller
+# l'URL Uptime complete "...?status=up&msg=OK&ping=") avant d'ajouter la notre,
+# sinon on obtiendrait un double "?" invalide.
 if [ -n "${UPTIME_PUSH_URL:-}" ]; then
-  curl -fsS -m 15 "${UPTIME_PUSH_URL}?status=up&msg=OK" >/dev/null 2>&1 || echo "[backup] warn: heartbeat KO"
+  base="${UPTIME_PUSH_URL%%[?]*}"
+  curl -fsS -m 15 "${base}?status=up&msg=OK" >/dev/null 2>&1 || echo "[backup] warn: heartbeat KO"
 fi
 echo "[backup] termine"
