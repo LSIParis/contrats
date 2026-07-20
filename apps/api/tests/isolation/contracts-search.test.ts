@@ -63,3 +63,24 @@ describe('GET /v1/contracts?q=', () => {
     expect(res.body.data).toHaveLength(0);
   });
 });
+
+describe('GET /v1/contracts?status= (valeur unique coercée en tableau)', () => {
+  // Régression : un `?status=DRAFT` unique arrivait en CHAÎNE, donnant
+  // `where.status = { in: "DRAFT" }` — Prisma exige un tableau pour `in`,
+  // d'où un 500 (PrismaClientValidationError) en production.
+  test('un statut unique ne plante pas et filtre bien', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/v1/contracts?status=DRAFT')
+      .set('x-lsi-session', 'sess-admin')
+      .expect(200);
+    expect(res.body.data.some((c: any) => c.reference === 'LSI-CHERCHE-XYZ')).toBe(true);
+  });
+
+  test('un statut unique sans correspondance renvoie vide (pas 500)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/v1/contracts?status=TERMINATED')
+      .set('x-lsi-session', 'sess-admin')
+      .expect(200);
+    expect(res.body.data).toHaveLength(0);
+  });
+});

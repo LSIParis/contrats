@@ -1,5 +1,5 @@
 import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { CONTRACT_STATUSES } from '@lsi/domain';
 
 export class ListContractsDto {
@@ -15,7 +15,15 @@ export class ListContractsDto {
   @IsUUID('7')
   customerId?: string;
 
+  /**
+   * Normalise une valeur unique en tableau : `?status=DRAFT` arrive en CHAÎNE,
+   * `?status=A&status=B` en tableau. Sans ça, `where.status = { in: q.status }`
+   * recevait une chaîne — et Prisma exige un tableau pour `in` (500 en prod).
+   */
   @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null ? value : Array.isArray(value) ? value : [value],
+  )
   @IsEnum(CONTRACT_STATUSES, { each: true })
   status?: string[];
 
