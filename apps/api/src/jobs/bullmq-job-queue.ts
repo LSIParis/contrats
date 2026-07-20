@@ -42,7 +42,10 @@ export class BullMqJobQueue implements JobQueue, OnModuleDestroy {
       removeOnFail: 1_000,
       // IDEMPOTENCE : un seul job de capture par signature_request. Le webhook
       // ET la réconciliation peuvent l'enfiler ; BullMQ déduplique par jobId.
-      jobId: `capture:${data.signatureRequestId}`,
+      // Séparateur « - » et NON « : » : BullMQ v5 refuse un jobId contenant
+      // « : » (« Custom Id cannot contain : ») — il s'en sert comme séparateur
+      // de clés Redis. Un « : » ici faisait échouer TOUT enfilement en prod.
+      jobId: `capture-${data.signatureRequestId}`,
     });
   }
 
@@ -54,7 +57,9 @@ export class BullMqJobQueue implements JobQueue, OnModuleDestroy {
       removeOnFail: 1_000,
       // IDEMPOTENCE : un seul envoi enfilé par rappel et par passage. Le
       // marquage SENT en base est la garantie finale contre le doublon.
-      jobId: `reminder:${data.reminderId}`,
+      // Séparateur « - » (jamais « : ») : cf. enqueueCaptureProof — BullMQ v5
+      // rejette un jobId contenant « : ».
+      jobId: `reminder-${data.reminderId}`,
     });
   }
 
