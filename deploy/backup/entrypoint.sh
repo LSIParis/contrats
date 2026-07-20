@@ -17,4 +17,7 @@ mc alias set wasabi "$WASABI_ENDPOINT"     "$WASABI_ACCESS_KEY" "$WASABI_SECRET_
 [ -n "${UPTIME_PUSH_URL:-}" ] || echo "[backup] AVERTISSEMENT : UPTIME_PUSH_URL non defini — sauvegardes NON surveillees"
 
 echo "[backup] alias mc configures ; planificateur demarre (backup 02h00, restore-check le 1er 03h00)"
-exec supercronic /etc/crontab
+# -no-reap : en PID 1, le reaper de supercronic plante ("Failed to fork exec")
+# sur cette image. On le desactive : les jobs (backup.sh/restore-check.sh)
+# attendent deja leurs propres enfants, donc aucun orphelin a moissonner.
+exec supercronic -no-reap /etc/crontab
