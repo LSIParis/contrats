@@ -14,6 +14,7 @@ import { Timeline, type Event } from './timeline.js';
 import { WorkflowActions } from './workflow-actions.js';
 import { SendForSignature } from './send-for-signature.js';
 import { SignatureActions } from './signature-actions.js';
+import { TerminateContract } from './terminate-contract.js';
 
 interface Detail {
   contract: {
@@ -24,6 +25,7 @@ interface Detail {
     currentVersionId: string | null;
     startDate: string | null;
     endDate: string | null;
+    noticePeriodDays: number | null;
   };
   customer: { name: string };
   signatureRequest: SignatureData | null;
@@ -113,6 +115,13 @@ export function ContractDetailPage() {
         editable={['DRAFT', 'CHANGES_REQUESTED'].includes(contract.status)}
       />
       <SignatureActions contractId={contract.id} status={contract.status} roles={me.data?.roles ?? []} />
+      <TerminateContract
+        contractId={contract.id}
+        customerName={customer.name}
+        noticePeriodDays={contract.noticePeriodDays}
+        roles={me.data?.roles ?? []}
+        allowedActions={allowed.data?.allowedActions ?? []}
+      />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SignatureBlock data={q.data.signatureRequest} />
         <RemindersBlock reminders={q.data.reminders} />
