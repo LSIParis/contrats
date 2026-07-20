@@ -86,3 +86,21 @@ describe('POST /v1/contracts/:id/renew', () => {
     expect(succView.body.predecessor?.id).toBe(id);
   });
 });
+
+describe('POST /v1/contracts/:id/renew/refuse', () => {
+  test('refuse → REFUSED + motif + délie le parent', async () => {
+    const id = await seedActive();
+    await renew(id).expect(201);
+    await request(app.getHttpServer()).post(`/v1/contracts/${id}/renew/refuse`).set('x-lsi-session', 'sess-am').send({ reason: 'Client non intéressé' }).expect(201);
+    const [parent, rr] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id }, select: { successorContractId: true } }),
+      await tx.renewalRequest.findFirst({ where: { contractId: id } }),
+    ]);
+    expect(parent!.successorContractId).toBeNull();
+    expect(rr).toMatchObject({ status: 'REFUSED', refusalReason: 'Client non intéressé' });
+  });
+  test('refuser sans renouvellement en cours → 409', async () => {
+    const id = await seedActive();
+    await request(app.getHttpServer()).post(`/v1/contracts/${id}/renew/refuse`).set('x-lsi-session', 'sess-am').send({ reason: 'x' }).expect(409);
+  });
+});

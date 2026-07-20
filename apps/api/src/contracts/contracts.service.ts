@@ -456,6 +456,37 @@ export class ContractsService {
   }
 
   /**
+   * Refus d'un renouvellement (EC-08) : la RenewalRequest PENDING passe
+   * REFUSED (+ motif) et le parent est DÉLIÉ (successorContractId = null).
+   *
+   * Un refus ne prolonge rien : le parent expirera normalement, comme s'il
+   * n'y avait jamais eu de tentative de renouvellement. Le successeur
+   * DRAFT créé par `renew` n'est PAS supprimé ici — il reste une trace,
+   * simplement débranché du parent.
+   */
+  async refuseRenewal(scope: Scope, id: string, reason: string, session: Session, now: Date) {
+    return withScope(scope, async (tx) => {
+      const parent = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
+
+      const rr = await tx.renewalRequest.findFirst({ where: { contractId: id, status: 'PENDING' } });
+      if (!rr) {
+        throw new ConflictException({ code: 'NO_PENDING_RENEWAL', detail: 'Aucun renouvellement en cours.' });
+      }
+
+      await tx.renewalRequest.update({
+        where: { id: rr.id },
+        data: { status: 'REFUSED', refusalReason: reason, decidedAt: now },
+      });
+      await tx.contract.update({
+        where: { id },
+        data: { successorContractId: null, updatedAt: now, updatedByUserId: session.userId },
+      });
+      return { status: 'REFUSED' as const };
+    });
+  }
+
+  /**
    * URL présignée (courte durée) vers la preuve PDF signée. (§10.7)
    *
    * On récupère la clé ET le scope objet (tenant + customer) depuis la

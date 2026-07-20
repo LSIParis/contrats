@@ -266,6 +266,24 @@ export class DocusealWebhookService {
         });
         await this.transition(tx, sigReq.contractId, { type: 'SIGNER_SIGNED', allSigned }, now);
 
+        // Renouvellement (§6.12) : si le contrat qui vient d'être totalement
+        // signé est un SUCCESSEUR de renouvellement, sa signature vaut
+        // acceptation de l'offre — la RenewalRequest PENDING correspondante
+        // passe ACCEPTED. `updateMany` sur PENDING est idempotent : un
+        // rejeu du webhook ou une RenewalRequest déjà décidée est un no-op.
+        if (allSigned) {
+          const signed = await tx.contract.findUnique({
+            where: { id: sigReq.contractId },
+            select: { predecessorContractId: true },
+          });
+          if (signed?.predecessorContractId) {
+            await tx.renewalRequest.updateMany({
+              where: { newContractId: sigReq.contractId, status: 'PENDING' },
+              data: { status: 'ACCEPTED', decidedAt: now },
+            });
+          }
+        }
+
         // À complétion TOTALE : capturer le PDF signé et la piste d'audit
         // (§11.6). Job ASYNCHRONE, enfilé APRÈS commit par handle() — jamais
         // en ligne : DocuSeal réessaie sur timeout, et télécharger ici

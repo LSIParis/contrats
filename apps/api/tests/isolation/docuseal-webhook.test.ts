@@ -510,6 +510,77 @@ describe('révocation — un webhook tardif ne doit pas ressusciter la demande',
   });
 });
 
+// ===========================================================================
+// Renouvellements — acceptation automatique à la signature du successeur
+// ===========================================================================
+
+describe('renouvellement — acceptation automatique à la signature', () => {
+  test('FORM_COMPLETED qui signe le successeur fait passer sa RenewalRequest PENDING à ACCEPTED', async () => {
+    const parentId = uuidv7();
+    const rrId = uuidv7();
+    const now = new Date();
+
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => {
+      // Le parent n'a besoin d'exister que pour satisfaire la FK de
+      // renewal_requests (contractId, tenantId, customerId) — son contenu
+      // n'est pas sous test ici.
+      await tx.contract.create({
+        data: {
+          id: parentId,
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          reference: `LSI-2026-${parentId.slice(-12)}`,
+          title: 'Contrat parent',
+          type: 'MAIN',
+          status: 'ACTIVE',
+          category: 'MAINTENANCE',
+          currency: 'EUR',
+          billingFrequency: 'MONTHLY',
+          successorContractId: subA.contractId,
+          ownerUserId: fx.amUserId,
+          createdAt: now,
+          updatedAt: now,
+          createdByUserId: fx.amUserId,
+          updatedByUserId: fx.amUserId,
+        },
+      });
+
+      // subA.contractId (seedé par beforeEach, PENDING_SIGNATURE, LSI déjà
+      // signé) DEVIENT le successeur de renouvellement : c'est sa signature
+      // qui doit déclencher l'acceptation automatique.
+      await tx.contract.update({
+        where: { id: subA.contractId },
+        data: { predecessorContractId: parentId },
+      });
+
+      await tx.renewalRequest.create({
+        data: {
+          id: rrId,
+          tenantId: fx.tenantId,
+          customerId: fx.customerA.id,
+          contractId: parentId,
+          newContractId: subA.contractId,
+          status: 'PENDING',
+          initiatedByUserId: fx.amUserId,
+          initiatedAt: now,
+        },
+      });
+    });
+
+    // form.completed du CLIENT, dernier signataire restant (LSI déjà SIGNED
+    // dans le seed du beforeEach) → allSigned.
+    const res = await post(formEvent());
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('processed');
+
+    const rr = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.renewalRequest.findUnique({ where: { id: rrId } }),
+    );
+    expect(rr!.status).toBe('ACCEPTED');
+    expect(rr!.decidedAt).toBeTruthy();
+  });
+});
+
 describe('journalisation', () => {
   test('chaque événement traité laisse un signature_event avec son payload brut', async () => {
     await post(formEvent());
