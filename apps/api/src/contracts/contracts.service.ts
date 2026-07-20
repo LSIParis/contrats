@@ -426,13 +426,31 @@ export class ContractsService {
           ownerUserId: session.userId, createdAt: now, updatedAt: now, createdByUserId: session.userId, updatedByUserId: session.userId,
         },
       });
-      await tx.contract.update({ where: { id }, data: { successorContractId: newId, updatedAt: now } });
-      await tx.renewalRequest.create({
-        data: {
-          id: uuidv7(), tenantId: parent.tenantId, customerId: parent.customerId, contractId: id,
-          newContractId: newId, status: 'PENDING', initiatedByUserId: session.userId, initiatedAt: now,
-        },
+      await tx.contract.update({
+        where: { id },
+        data: { successorContractId: newId, updatedAt: now, updatedByUserId: session.userId },
       });
+      try {
+        await tx.renewalRequest.create({
+          data: {
+            id: uuidv7(), tenantId: parent.tenantId, customerId: parent.customerId, contractId: id,
+            newContractId: newId, status: 'PENDING', initiatedByUserId: session.userId, initiatedAt: now,
+          },
+        });
+      } catch (e: any) {
+        if (e?.code === 'P2002') {
+          // renewal_requests_one_pending (§8.3) : un seul renouvellement en
+          // attente par contrat. La contrainte est en base, pas dans un `if` —
+          // le `findFirst` ci-dessus est le chemin rapide, ceci est le filet
+          // contre un double-submit concurrent (même course que
+          // signature_requests_one_active).
+          throw new ConflictException({
+            code: 'RENEWAL_ALREADY_IN_PROGRESS',
+            detail: 'Un renouvellement est déjà en cours pour ce contrat.',
+          });
+        }
+        throw e;
+      }
       return { id: newId, reference: successor.reference };
     });
   }
