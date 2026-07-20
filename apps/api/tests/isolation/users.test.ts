@@ -58,6 +58,19 @@ describe('gestion des utilisateurs (MSP_ADMIN)', () => {
     await post({ kind: 'INTERNAL', email: 'x@lsi.fr', fullName: 'X', roles: ['TECHNICIAN'] }, 'sess-am').expect(403);
   });
 
+  test('rôles en double à la création → un seul user_role (pas de 500 P2002)', async () => {
+    const res = await post({
+      kind: 'INTERNAL',
+      email: 'dup-roles@lsi.fr',
+      fullName: 'Dup Roles',
+      roles: ['TECHNICIAN', 'TECHNICIAN'],
+    }).expect(201);
+    const u = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.user.findUnique({ where: { id: res.body.id }, include: { roles: { include: { role: true } } } }),
+    );
+    expect(u!.roles.map((r: any) => r.role.code)).toEqual(['TECHNICIAN']);
+  });
+
   test('GET /v1/users liste les utilisateurs du tenant', async () => {
     const res = await request(app.getHttpServer()).get('/v1/users').set('x-lsi-session', 'sess-admin').expect(200);
     expect(res.body.items.some((u: any) => u.email === 'interne1@lsi.fr')).toBe(true);
@@ -75,5 +88,19 @@ describe('gestion des utilisateurs (MSP_ADMIN)', () => {
   test('on ne peut pas retirer le dernier MSP_ADMIN actif → 409', async () => {
     // fx.adminUserId est le seul MSP_ADMIN actif : le désactiver doit échouer.
     await request(app.getHttpServer()).patch(`/v1/users/${fx.adminUserId}`).set('x-lsi-session', 'sess-admin').send({ status: 'DISABLED' }).expect(409);
+  });
+
+  test('on ne peut pas retirer le rôle MSP_ADMIN du dernier admin actif via `roles` → 409', async () => {
+    // Même garde que le test précédent, mais déclenchée par la branche
+    // `dto.roles` (roles ne contenant plus MSP_ADMIN) plutôt que `status`.
+    await request(app.getHttpServer())
+      .patch(`/v1/users/${fx.adminUserId}`)
+      .set('x-lsi-session', 'sess-admin')
+      .send({ roles: ['ACCOUNT_MANAGER'] })
+      .expect(409);
+    const u = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.user.findUnique({ where: { id: fx.adminUserId }, include: { roles: { include: { role: true } } } }),
+    );
+    expect(u!.roles.map((r: any) => r.role.code)).toContain('MSP_ADMIN');
   });
 });

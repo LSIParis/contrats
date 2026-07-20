@@ -114,7 +114,10 @@ export class UsersService {
         if (e?.code === 'P2002') throw new ConflictException('Un utilisateur avec cet email existe déjà pour ce tenant');
         throw e;
       }
-      for (const code of dto.roles) {
+      // Dédup : `user_roles` a pour PK (userId, roleId) — un doublon dans
+      // dto.roles (ex. ['TECHNICIAN','TECHNICIAN']) ferait échouer le second
+      // create() avec P2002 non intercepté → 500 (au lieu d'un 201 idempotent).
+      for (const code of new Set(dto.roles)) {
         const roleId = await this.findOrCreateRole(tx, scope.tenantId, code);
         await tx.userRole.create({ data: { userId: id, roleId, tenantId: scope.tenantId } });
       }
@@ -137,6 +140,28 @@ export class UsersService {
         (dto.status === 'DISABLED' || (dto.roles !== undefined && !dto.roles.includes('MSP_ADMIN')));
 
       if (losesAdmin) {
+        // Verrou anti-course (TOCTOU) : sous READ COMMITTED (défaut Postgres),
+        // deux PATCH concurrents désactivant chacun un admin DIFFÉRENT parmi
+        // les deux derniers pourraient chacun lire « 1 autre admin actif »
+        // AVANT que l'un des deux ne commite, et donc committer tous les
+        // deux → zéro admin actif (verrouillage total du tenant). Verrouiller
+        // uniquement les lignes du user ciblé ne suffit pas : ce sont des
+        // lignes DIFFÉRENTES qui ne se bloquent pas mutuellement.
+        //
+        // On verrouille donc l'ENSEMBLE des lignes user_roles MSP_ADMIN du
+        // tenant (FOR UPDATE) avant de compter. La seconde transaction
+        // concurrente bloque sur ce verrou jusqu'au commit de la première,
+        // puis relit un compte à jour et voit correctement 0 → 409. RLS
+        // injecte le prédicat tenant_id/actor_kind (policy user_roles_scope,
+        // migration 00000000000003_rls) ; lsi_app a UPDATE sur user_roles
+        // (migration 00000000000001_app_role), donc SELECT ... FOR UPDATE
+        // est autorisé.
+        await tx.$queryRaw`
+          SELECT ur.user_id FROM user_roles ur
+          JOIN roles r ON r.id = ur.role_id
+          WHERE r.code = 'MSP_ADMIN'
+          FOR UPDATE`;
+
         // Dernier-admin : compter les AUTRES MSP_ADMIN actifs du tenant.
         // Le scope MSP_ADMIN est all_customers, donc cette requête voit tout
         // le tenant — pas seulement le portefeuille de l'appelant.
@@ -162,7 +187,8 @@ export class UsersService {
       if (dto.roles !== undefined) {
         this.assertKindRoles(user.kind, dto.roles, user.customerId);
         await tx.userRole.deleteMany({ where: { userId: id } });
-        for (const code of dto.roles) {
+        // Même dédup que create() — cf. commentaire ci-dessus.
+        for (const code of new Set(dto.roles)) {
           const roleId = await this.findOrCreateRole(tx, scope.tenantId, code);
           await tx.userRole.create({ data: { userId: id, roleId, tenantId: scope.tenantId } });
         }
