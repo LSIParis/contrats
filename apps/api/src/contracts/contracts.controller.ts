@@ -16,6 +16,7 @@ import { SendForSignatureService } from '../signature/send-for-signature.service
 import { CreateContractDto } from './dto/create-contract.dto.js';
 import { SendForSignatureDto } from './dto/send-for-signature.dto.js';
 import { ListContractsDto } from './dto/list-contracts.dto.js';
+import { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
 import { IsString, MinLength } from 'class-validator';
@@ -154,6 +155,17 @@ export class ContractsController {
     // de vue du client. Répondre 201 ferait mentir l'API sur un état qui
     // n'existe pas encore (§14.4).
     return this.send.send(scope, id, dto, idempotencyKey, new Date());
+  }
+
+  @Post(':id/terminate')
+  async terminate(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TerminateContractDto,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.terminate(scope, id, dto, session, new Date());
   }
 
   @Post(':id/cancel')

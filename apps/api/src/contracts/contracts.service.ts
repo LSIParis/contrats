@@ -15,6 +15,8 @@ import {
 } from '../documents/document-storage.port.js';
 import type { CreateContractDto } from './dto/create-contract.dto.js';
 import type { ListContractsDto } from './dto/list-contracts.dto.js';
+import type { TerminateContractDto } from './dto/terminate-contract.dto.js';
+import type { Session } from '../auth/session.service.js';
 
 /**
  * Service métier des contrats.
@@ -279,6 +281,17 @@ export class ContractsService {
         });
       }
 
+      if (event.type === 'CANCEL') {
+        await tx.cancellation.create({
+          data: {
+            id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId: id,
+            type: 'CANCELLATION', reason: event.reason, initiatedBy: 'LSI',
+            effectiveDate: now, noticeRespected: true,
+            createdByUserId: event.actorUserId, createdAt: now,
+          },
+        });
+      }
+
       return tx.contract.update({
         where: { id },
         data: {
@@ -291,6 +304,59 @@ export class ContractsService {
           updatedByUserId: scope.userId,
         },
       });
+    });
+  }
+
+  /**
+   * Résiliation (RM-20) avec traçage de la Cancellation (type=TERMINATION).
+   *
+   * Comme `applyEvent`, le service ne décide pas : le domaine tranche
+   * (préavis, dérogation admin justifiée), le service persiste.
+   */
+  async terminate(scope: Scope, id: string, dto: TerminateContractDto, session: Session, now: Date) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({
+        where: { id },
+        include: { signers: { select: { party: true } }, attachments: { select: { id: true } }, amendments: { select: { status: true } } },
+      });
+      if (!c) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
+
+      const effectiveDate = new Date(dto.effectiveDate);
+      const isAdmin = session.roles.includes('MSP_ADMIN');
+      const snapshot = this.toSnapshot(c, null);
+      try {
+        applyEvent(snapshot, { type: 'TERMINATE', actorUserId: session.userId, reason: dto.reason, effectiveDate, isAdmin, overrideReason: dto.overrideReason }, now);
+      } catch (e) {
+        if (e instanceof InvalidTransitionError) {
+          throw new ConflictException({ code: e.code, detail: e.message, currentStatus: e.currentStatus, allowedTransitions: e.allowedTransitions });
+        }
+        if (e instanceof BusinessRuleError) {
+          throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
+        }
+        throw e;
+      }
+
+      const noticeMin = new Date(now);
+      noticeMin.setDate(noticeMin.getDate() + (c.noticePeriodDays ?? 0));
+      const noticeRespected = effectiveDate >= noticeMin;
+
+      await tx.cancellation.create({
+        data: {
+          id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId: id,
+          type: 'TERMINATION', reason: dto.reason, initiatedBy: dto.initiatedBy,
+          effectiveDate, noticeRespected,
+          overrideReason: noticeRespected ? null : (dto.overrideReason ?? null),
+          overrideByUserId: noticeRespected ? null : session.userId,
+          createdByUserId: session.userId, createdAt: now,
+        },
+      });
+
+      await tx.contract.update({
+        where: { id },
+        data: { status: 'TERMINATED', terminatedAt: now, updatedAt: now, updatedByUserId: session.userId },
+      });
+
+      return { status: 'TERMINATED' as const, effectiveDate: dto.effectiveDate, noticeRespected };
     });
   }
 
