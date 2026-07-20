@@ -29,7 +29,7 @@ export async function apiPost<T>(
     let message = `Erreur ${res.status}`;
     try {
       const b = await res.json();
-      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? message);
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? b?.detail ?? message);
     } catch {
       /* corps non-JSON : on garde le message par défaut */
     }
@@ -50,7 +50,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     let message = `Erreur ${res.status}`;
     try {
       const b = await res.json();
-      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? message);
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? b?.detail ?? message);
     } catch {
       /* corps non-JSON : on garde le message par défaut */
     }
@@ -71,7 +71,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
     let message = `Erreur ${res.status}`;
     try {
       const b = await res.json();
-      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? message);
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? b?.detail ?? message);
     } catch {
       /* corps non-JSON : on garde le message par défaut */
     }
@@ -87,7 +87,7 @@ export async function apiDelete(path: string): Promise<void> {
     let message = `Erreur ${res.status}`;
     try {
       const b = await res.json();
-      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? message);
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? b?.detail ?? message);
     } catch {
       /* corps non-JSON : on garde le message par défaut */
     }

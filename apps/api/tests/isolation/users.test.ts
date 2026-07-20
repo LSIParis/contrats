@@ -5,7 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
 import { adminScope, internalScope, withScope } from '@lsi/persistence';
-import { seedTwoCustomers, assignAdminRole, type TwoCustomerFixture } from '@lsi/persistence/testing';
+import { seedTwoCustomers, assignAdminRole, archiveCustomer, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
 let app: INestApplication;
 let fx: TwoCustomerFixture;
@@ -53,6 +53,32 @@ describe('gestion des utilisateurs (MSP_ADMIN)', () => {
   test('email déjà pris → 409', async () => {
     await post({ kind: 'INTERNAL', email: 'dup@lsi.fr', fullName: 'A', roles: ['TECHNICIAN'] }).expect(201);
     await post({ kind: 'INTERNAL', email: 'dup@lsi.fr', fullName: 'B', roles: ['TECHNICIAN'] }).expect(409);
+  });
+  test('email déjà pris (variante de casse) → 409', async () => {
+    // L'unicité en base est CASE-SENSITIVE (@@unique([tenantId, email])) mais
+    // le login (OIDC, magic-link) résout via lower(email) : sans normalisation
+    // à l'écriture, 'Dup@lsi.fr' cohabiterait avec 'dup@lsi.fr' déjà créé
+    // ci-dessus, et le login deviendrait non déterministe entre les deux.
+    await post({ kind: 'INTERNAL', email: 'Dup@lsi.fr', fullName: 'C', roles: ['TECHNICIAN'] }).expect(409);
+  });
+  test('INTERNE avec un customerId → 422', async () => {
+    await post({
+      kind: 'INTERNAL',
+      email: 'i3@lsi.fr',
+      fullName: 'X',
+      customerId: fx.customerA.id,
+      roles: ['TECHNICIAN'],
+    }).expect(422);
+  });
+  test('CLIENT rattaché à un client archivé → 422', async () => {
+    await archiveCustomer(fx.customerB.id);
+    await post({
+      kind: 'CLIENT',
+      email: 'client-archived@acme.fr',
+      fullName: 'Y',
+      customerId: fx.customerB.id,
+      roles: ['CLIENT_VIEWER'],
+    }).expect(422);
   });
   test('non-MSP_ADMIN → 403', async () => {
     await post({ kind: 'INTERNAL', email: 'x@lsi.fr', fullName: 'X', roles: ['TECHNICIAN'] }, 'sess-am').expect(403);

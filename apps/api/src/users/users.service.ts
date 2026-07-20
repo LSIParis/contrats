@@ -51,9 +51,9 @@ export class UsersService {
     });
   }
 
-  // CLIENT ⊆ CLIENT_ROLES, INTERNAL ⊆ INTERNAL_ROLES ; CLIENT exige customerId.
-  // 422 (pas 400) : le corps est syntaxiquement valide, c'est la COHÉRENCE
-  // métier kind↔rôles qui est en cause (RM-32).
+  // CLIENT ⊆ CLIENT_ROLES, INTERNAL ⊆ INTERNAL_ROLES ; CLIENT exige customerId,
+  // INTERNAL l'interdit. 422 (pas 400) : le corps est syntaxiquement valide,
+  // c'est la COHÉRENCE métier kind↔rôles↔customerId qui est en cause (RM-32).
   private assertKindRoles(kind: 'INTERNAL' | 'CLIENT', roles: readonly string[], customerId?: string | null): void {
     const allowed = kind === 'CLIENT' ? CLIENT_ROLES : INTERNAL_ROLES;
     const bad = roles.filter((r) => !allowed.includes(r));
@@ -64,6 +64,9 @@ export class UsersService {
     }
     if (kind === 'CLIENT' && !customerId) {
       throw new UnprocessableEntityException('customerId requis pour un utilisateur CLIENT');
+    }
+    if (kind === 'INTERNAL' && customerId) {
+      throw new UnprocessableEntityException('customerId doit être absent pour un utilisateur INTERNAL');
     }
   }
 
@@ -89,10 +92,22 @@ export class UsersService {
 
   async create(scope: Scope, dto: CreateUserDto) {
     this.assertKindRoles(dto.kind, dto.roles, dto.customerId);
+    // Uniqueness côté base est @@unique([tenantId, email]) — CASE-SENSITIVE —
+    // alors que les deux parcours de connexion (OIDC, magic-link) résolvent
+    // l'email via lower(email). Sans normalisation ici, 'Admin@lsi.fr' et
+    // 'admin@lsi.fr' cohabiteraient (pas de P2002 → pas de 409), et le login
+    // résoudrait ensuite de façon non déterministe entre les deux lignes.
+    const normalizedEmail = dto.email.trim().toLowerCase();
     return withScope(scope, async (tx) => {
       if (dto.kind === 'CLIENT') {
         const customer = await tx.customer.findUnique({ where: { id: dto.customerId! } });
         if (!customer) throw new BadRequestException('Client introuvable');
+        if (customer.status !== 'ACTIVE') {
+          throw new UnprocessableEntityException({
+            code: 'CUSTOMER_ARCHIVED',
+            detail: 'Impossible de rattacher un utilisateur CLIENT à un client archivé.',
+          });
+        }
       }
       const id = uuidv7();
       const now = new Date();
@@ -103,7 +118,7 @@ export class UsersService {
             tenantId: scope.tenantId,
             kind: dto.kind,
             customerId: dto.kind === 'CLIENT' ? dto.customerId! : null,
-            email: dto.email,
+            email: normalizedEmail,
             fullName: dto.fullName,
             status: 'ACTIVE',
             createdAt: now,

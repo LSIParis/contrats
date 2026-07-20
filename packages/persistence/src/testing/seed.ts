@@ -71,6 +71,20 @@ export async function assignAdminRole(
 }
 
 /**
+ * Archive un client (CustomerStatus.ARCHIVED). (tests de cohérence CLIENT↔customer)
+ *
+ * Écrit avec le rôle propriétaire, comme le reste des seeds — pas de route
+ * d'archivage exposée par l'API à ce jour.
+ */
+export async function archiveCustomer(customerId: string, databaseUrl?: string): Promise<void> {
+  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  await owner.$executeRawUnsafe(
+    `UPDATE customers SET status = 'ARCHIVED', updated_at = now() WHERE id = '${customerId}'`,
+  );
+  await owner.$disconnect();
+}
+
+/**
  * Deux clients aux portefeuilles DISJOINTS.
  *
  * C'est la disjonction qui rend les tests d'isolation significatifs : si les
