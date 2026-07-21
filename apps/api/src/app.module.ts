@@ -58,6 +58,8 @@ import { ReminderSendService } from './jobs/reminder-send.service.js';
 import { SignatureWorkerService } from './jobs/signature-worker.service.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
+import { AuditService } from './audit/audit.service.js';
+import { AuditInterceptor } from './audit/audit.interceptor.js';
 
 @Controller()
 class HealthController {
@@ -129,6 +131,7 @@ class HealthController {
     DashboardService,
     RemindersReadService,
     NotificationsService,
+    AuditService,
     RedisProvider,
     SessionService,
     MagicLinkService,
@@ -195,6 +198,15 @@ class HealthController {
       // portant un montant.
       provide: APP_INTERCEPTOR,
       useClass: BigIntInterceptor,
+    },
+    {
+      // Journal d'audit inviolable (§6.9) : audite toutes les mutations
+      // authentifiées réussies (POST/PUT/PATCH/DELETE, 2xx). Best-effort —
+      // un échec d'écriture d'audit ne casse jamais la requête utilisateur.
+      // Plusieurs APP_INTERCEPTOR sont supportés ; l'ordre de déclaration
+      // est l'ordre d'exécution (celui-ci s'exécute après BigIntInterceptor).
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
   ],
 })
