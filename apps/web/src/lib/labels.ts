@@ -89,3 +89,9 @@ export function commentAuthorLabel(kind: string): string {
 export function commentVisibilityLabel(visibility: string): string {
   return visibility === 'SHARED' ? 'Partagé client' : 'Interne';
 }
+
+export function notificationTypeLabel(type: string): string {
+  if (type === 'CLIENT_COMMENT') return 'Message client';
+  if (type.startsWith('REMINDER')) return 'Rappel';
+  return type;
+}

@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router-dom';
 import { useMe } from '../lib/queries.js';
+import { NotificationBell } from '../features/notifications/notification-bell.js';
 
 export function AppShell() {
   const me = useMe();
@@ -16,8 +17,9 @@ export function AppShell() {
         </ul>
       </nav>
       <div className="flex-1">
-        <header className="flex justify-end border-b p-3 text-sm text-gray-600">
-          {me.data?.fullName} · {me.data?.roles?.join(', ')}
+        <header className="flex items-center justify-end gap-4 border-b p-3 text-sm text-gray-600">
+          <NotificationBell />
+          <span>{me.data?.fullName} · {me.data?.roles?.join(', ')}</span>
         </header>
         <main className="p-6"><Outlet /></main>
       </div>
