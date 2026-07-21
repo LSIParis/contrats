@@ -40,7 +40,9 @@ export async function appendAudit(e: AuditAppendInput): Promise<string> {
       ${e.actorUserId}::uuid, ${e.actorKind}::text, ${e.actorIp}::text, ${e.actorUserAgent}::text,
       ${e.action}::text, ${e.resourceType}::text, ${e.resourceId}::uuid,
       ${JSON.stringify(e.after ?? null)}::jsonb, ${e.requestId}::text, ${e.occurredAt}::timestamptz)`;
-  return rows[0].app_append_audit;
+  const hash = rows[0]?.app_append_audit;
+  if (hash == null) throw new Error("app_append_audit n'a pas renvoyé de hash");
+  return hash;
 }
 
 /**
