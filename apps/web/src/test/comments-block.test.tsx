@@ -25,3 +25,14 @@ test('choisir SHARED affiche un avertissement « visible du client »', async ()
   fireEvent.click(screen.getByLabelText(/Partagé client/));
   expect(screen.getByText(/visible du client/i)).toBeInTheDocument();
 });
+
+test('un commentaire résolu est marqué, un supprimé affiche « message supprimé »', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ items: [
+    { id: 'm1', body: 'Traité', visibility: 'INTERNAL', resolvedAt: '2026-07-21T10:00:00Z', editedAt: null, deletedAt: null, author: { fullName: 'Marc D.' }, createdAt: '2026-07-21T09:00:00Z' },
+    { id: 'm2', body: null, visibility: 'SHARED', resolvedAt: null, editedAt: null, deletedAt: '2026-07-21T11:00:00Z', author: { fullName: 'Marc D.' }, createdAt: '2026-07-21T09:00:00Z' },
+  ] }), { status: 200, headers: { 'content-type': 'application/json' } })) as never);
+  wrap();
+  await waitFor(() => expect(screen.getByText('Traité')).toBeInTheDocument());
+  expect(screen.getByText(/Résolu/i)).toBeInTheDocument();
+  expect(screen.getByText(/message supprimé/i)).toBeInTheDocument();
+});

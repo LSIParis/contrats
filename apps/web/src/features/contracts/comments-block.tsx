@@ -1,22 +1,30 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost } from '../../lib/api.js';
+import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api.js';
+import { useMe } from '../../lib/queries.js';
 import { Card } from '../../ui/card.js';
 import { Button } from '../../ui/button.js';
 import { commentVisibilityLabel } from '../../lib/labels.js';
 
 interface Comment {
   id: string;
-  body: string;
+  body: string | null;
   visibility: 'INTERNAL' | 'SHARED';
   author: { fullName: string };
+  authorUserId: string;
   createdAt: string;
+  resolvedAt: string | null;
+  editedAt: string | null;
+  deletedAt: string | null;
 }
 
 export function CommentsBlock({ contractId }: { contractId: string }) {
   const qc = useQueryClient();
+  const me = useMe();
   const [draft, setDraft] = useState('');
   const [visibility, setVisibility] = useState<'INTERNAL' | 'SHARED'>('INTERNAL');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
   const q = useQuery({
     queryKey: ['comments', contractId],
     queryFn: () => apiGet<{ items: Comment[] }>(`/v1/contracts/${contractId}/comments`),
@@ -26,6 +34,21 @@ export function CommentsBlock({ contractId }: { contractId: string }) {
       apiPost(`/v1/contracts/${contractId}/comments`, payload),
     onSuccess: () => { setDraft(''); setVisibility('INTERNAL'); qc.invalidateQueries({ queryKey: ['comments', contractId] }); },
   });
+  const act = (fn: () => Promise<unknown>) => { fn().then(() => qc.invalidateQueries({ queryKey: ['comments', contractId] })); };
+  const resolve = (id: string, on: boolean) =>
+    act(() => apiPost(`/v1/contracts/${contractId}/comments/${id}/${on ? 'resolve' : 'unresolve'}`, {}));
+  const share = (id: string) => {
+    if (confirm('Partager ce commentaire avec le client ? (irréversible)')) {
+      act(() => apiPatch(`/v1/contracts/${contractId}/comments/${id}/share`, {}));
+    }
+  };
+  const remove = (id: string) => {
+    if (confirm('Supprimer ce commentaire ?')) act(() => apiDelete(`/v1/contracts/${contractId}/comments/${id}`));
+  };
+  const saveEdit = (id: string, body: string) => {
+    act(() => apiPatch(`/v1/contracts/${contractId}/comments/${id}`, { body }));
+    setEditing(null);
+  };
   const items = q.data?.items ?? [];
   return (
     <Card title="Commentaires">
@@ -33,18 +56,72 @@ export function CommentsBlock({ contractId }: { contractId: string }) {
         <p className="text-sm text-gray-400">Aucun commentaire.</p>
       ) : (
         <ul className="mb-4 space-y-3">
-          {items.map((c) => (
-            <li key={c.id} className="text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{c.author.fullName}</span>
-                <span className={`rounded px-1.5 py-0.5 text-xs ${c.visibility === 'SHARED' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
-                  {commentVisibilityLabel(c.visibility)}
-                </span>
-                <span className="text-gray-400">· {new Date(c.createdAt).toLocaleDateString('fr-FR')}</span>
-              </div>
-              <div className="whitespace-pre-wrap text-gray-700">{c.body}</div>
-            </li>
-          ))}
+          {items.map((c) => {
+            const canManage = me.data?.userId === c.authorUserId || me.data?.roles?.includes('MSP_ADMIN');
+            return (
+              <li key={c.id} className={`text-sm ${c.resolvedAt ? 'opacity-60' : ''}`}>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{c.author.fullName}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-xs ${c.visibility === 'SHARED' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                    {commentVisibilityLabel(c.visibility)}
+                  </span>
+                  <span className="text-gray-400">· {new Date(c.createdAt).toLocaleDateString('fr-FR')}</span>
+                  {c.resolvedAt && <span className="text-xs font-medium text-gray-500">Résolu</span>}
+                </div>
+                {c.deletedAt ? (
+                  <div className="italic text-gray-400">message supprimé</div>
+                ) : editing === c.id ? (
+                  <div className="mt-1">
+                    <textarea
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      rows={2}
+                      className="w-full rounded border border-gray-300 p-2 text-sm"
+                    />
+                    <div className="mt-1 flex gap-3 text-xs">
+                      <button type="button" className="text-lsi underline" onClick={() => saveEdit(c.id, editDraft.trim())}>
+                        Enregistrer
+                      </button>
+                      <button type="button" className="text-gray-500 underline" onClick={() => setEditing(null)}>
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="whitespace-pre-wrap text-gray-700">
+                      {c.body}
+                      {c.editedAt && <span className="text-xs text-gray-400"> (modifié)</span>}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-3 text-xs">
+                      <button type="button" className="text-lsi underline" onClick={() => resolve(c.id, !c.resolvedAt)}>
+                        {c.resolvedAt ? 'Rouvrir' : 'Résoudre'}
+                      </button>
+                      {c.visibility === 'INTERNAL' && (
+                        <button type="button" className="text-lsi underline" onClick={() => share(c.id)}>
+                          Partager avec le client
+                        </button>
+                      )}
+                      {canManage && (
+                        <>
+                          <button
+                            type="button"
+                            className="text-lsi underline"
+                            onClick={() => { setEditing(c.id); setEditDraft(c.body ?? ''); }}
+                          >
+                            Modifier
+                          </button>
+                          <button type="button" className="text-red-600 underline" onClick={() => remove(c.id)}>
+                            Supprimer
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
       <textarea
