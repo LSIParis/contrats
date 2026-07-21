@@ -91,4 +91,20 @@ describe('commentaires portail', () => {
     const id = await seedContract(fx.customerA.id, fx.amUserId);
     await asClient('post', `/v1/portal/contracts/${id}/comments`).send({ body: '' }).expect(400);
   });
+
+  test('un commentaire SHARED supprimé apparaît masqué (body null) au portail', async () => {
+    const id = await seedContract(fx.customerA.id, fx.amUserId);
+    const cid = uuidv7(); const now = new Date();
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => tx.comment.create({ data: {
+      id: cid, tenantId: fx.tenantId, customerId: fx.customerA.id, contractId: id, authorUserId: fx.amUserId,
+      visibility: 'SHARED', body: 'à supprimer', editedAt: now, deletedAt: now, deletedByUserId: fx.amUserId,
+      createdAt: now, updatedAt: now } }));
+    const res = await asClient('get', `/v1/portal/contracts/${id}/comments`).expect(200);
+    const it = res.body.items.find((i: any) => i.id === cid);
+    expect(it).toBeTruthy();
+    expect(it.body).toBeNull();
+    expect(it.deletedAt).not.toBeNull();
+    expect(it.editedAt).not.toBeNull();
+    expect(JSON.stringify(res.body)).not.toContain('à supprimer');
+  });
 });

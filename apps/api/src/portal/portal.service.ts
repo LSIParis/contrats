@@ -111,13 +111,14 @@ export class PortalService {
       const rows = await tx.comment.findMany({
         where: { contractId },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, body: true, createdAt: true, authorUserId: true },
+        select: { id: true, body: true, createdAt: true, authorUserId: true, editedAt: true, deletedAt: true },
       });
       return rows.map((r) => ({
-        id: r.id, body: r.body,
+        id: r.id, body: r.deletedAt ? null : r.body,
         author: r.authorUserId === scope.userId
           ? { fullName: 'Vous', kind: 'CLIENT' as const }
           : { fullName: 'LSI', kind: 'INTERNAL' as const },
+        editedAt: r.editedAt, deletedAt: r.deletedAt,
         createdAt: r.createdAt,
       }));
     });
