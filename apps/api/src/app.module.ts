@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { LoggerModule } from 'nestjs-pino';
 import { fileURLToPath } from 'node:url';
 import { uuidv7 } from '@lsi/persistence';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
+import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
 import { ScopeGuard } from './auth/scope.guard.js';
 import { SessionService } from './auth/session.service.js';
 import { RedisProvider } from './auth/redis.provider.js';
@@ -217,6 +218,14 @@ import { AuditReadService } from './audit/audit-read.service.js';
       // est l'ordre d'exécution (celui-ci s'exécute après BigIntInterceptor).
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
+    },
+    {
+      // Filtre d'exception global (§3.3) : PRÉSERVE le corps d'erreur existant
+      // (HttpException.getResponse(), objet ou string) et y AJOUTE requestId
+      // pour la corrélation. Erreur inconnue → 500 générique sans fuite de
+      // stack. Ne logue QUE les 5xx (les 4xx sont déjà tracées par pino-http).
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
     },
   ],
 })
