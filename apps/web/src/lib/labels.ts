@@ -85,3 +85,7 @@ export const userKindLabel = (s: string): string => USER_KIND_FR[s] ?? s;
 export function commentAuthorLabel(kind: string): string {
   return kind === 'CLIENT' ? 'Vous' : 'LSI';
 }
+
+export function commentVisibilityLabel(visibility: string): string {
+  return visibility === 'SHARED' ? 'Partagé client' : 'Interne';
+}

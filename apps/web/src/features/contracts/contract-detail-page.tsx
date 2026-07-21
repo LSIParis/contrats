@@ -11,6 +11,7 @@ import { SignatureBlock, type SignatureData } from './signature-block.js';
 import { RemindersBlock, type Reminder } from './reminders-block.js';
 import { SignersBlock, type Signer } from './signers-block.js';
 import { Timeline, type Event } from './timeline.js';
+import { CommentsBlock } from './comments-block.js';
 import { WorkflowActions } from './workflow-actions.js';
 import { SendForSignature } from './send-for-signature.js';
 import { SignatureActions } from './signature-actions.js';
@@ -147,6 +148,7 @@ export function ContractDetailPage() {
         <RemindersBlock reminders={q.data.reminders} />
       </div>
       <Timeline events={q.data.timeline} />
+      <CommentsBlock contractId={contract.id} />
     </div>
   );
 }
