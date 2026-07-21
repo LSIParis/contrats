@@ -73,6 +73,12 @@ const USER_KIND_FR: Record<string, string> = {
   CLIENT: 'Client',
 };
 
+const ACTOR_KIND_FR: Record<string, string> = {
+  INTERNAL: 'Interne',
+  CLIENT: 'Client',
+  SYSTEM: 'Système',
+};
+
 export const contractStatusLabel = (s: string): string => CONTRACT_STATUS_FR[s] ?? s;
 export const signerStatusLabel = (s: string): string => SIGNER_STATUS_FR[s] ?? s;
 export const reminderStatusLabel = (s: string): string => REMINDER_STATUS_FR[s] ?? s;
@@ -81,6 +87,7 @@ export const contractCategoryLabel = (s: string): string => CONTRACT_CATEGORY_FR
 export const billingFrequencyLabel = (s: string): string => BILLING_FREQUENCY_FR[s] ?? s;
 export const roleLabel = (s: string): string => ROLE_FR[s] ?? s;
 export const userKindLabel = (s: string): string => USER_KIND_FR[s] ?? s;
+export const actorKindLabel = (s: string): string => ACTOR_KIND_FR[s] ?? s;
 
 export function commentAuthorLabel(kind: string): string {
   return kind === 'CLIENT' ? 'Vous' : 'LSI';

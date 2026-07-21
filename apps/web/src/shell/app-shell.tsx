@@ -14,6 +14,7 @@ export function AppShell() {
           <li><Link to="/contracts">Contrats</Link></li>
           <li><Link to="/reminders">Rappels</Link></li>
           {me.data?.roles?.includes('MSP_ADMIN') && <li><Link to="/users">Utilisateurs</Link></li>}
+          {me.data?.roles?.includes('MSP_ADMIN') && <li><Link to="/audit">Audit</Link></li>}
         </ul>
       </nav>
       <div className="flex-1">

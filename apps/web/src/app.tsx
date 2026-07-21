@@ -11,6 +11,7 @@ import { CustomersPage } from './features/customers/customers-page.js';
 import { CustomerNewPage } from './features/customers/customer-new-page.js';
 import { CustomerDetailPage } from './features/customers/customer-detail-page.js';
 import { UsersPage } from './features/users/users-page.js';
+import { AuditPage } from './features/audit/audit-page.js';
 import { PortalApp } from './portal/portal-app.js';
 
 function InternalRoutes() {
@@ -29,6 +30,7 @@ function InternalRoutes() {
         <Route path="/contracts/:id" element={<ContractDetailPage />} />
         <Route path="/reminders" element={<div>Rappels</div>} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/audit" element={<AuditPage />} />
       </Route>
     </Routes>
   );
