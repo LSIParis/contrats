@@ -21,6 +21,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (status >= 500) {
       this.logger.error({ err: exception, requestId, method: req.method, path: req.url, status }, 'Erreur non gérée');
     }
+    // Filtre global : une réponse déjà (partiellement) envoyée ferait planter
+    // `res.status().json()`. On ne fait que loguer dans ce cas rare.
+    if (res.headersSent) return;
     res.status(status).json(body);
   }
 }
