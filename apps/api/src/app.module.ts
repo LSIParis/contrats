@@ -56,6 +56,8 @@ import { LifecycleService } from './jobs/lifecycle.service.js';
 import { ReminderDispatchService } from './jobs/reminder-dispatch.service.js';
 import { ReminderSendService } from './jobs/reminder-send.service.js';
 import { SignatureWorkerService } from './jobs/signature-worker.service.js';
+import { NotificationsController } from './notifications/notifications.controller.js';
+import { NotificationsService } from './notifications/notifications.service.js';
 
 @Controller()
 class HealthController {
@@ -113,6 +115,7 @@ class HealthController {
     MeController,
     DashboardController,
     RemindersController,
+    NotificationsController,
     HealthController,
   ],
   providers: [
@@ -125,6 +128,7 @@ class HealthController {
     PortalService,
     DashboardService,
     RemindersReadService,
+    NotificationsService,
     RedisProvider,
     SessionService,
     MagicLinkService,
