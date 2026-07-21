@@ -60,6 +60,8 @@ import { NotificationsController } from './notifications/notifications.controlle
 import { NotificationsService } from './notifications/notifications.service.js';
 import { AuditService } from './audit/audit.service.js';
 import { AuditInterceptor } from './audit/audit.interceptor.js';
+import { AuditController } from './audit/audit.controller.js';
+import { AuditReadService } from './audit/audit-read.service.js';
 
 @Controller()
 class HealthController {
@@ -118,6 +120,7 @@ class HealthController {
     DashboardController,
     RemindersController,
     NotificationsController,
+    AuditController,
     HealthController,
   ],
   providers: [
@@ -132,6 +135,7 @@ class HealthController {
     RemindersReadService,
     NotificationsService,
     AuditService,
+    AuditReadService,
     RedisProvider,
     SessionService,
     MagicLinkService,
