@@ -22,6 +22,8 @@ import type { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import type { AmendContractDto } from './dto/amend-contract.dto.js';
 import type { Session } from '../auth/session.service.js';
 
+const TERMINAL_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
+
 /**
  * Service métier des contrats.
  *
@@ -209,10 +211,17 @@ export class ContractsService {
       }
       if (q.cursor) where.id = { gt: q.cursor };
 
+      // Vue par défaut : contrats actifs (non archivés). `?archived=true`
+      // bascule sur la vue archives — les deux vues sont mutuellement
+      // exclusives, jamais mélangées.
+      where.archivedAt = q.archived ? { not: null } : null;
+
       if (q.q?.trim()) {
+        const term = q.q.trim();
         where.OR = [
-          { reference: { contains: q.q.trim(), mode: 'insensitive' } },
-          { title: { contains: q.q.trim(), mode: 'insensitive' } },
+          { reference: { contains: term, mode: 'insensitive' } },
+          { title: { contains: term, mode: 'insensitive' } },
+          { customer: { name: { contains: term, mode: 'insensitive' } } },
         ];
       }
 
@@ -229,6 +238,34 @@ export class ContractsService {
         data,
         pagination: { nextCursor: hasMore ? data[data.length - 1]?.id : null, hasMore },
       };
+    });
+  }
+
+  /**
+   * Archivage (attribut ORTHOGONAL au statut, pas un événement du domaine) :
+   * `archivedAt` ne change rien à la machine à états — il ne fait que
+   * sortir le contrat de la vue par défaut. Réservé aux statuts terminaux.
+   */
+  async archive(scope: Scope, id: string, actorUserId: string, now: Date) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true, status: true, archivedAt: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      if (c.archivedAt) return { ok: true as const }; // idempotent
+      if (!TERMINAL_STATUSES.includes(c.status)) {
+        throw new ConflictException({ code: 'NOT_TERMINAL', detail: 'Seuls les contrats terminés peuvent être archivés.' });
+      }
+      await tx.contract.update({ where: { id }, data: { archivedAt: now, updatedAt: now, updatedByUserId: actorUserId } });
+      return { ok: true as const };
+    });
+  }
+
+  async unarchive(scope: Scope, id: string, actorUserId: string, now: Date) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true, archivedAt: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      if (!c.archivedAt) return { ok: true as const }; // idempotent
+      await tx.contract.update({ where: { id }, data: { archivedAt: null, updatedAt: now, updatedByUserId: actorUserId } });
+      return { ok: true as const };
     });
   }
 

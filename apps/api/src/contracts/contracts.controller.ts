@@ -202,6 +202,26 @@ export class ContractsController {
     return this.contracts.amend(scope, id, dto, session, new Date());
   }
 
+  @Post(':id/archive')
+  async archive(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.archive(scope, id, session.userId, new Date());
+  }
+
+  @Post(':id/unarchive')
+  async unarchive(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    return this.contracts.unarchive(scope, id, session.userId, new Date());
+  }
+
   @Post(':id/cancel')
   async cancel(
     @CurrentScope() scope: Scope,

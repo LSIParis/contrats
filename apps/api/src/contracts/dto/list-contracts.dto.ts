@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { CONTRACT_STATUSES } from '@lsi/domain';
 
@@ -30,6 +30,12 @@ export class ListContractsDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  /** Vue archivés : true → seulement les archivés ; absent/false → seulement les actifs. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  archived?: boolean;
 
   @IsOptional()
   @Type(() => Number)
