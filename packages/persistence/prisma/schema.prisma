@@ -668,6 +668,9 @@ model Comment {
 
   resolvedAt       DateTime? @map("resolved_at")
   resolvedByUserId String?   @map("resolved_by_user_id") @db.Uuid
+  editedAt         DateTime? @map("edited_at")
+  deletedAt        DateTime? @map("deleted_at")
+  deletedByUserId  String?   @map("deleted_by_user_id") @db.Uuid
   createdAt        DateTime  @map("created_at")
   updatedAt        DateTime  @map("updated_at")
 
