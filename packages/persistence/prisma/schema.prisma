@@ -811,8 +811,15 @@ model AuditLog {
   prevHash String? @map("prev_hash") @db.Char(64)
   hash     String  @db.Char(64)
 
+  /// Ordre de chaînage, assigné SOUS le verrou consultatif dans app_append_audit
+  /// (migration 15). Généré par la base (IDENTITY) : jamais écrit via Prisma.
+  /// C'est cette valeur — pas (occurred_at, id) — qui ordonne la chaîne, pour
+  /// qu'elle ne forke pas sous des appends concurrents du même tenant.
+  seq BigInt @default(autoincrement()) @map("seq")
+
   @@index([tenantId, customerId, occurredAt(sort: Desc)])
   @@index([tenantId, resourceType, resourceId, occurredAt(sort: Desc)])
+  @@index([tenantId, seq])
   @@map("audit_logs")
 }
 
