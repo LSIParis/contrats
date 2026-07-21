@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { LoggerModule } from 'nestjs-pino';
+import { LOG_REDACT_PATHS, logReqSerializer } from './observability/logging.js';
 import { fileURLToPath } from 'node:url';
 import { uuidv7 } from '@lsi/persistence';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
@@ -72,7 +73,11 @@ import { AuditReadService } from './audit/audit-read.service.js';
       pinoHttp: {
         level: process.env.NODE_ENV === 'test' ? 'silent' : (process.env.LOG_LEVEL ?? 'info'),
         autoLogging: process.env.NODE_ENV !== 'test',
-        redact: ['req.headers.cookie', 'req.headers.authorization'],
+        // Redaction des credentials : en-têtes entrants (cookie de session,
+        // Authorization) ET le Set-Cookie SORTANT (le sessionId est un bearer :
+        // le loguer en clair = fuite d'auth dans stdout → Portainer → backups).
+        redact: LOG_REDACT_PATHS,
+        serializers: { req: logReqSerializer },
         genReqId: (req: any, res: any) => {
           const incoming = typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined;
           const id = incoming ?? uuidv7();
