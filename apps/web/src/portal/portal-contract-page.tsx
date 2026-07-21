@@ -31,9 +31,11 @@ interface PortalContractDetail {
 
 interface PortalComment {
   id: string;
-  body: string;
+  body: string | null;
   author: { fullName: string; kind: string };
   createdAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
 }
 
 const RENEW_PREFILL = 'Bonjour, je souhaite renouveler ce contrat. Merci de me recontacter.';
@@ -61,7 +63,16 @@ function CommentsCard({ contractId }: { contractId: string }) {
           {items.map((m) => (
             <li key={m.id} className="text-sm">
               <div className="font-medium">{commentAuthorLabel(m.author.kind)} <span className="text-gray-400">· {new Date(m.createdAt).toLocaleDateString('fr-FR')}</span></div>
-              <div className="whitespace-pre-wrap text-gray-700">{m.body}</div>
+              <div className="whitespace-pre-wrap text-gray-700">
+                {m.deletedAt ? (
+                  <span className="italic text-gray-400">message supprimé</span>
+                ) : (
+                  <>
+                    {m.body}
+                    {m.editedAt && <span className="text-xs text-gray-400"> (modifié)</span>}
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
