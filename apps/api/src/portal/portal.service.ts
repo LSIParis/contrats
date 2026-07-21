@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { withScope, type Scope } from '@lsi/persistence';
+import { withScope, uuidv7, type Scope } from '@lsi/persistence';
 import type { ContractStatus } from '@lsi/domain';
 
 const SIGN_PENDING = ['SENT', 'VIEWED'];
@@ -91,5 +91,69 @@ export class PortalService {
   async emailOf(scope: Scope, userId: string): Promise<string | null> {
     const user = await withScope(scope, (tx) => tx.user.findUnique({ where: { id: userId }, select: { email: true } }));
     return user?.email ?? null;
+  }
+
+  /**
+   * Commentaires visibles du portail (RLS → SHARED uniquement pour un CLIENT).
+   *
+   * Pas de `select: { author: {...} } }` : la policy `users_scope` interdit
+   * à une session CLIENT de lire la ligne d'un AUTRE utilisateur (l'annuaire
+   * interne LSI ne doit pas fuiter — cf. migration RLS). Un `include` Prisma
+   * traversant cette frontière échoue (`author` requis, RLS renvoie 0 ligne
+   * → « Field author is required to return data, got null »). On dérive donc
+   * `author` sans jointure : le client ne s'authentifie que comme lui-même,
+   * donc tout auteur différent de `scope.userId` est nécessairement interne.
+   */
+  async listComments(scope: Scope, contractId: string) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id: contractId }, select: { id: true, status: true } });
+      if (!c || !CLIENT_VISIBLE_STATUSES.includes(c.status)) throw new NotFoundException('Contrat introuvable');
+      const rows = await tx.comment.findMany({
+        where: { contractId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, body: true, createdAt: true, authorUserId: true },
+      });
+      return rows.map((r) => ({
+        id: r.id, body: r.body,
+        author: r.authorUserId === scope.userId
+          ? { fullName: 'Vous', kind: 'CLIENT' as const }
+          : { fullName: 'LSI', kind: 'INTERNAL' as const },
+        createdAt: r.createdAt,
+      }));
+    });
+  }
+
+  /** Le client publie un message SHARED + notifie le propriétaire du contrat. */
+  async createComment(scope: Scope, contractId: string, body: string, now: Date) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({
+        where: { id: contractId },
+        select: { id: true, status: true, tenantId: true, customerId: true, ownerUserId: true, reference: true },
+      });
+      if (!c || !CLIENT_VISIBLE_STATUSES.includes(c.status)) throw new NotFoundException('Contrat introuvable');
+      const id = uuidv7();
+      await tx.comment.create({ data: {
+        id, tenantId: c.tenantId, customerId: c.customerId, contractId,
+        authorUserId: scope.userId, visibility: 'SHARED', body, createdAt: now, updatedAt: now,
+      } });
+      // Notification pour le propriétaire. Le WITH CHECK notifications_scope
+      // n'exige que tenant + customer_in_scope → une session CLIENT peut créer
+      // une notification destinée à l'utilisateur interne propriétaire.
+      // `createMany` plutôt que `create` : le recipient (l'AM propriétaire)
+      // n'est pas l'utilisateur courant, donc le SELECT implicite du
+      // RETURNING d'un `create()` échouerait sur le USING de
+      // notifications_scope (`recipient_user_id = app_current_user()` pour
+      // un acteur non-SYSTEM) — RLS lève alors "new row violates row-level
+      // security policy" alors que le WITH CHECK de l'INSERT est satisfait.
+      // `createMany` n'a pas de RETURNING et n'est donc pas soumis à ce USING.
+      await tx.notification.createMany({ data: [{
+        id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId,
+        recipientUserId: c.ownerUserId, type: 'CLIENT_COMMENT',
+        subject: `Nouveau message client — ${c.reference}`,
+        body, relatedContractId: contractId,
+        dedupKey: `client-comment:${id}`, createdAt: now,
+      }] });
+      return { id };
+    });
   }
 }
