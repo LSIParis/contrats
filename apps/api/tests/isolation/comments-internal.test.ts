@@ -4,10 +4,10 @@ import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
-import { adminScope, internalScope, withScope, uuidv7 } from '@lsi/persistence';
+import { adminScope, internalScope, clientScope, withScope, uuidv7 } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
-let app: INestApplication; let fx: TwoCustomerFixture;
+let app: INestApplication; let fx: TwoCustomerFixture; let clientUserId: string;
 
 async function seedContract(customerId: string, ownerUserId: string) {
   const id = uuidv7(); const now = new Date();
@@ -28,6 +28,14 @@ beforeAll(async () => {
     roles: ['ACCOUNT_MANAGER'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) }, 3600);
   await sessions.put({ sessionId: 'sess-tech', userId: fx.amUserId, tenantId: fx.tenantId,
     roles: ['TECHNICIAN'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) }, 3600);
+  // Un utilisateur CLIENT rattaché au customerA (kind CLIENT) : rôle non autorisé pour l'API interne.
+  clientUserId = uuidv7();
+  await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => tx.user.create({ data: {
+    id: clientUserId, tenantId: fx.tenantId, kind: 'CLIENT', customerId: fx.customerA.id,
+    email: 'client-comments-internal@example.com', fullName: 'Client Test', status: 'ACTIVE',
+    createdAt: new Date(), updatedAt: new Date() } }));
+  await sessions.put({ sessionId: 'sess-client', userId: clientUserId, tenantId: fx.tenantId,
+    roles: ['CLIENT_VIEWER'], scope: clientScope(fx.tenantId, fx.customerA.id, clientUserId) }, 3600);
 });
 const asAmA = () => request(app.getHttpServer());
 
@@ -50,10 +58,15 @@ describe('commentaires interne', () => {
     expect(res.body.items[0].visibility).toBe('INTERNAL');
   });
 
-  test('un rôle non autorisé (TECHNICIAN) → 403', async () => {
+  test('TECHNICIAN est autorisé sur l’API interne (INTERNAL élargi) ; un rôle client ne l’est pas → 403', async () => {
     const id = await seedContract(fx.customerA.id, fx.amUserId);
-    await asAmA().get(`/v1/contracts/${id}/comments`).set('x-lsi-session', 'sess-tech').expect(403);
+    // TECHNICIAN : GET/POST INTERNAL désormais autorisés (§6.10 différée B).
+    await asAmA().get(`/v1/contracts/${id}/comments`).set('x-lsi-session', 'sess-tech').expect(200);
     await asAmA().post(`/v1/contracts/${id}/comments`).set('x-lsi-session', 'sess-tech')
+      .send({ body: 'x' }).expect(201);
+    // Rôle client (CLIENT_VIEWER) : toujours non autorisé sur l'API interne → 403.
+    await asAmA().get(`/v1/contracts/${id}/comments`).set('x-lsi-session', 'sess-client').expect(403);
+    await asAmA().post(`/v1/contracts/${id}/comments`).set('x-lsi-session', 'sess-client')
       .send({ body: 'x' }).expect(403);
   });
 
