@@ -33,6 +33,8 @@ import { PortalService } from './portal/portal.service.js';
 import { ClientPortalGuard } from './portal/client-portal.guard.js';
 import { SignersController } from './contracts/signers.controller.js';
 import { SignersService } from './contracts/signers.service.js';
+import { CommentsController } from './comments/comments.controller.js';
+import { CommentsService } from './comments/comments.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
 import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
 import { DocusealAdapter } from './signature/docuseal.adapter.js';
@@ -102,6 +104,7 @@ class HealthController {
     CustomersController,
     UsersController,
     SignersController,
+    CommentsController,
     PortalContractsController,
     DocusealWebhookController,
     SignatureActionsController,
@@ -118,6 +121,7 @@ class HealthController {
     CustomersService,
     UsersService,
     SignersService,
+    CommentsService,
     PortalService,
     DashboardService,
     RemindersReadService,
