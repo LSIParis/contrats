@@ -16,13 +16,15 @@ export function ContractsPage() {
   const [params] = useSearchParams();
   const status = params.get('status') ?? '';
   const [q, setQ] = useState('');
+  const [archived, setArchived] = useState(false);
 
   const query = useInfiniteQuery({
-    queryKey: ['contracts', status, q],
+    queryKey: ['contracts', status, q, archived],
     queryFn: ({ pageParam }) => {
       const sp = new URLSearchParams();
       if (status) sp.set('status', status);
       if (q.trim()) sp.set('q', q.trim());
+      if (archived) sp.set('archived', 'true');
       if (pageParam) sp.set('cursor', pageParam);
       return apiGet<ListResponse>(`/v1/contracts?${sp.toString()}`);
     },
@@ -41,6 +43,9 @@ export function ContractsPage() {
         placeholder="Rechercher (référence, titre)…"
         className="w-72 rounded border px-3 py-1.5 text-sm"
       />
+      <label className="ml-3 inline-flex items-center gap-1 text-sm text-gray-600">
+        <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> Archivés
+      </label>
       {query.isLoading ? (
         <Spinner />
       ) : (query.error || !query.data) && rows.length === 0 ? (

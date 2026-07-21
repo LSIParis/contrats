@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '../../lib/api.js';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '../../lib/api.js';
 import { useMe } from '../../lib/queries.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Button } from '../../ui/button.js';
@@ -19,6 +19,8 @@ import { TerminateContract } from './terminate-contract.js';
 import { RenewContract } from './renew-contract.js';
 import { AmendContract } from './amend-contract.js';
 
+const TERMINAL = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
+
 interface Detail {
   contract: {
     id: string;
@@ -29,6 +31,7 @@ interface Detail {
     startDate: string | null;
     endDate: string | null;
     noticePeriodDays: number | null;
+    archivedAt: string | null;
   };
   customer: { name: string };
   signatureRequest: SignatureData | null;
@@ -55,11 +58,15 @@ export function ContractDetailPage() {
     queryFn: () => apiGet<{ allowedActions: string[] }>(`/v1/contracts/${id}/allowed-actions`),
   });
   const me = useMe();
+  const qc = useQueryClient();
   const [downloadError, setDownloadError] = useState<string | null>(null);
   if (q.isLoading) return <Spinner />;
   if (q.error || !q.data) return <p className="text-red-600">Contrat introuvable.</p>;
   const { contract, customer } = q.data;
   const canDownloadSigned = q.data.signatureRequest?.status === 'COMPLETED';
+  const canArchive = me.data?.roles?.some((r) => ['MSP_ADMIN', 'ACCOUNT_MANAGER'].includes(r)) ?? false;
+  const archiveAct = (verb: 'archive' | 'unarchive') =>
+    apiPost(`/v1/contracts/${contract.id}/${verb}`, {}).then(() => qc.invalidateQueries({ queryKey: ['contract', id] }));
 
   async function handleDownload() {
     if (!id) return;
@@ -82,6 +89,16 @@ export function ContractDetailPage() {
             {' → '}
             {contract.endDate ? new Date(contract.endDate).toLocaleDateString('fr-FR') : '—'}
           </p>
+          {contract.archivedAt ? (
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <span>Archivé le {new Date(contract.archivedAt).toLocaleDateString('fr-FR')}</span>
+              {canArchive && <button type="button" className="text-lsi underline" onClick={() => archiveAct('unarchive')}>Désarchiver</button>}
+            </div>
+          ) : (
+            canArchive && TERMINAL.includes(contract.status) && (
+              <button type="button" className="text-lsi underline text-sm" onClick={() => archiveAct('archive')}>Archiver</button>
+            )
+          )}
         </div>
         {canDownloadSigned && (
           <div className="flex flex-col items-end gap-1">
