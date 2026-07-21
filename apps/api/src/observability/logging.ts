@@ -1,5 +1,3 @@
-import { stdSerializers } from 'pino';
-
 /**
  * Chemins redactés dans les logs (§ observabilité).
  *
@@ -17,10 +15,15 @@ export const LOG_REDACT_PATHS = [
  * Sérialiseur `req` : ne JAMAIS loguer le query-string, il porte des tokens de
  * login (magic-link `?token=`, code OIDC `?code=&state=`). On ne garde que le
  * chemin (utile au debug) et on supprime l'objet `query`.
+ *
+ * IMPORTANT : pino-http enveloppe ce sérialiseur custom (`wrapRequestSerializer`)
+ * et lui passe le req **déjà sérialisé** par `stdSerializers.req` (avec `url`,
+ * `query`, `remoteAddress`, `remotePort`, …). On ne RE-sérialise donc PAS ici
+ * (cela reperdrait `remoteAddress`/`remotePort` faute de `req.socket`) : on ne
+ * fait que retirer le query-string du `url` et supprimer `query`.
  */
-export function logReqSerializer(req: unknown): Record<string, unknown> {
-  const s = stdSerializers.req(req as never) as unknown as Record<string, unknown>;
-  if (typeof s.url === 'string') s.url = s.url.split('?')[0];
-  delete s.query;
-  return s;
+export function logReqSerializer(req: Record<string, unknown>): Record<string, unknown> {
+  if (typeof req.url === 'string') req.url = req.url.split('?')[0];
+  delete req.query;
+  return req;
 }
