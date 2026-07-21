@@ -19,7 +19,7 @@ import { TerminateContract } from './terminate-contract.js';
 import { RenewContract } from './renew-contract.js';
 import { AmendContract } from './amend-contract.js';
 
-const TERMINAL = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
+const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
 interface Detail {
   contract: {
@@ -95,7 +95,7 @@ export function ContractDetailPage() {
               {canArchive && <button type="button" className="text-lsi underline" onClick={() => archiveAct('unarchive')}>Désarchiver</button>}
             </div>
           ) : (
-            canArchive && TERMINAL.includes(contract.status) && (
+            canArchive && ARCHIVABLE_STATUSES.includes(contract.status) && (
               <button type="button" className="text-lsi underline text-sm" onClick={() => archiveAct('archive')}>Archiver</button>
             )
           )}

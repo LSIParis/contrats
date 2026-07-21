@@ -22,7 +22,7 @@ import type { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import type { AmendContractDto } from './dto/amend-contract.dto.js';
 import type { Session } from '../auth/session.service.js';
 
-const TERMINAL_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
+const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
 /**
  * Service métier des contrats.
@@ -251,7 +251,7 @@ export class ContractsService {
       const c = await tx.contract.findUnique({ where: { id }, select: { id: true, status: true, archivedAt: true } });
       if (!c) throw new NotFoundException('Contrat introuvable');
       if (c.archivedAt) return { ok: true as const }; // idempotent
-      if (!TERMINAL_STATUSES.includes(c.status)) {
+      if (!ARCHIVABLE_STATUSES.includes(c.status)) {
         throw new ConflictException({ code: 'NOT_TERMINAL', detail: 'Seuls les contrats terminés peuvent être archivés.' });
       }
       await tx.contract.update({ where: { id }, data: { archivedAt: now, updatedAt: now, updatedByUserId: actorUserId } });
