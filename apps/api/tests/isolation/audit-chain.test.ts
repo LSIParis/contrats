@@ -28,9 +28,27 @@ describe('chaîne d’audit', () => {
     // withScope, comme tout le reste du code applicatif.
     const rows = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
       tx.$queryRaw<{ prev_hash: string | null; hash: string }[]>`
-        SELECT prev_hash, hash FROM audit_logs WHERE tenant_id = ${fx.tenantId}::uuid ORDER BY occurred_at ASC, id ASC`,
+        SELECT prev_hash, hash FROM audit_logs WHERE tenant_id = ${fx.tenantId}::uuid ORDER BY seq ASC`,
     );
     expect(rows.at(-1)!.prev_hash).toBe(rows.at(-2)!.hash); // chaînage
+    const v = await db.$queryRaw<{ app_verify_audit_chain: string | null }[]>`
+      SELECT app_verify_audit_chain(${fx.tenantId}::uuid)`;
+    expect(v[0].app_verify_audit_chain).toBeNull();
+  });
+
+  test('appends au même occurred_at ne forkent pas la chaîne (ordre = seq, pas id)', async () => {
+    // Tous au MÊME timestamp, et antérieur à A1/A2 : sur l'ancien code
+    // (chaînage ordonné par occurred_at/id), l'ordre de parcours divergeait de
+    // l'ordre d'append → faux positif quasi systématique. Avec `seq` (assigné
+    // sous le verrou), l'ordre de chaîne suit l'ordre d'append : intègre.
+    const ts = '2020-01-01T00:00:00.000Z';
+    for (let i = 0; i < 6; i++) {
+      await db.$queryRaw`
+        SELECT app_append_audit(${uuidv7()}::uuid, ${fx.tenantId}::uuid, ${null}::uuid,
+          ${fx.adminUserId}::uuid, 'INTERNAL', ${null}::text, ${null}::text,
+          ${'SAME_TS_' + i}::text, 'contract', ${null}::uuid,
+          ${'{}'}::jsonb, ${null}::text, ${ts}::timestamptz)`;
+    }
     const v = await db.$queryRaw<{ app_verify_audit_chain: string | null }[]>`
       SELECT app_verify_audit_chain(${fx.tenantId}::uuid)`;
     expect(v[0].app_verify_audit_chain).toBeNull();
