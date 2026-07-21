@@ -1,7 +1,9 @@
 import { Module, Controller, Get } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { LoggerModule } from 'nestjs-pino';
 import { fileURLToPath } from 'node:url';
+import { uuidv7 } from '@lsi/persistence';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { ScopeGuard } from './auth/scope.guard.js';
 import { SessionService } from './auth/session.service.js';
@@ -74,6 +76,19 @@ class HealthController {
 
 @Module({
   imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.NODE_ENV === 'test' ? 'silent' : (process.env.LOG_LEVEL ?? 'info'),
+        autoLogging: process.env.NODE_ENV !== 'test',
+        redact: ['req.headers.cookie', 'req.headers.authorization'],
+        genReqId: (req: any, res: any) => {
+          const incoming = typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined;
+          const id = incoming ?? uuidv7();
+          res.setHeader('x-request-id', id);
+          return id;
+        },
+      },
+    }),
     ServeStaticModule.forRoot({
       // Le bundle Vite ; en dev il peut être absent (Vite sert lui-même) —
       // ServeStatic renvoie alors 404 sur les routes SPA, ce qui est sans effet

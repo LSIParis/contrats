@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
@@ -9,7 +10,8 @@ async function bootstrap() {
   // DocuSeal (§11.7). Sans cela, verifyWebhook n'a rien à vérifier et le
   // webhook refuserait TOUT en production — ou pire, si on l'avait fait
   // porter sur le JSON reparsé, il accepterait des corps falsifiés.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create(AppModule, { rawBody: true, bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   // Parse les cookies : le guard lit le cookie de session (§13.1).
   app.use(cookieParser());

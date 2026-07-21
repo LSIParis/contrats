@@ -50,7 +50,7 @@ export class AuditInterceptor implements NestInterceptor {
           resourceType: resourceTypeOf(path),
           resourceId: resId,
           after: redact(req.body),
-          requestId: (req.headers?.['x-request-id'] as string) ?? null,
+          requestId: (req.id as string) ?? (req.headers?.['x-request-id'] as string) ?? null,
           occurredAt: new Date(),
         });
       },
