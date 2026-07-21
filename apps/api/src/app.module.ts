@@ -1,4 +1,4 @@
-import { Module, Controller, Get } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { LoggerModule } from 'nestjs-pino';
@@ -21,7 +21,7 @@ import { RemindersController } from './read/reminders.controller.js';
 import { RemindersReadService } from './read/reminders.service.js';
 import { OIDC_PROVIDER } from './auth/oidc.port.js';
 import { EntraOidcProvider } from './auth/oidc-entra.adapter.js';
-import { Public } from './auth/public.decorator.js';
+import { HealthController } from './health/health.controller.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { ContentController } from './contracts/content.controller.js';
@@ -64,15 +64,6 @@ import { AuditService } from './audit/audit.service.js';
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditReadService } from './audit/audit-read.service.js';
-
-@Controller()
-class HealthController {
-  @Public()
-  @Get('health')
-  health() {
-    return { status: 'ok' };
-  }
-}
 
 @Module({
   imports: [
