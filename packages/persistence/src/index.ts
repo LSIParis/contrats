@@ -38,3 +38,4 @@ export {
   type ResolvedRole,
 } from './scope-resolution.js';
 export { createCustomer, CustomerSirenConflict, type NewCustomerInput } from './customer-write.js';
+export { appendAudit, verifyAuditChain, type AuditAppendInput } from './audit-write.js';

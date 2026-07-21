@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { withScope, unsafeUnscopedClient, type Scope } from '@lsi/persistence';
+import { withScope, verifyAuditChain, type Scope } from '@lsi/persistence';
 import type { ListAuditDto } from './dto/list-audit.dto.js';
 
 @Injectable()
@@ -25,9 +25,7 @@ export class AuditReadService {
 
   /** Vérifie la chaîne du tenant du scope (fonction SECURITY DEFINER). */
   async verify(scope: Scope) {
-    const rows = await unsafeUnscopedClient.$queryRaw<{ app_verify_audit_chain: string | null }[]>`
-      SELECT app_verify_audit_chain(${scope.tenantId}::uuid)`;
-    const brokenAt = rows[0]?.app_verify_audit_chain ?? null;
+    const brokenAt = await verifyAuditChain(scope.tenantId);
     return { ok: brokenAt === null, brokenAt };
   }
 }

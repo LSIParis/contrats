@@ -4,11 +4,10 @@ import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
-import { adminScope, internalScope, unsafeUnscopedClient, withScope, uuidv7 } from '@lsi/persistence';
+import { adminScope, internalScope, withScope, uuidv7 } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
 let app: INestApplication; let fx: TwoCustomerFixture;
-const db = unsafeUnscopedClient;
 
 async function auditCount(tenantId: string, action?: string) {
   const rows = action

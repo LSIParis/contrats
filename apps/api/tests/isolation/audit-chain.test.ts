@@ -1,18 +1,15 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { unsafeUnscopedClient, withScope, adminScope, uuidv7 } from '@lsi/persistence';
+import { withScope, adminScope, uuidv7, appendAudit, verifyAuditChain } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
 let fx: TwoCustomerFixture;
-const db = unsafeUnscopedClient;
 
-async function append(tenantId: string, action: string, after: unknown, actorUserId: string) {
-  const rows = await db.$queryRaw<{ app_append_audit: string }[]>`
-    SELECT app_append_audit(
-      ${uuidv7()}::uuid, ${tenantId}::uuid, ${null}::uuid,
-      ${actorUserId}::uuid, 'INTERNAL', ${null}::text, ${null}::text,
-      ${action}, 'contract', ${null}::uuid,
-      ${JSON.stringify(after)}::jsonb, ${null}::text, now()::timestamptz)`;
-  return rows[0].app_append_audit;
+async function append(tenantId: string, action: string, after: unknown, actorUserId: string, occurredAt = new Date()) {
+  return appendAudit({
+    tenantId, customerId: null, actorUserId, actorKind: 'INTERNAL',
+    actorIp: null, actorUserAgent: null, action, resourceType: 'contract',
+    resourceId: null, after, requestId: null, occurredAt,
+  });
 }
 
 beforeAll(async () => { fx = await seedTwoCustomers(); });
@@ -31,9 +28,7 @@ describe('chaîne d’audit', () => {
         SELECT prev_hash, hash FROM audit_logs WHERE tenant_id = ${fx.tenantId}::uuid ORDER BY seq ASC`,
     );
     expect(rows.at(-1)!.prev_hash).toBe(rows.at(-2)!.hash); // chaînage
-    const v = await db.$queryRaw<{ app_verify_audit_chain: string | null }[]>`
-      SELECT app_verify_audit_chain(${fx.tenantId}::uuid)`;
-    expect(v[0].app_verify_audit_chain).toBeNull();
+    expect(await verifyAuditChain(fx.tenantId)).toBeNull();
   });
 
   test('appends au même occurred_at ne forkent pas la chaîne (ordre = seq, pas id)', async () => {
@@ -41,17 +36,11 @@ describe('chaîne d’audit', () => {
     // (chaînage ordonné par occurred_at/id), l'ordre de parcours divergeait de
     // l'ordre d'append → faux positif quasi systématique. Avec `seq` (assigné
     // sous le verrou), l'ordre de chaîne suit l'ordre d'append : intègre.
-    const ts = '2020-01-01T00:00:00.000Z';
+    const ts = new Date('2020-01-01T00:00:00.000Z');
     for (let i = 0; i < 6; i++) {
-      await db.$queryRaw`
-        SELECT app_append_audit(${uuidv7()}::uuid, ${fx.tenantId}::uuid, ${null}::uuid,
-          ${fx.adminUserId}::uuid, 'INTERNAL', ${null}::text, ${null}::text,
-          ${'SAME_TS_' + i}::text, 'contract', ${null}::uuid,
-          ${'{}'}::jsonb, ${null}::text, ${ts}::timestamptz)`;
+      await append(fx.tenantId, `SAME_TS_${i}`, {}, fx.adminUserId, ts);
     }
-    const v = await db.$queryRaw<{ app_verify_audit_chain: string | null }[]>`
-      SELECT app_verify_audit_chain(${fx.tenantId}::uuid)`;
-    expect(v[0].app_verify_audit_chain).toBeNull();
+    expect(await verifyAuditChain(fx.tenantId)).toBeNull();
   });
 
   test('une entrée au hash falsifié est détectée par verify', async () => {
@@ -65,8 +54,6 @@ describe('chaîne d’audit', () => {
         VALUES (${badId}::uuid, ${fx.tenantId}::uuid, ${null}::uuid, ${fx.adminUserId}::uuid, 'INTERNAL',
           'FORGED', 'contract', now()::timestamptz, 'deadbeef', ${'0'.repeat(64)})`,
     );
-    const v = await db.$queryRaw<{ app_verify_audit_chain: string | null }[]>`
-      SELECT app_verify_audit_chain(${fx.tenantId}::uuid)`;
-    expect(v[0].app_verify_audit_chain).toBe(badId);
+    expect(await verifyAuditChain(fx.tenantId)).toBe(badId);
   });
 });

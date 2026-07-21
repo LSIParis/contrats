@@ -4,15 +4,16 @@ import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
-import { adminScope, internalScope, unsafeUnscopedClient, withScope, uuidv7 } from '@lsi/persistence';
+import { adminScope, internalScope, appendAudit } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
 let app: INestApplication; let fx: TwoCustomerFixture;
-const db = unsafeUnscopedClient;
 async function append(tenantId: string, action: string, actor: string) {
-  await db.$queryRaw`SELECT app_append_audit(${uuidv7()}::uuid, ${tenantId}::uuid, ${null}::uuid,
-    ${actor}::uuid, 'INTERNAL', ${null}::text, ${null}::text, ${action}::text, 'contract', ${null}::uuid,
-    ${'{}'}::jsonb, ${null}::text, now()::timestamptz)`;
+  await appendAudit({
+    tenantId, customerId: null, actorUserId: actor, actorKind: 'INTERNAL',
+    actorIp: null, actorUserAgent: null, action, resourceType: 'contract',
+    resourceId: null, after: {}, requestId: null, occurredAt: new Date(),
+  });
 }
 
 beforeAll(async () => {
