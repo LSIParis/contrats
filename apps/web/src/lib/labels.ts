@@ -81,3 +81,7 @@ export const contractCategoryLabel = (s: string): string => CONTRACT_CATEGORY_FR
 export const billingFrequencyLabel = (s: string): string => BILLING_FREQUENCY_FR[s] ?? s;
 export const roleLabel = (s: string): string => ROLE_FR[s] ?? s;
 export const userKindLabel = (s: string): string => USER_KIND_FR[s] ?? s;
+
+export function commentAuthorLabel(kind: string): string {
+  return kind === 'CLIENT' ? 'Vous' : 'LSI';
+}
