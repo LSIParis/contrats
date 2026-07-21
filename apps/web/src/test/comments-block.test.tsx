@@ -26,6 +26,28 @@ test('choisir SHARED affiche un avertissement « visible du client »', async ()
   expect(screen.getByText(/visible du client/i)).toBeInTheDocument();
 });
 
+function stubWithMe(roles: string[]) {
+  const item = { id: 'm1', body: 'Note interne', visibility: 'INTERNAL', resolvedAt: null, editedAt: null, deletedAt: null, authorUserId: 'other', author: { fullName: 'Marc D.' }, createdAt: '2026-07-21T10:00:00Z' };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    const body = String(url).endsWith('/auth/me') ? { userId: 'me', roles } : { items: [item] };
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as never);
+}
+
+test('« Partager avec le client » n’apparaît que pour un rôle SHARE-capable', async () => {
+  stubWithMe(['ACCOUNT_MANAGER']);
+  wrap();
+  await waitFor(() => expect(screen.getByText('Note interne')).toBeInTheDocument());
+  expect(screen.getByText(/Partager avec le client/i)).toBeInTheDocument();
+});
+
+test('un TECHNICIAN ne voit pas « Partager avec le client »', async () => {
+  stubWithMe(['TECHNICIAN']);
+  wrap();
+  await waitFor(() => expect(screen.getByText('Note interne')).toBeInTheDocument());
+  expect(screen.queryByText(/Partager avec le client/i)).not.toBeInTheDocument();
+});
+
 test('un commentaire résolu est marqué, un supprimé affiche « message supprimé »', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ items: [
     { id: 'm1', body: 'Traité', visibility: 'INTERNAL', resolvedAt: '2026-07-21T10:00:00Z', editedAt: null, deletedAt: null, author: { fullName: 'Marc D.' }, createdAt: '2026-07-21T09:00:00Z' },

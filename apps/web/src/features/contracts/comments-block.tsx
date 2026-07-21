@@ -18,13 +18,17 @@ interface Comment {
   deletedAt: string | null;
 }
 
+const SHARE_ROLES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER'];
+
 export function CommentsBlock({ contractId }: { contractId: string }) {
   const qc = useQueryClient();
   const me = useMe();
+  const canShare = me.data?.roles?.some((r) => SHARE_ROLES.includes(r)) ?? false;
   const [draft, setDraft] = useState('');
   const [visibility, setVisibility] = useState<'INTERNAL' | 'SHARED'>('INTERNAL');
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ['comments', contractId],
     queryFn: () => apiGet<{ items: Comment[] }>(`/v1/contracts/${contractId}/comments`),
@@ -34,7 +38,10 @@ export function CommentsBlock({ contractId }: { contractId: string }) {
       apiPost(`/v1/contracts/${contractId}/comments`, payload),
     onSuccess: () => { setDraft(''); setVisibility('INTERNAL'); qc.invalidateQueries({ queryKey: ['comments', contractId] }); },
   });
-  const act = (fn: () => Promise<unknown>) => { fn().then(() => qc.invalidateQueries({ queryKey: ['comments', contractId] })); };
+  const act = (fn: () => Promise<unknown>) =>
+    fn()
+      .then(() => { setActionError(null); qc.invalidateQueries({ queryKey: ['comments', contractId] }); })
+      .catch(() => setActionError('Action impossible sur ce commentaire.'));
   const resolve = (id: string, on: boolean) =>
     act(() => apiPost(`/v1/contracts/${contractId}/comments/${id}/${on ? 'resolve' : 'unresolve'}`, {}));
   const share = (id: string) => {
@@ -46,8 +53,11 @@ export function CommentsBlock({ contractId }: { contractId: string }) {
     if (confirm('Supprimer ce commentaire ?')) act(() => apiDelete(`/v1/contracts/${contractId}/comments/${id}`));
   };
   const saveEdit = (id: string, body: string) => {
-    act(() => apiPatch(`/v1/contracts/${contractId}/comments/${id}`, { body }));
-    setEditing(null);
+    // On ne referme l'édition qu'après succès (sinon l'ancien corps réapparaît
+    // brièvement avant le refetch, et un échec perdrait la saisie).
+    apiPatch(`/v1/contracts/${contractId}/comments/${id}`, { body })
+      .then(() => { setEditing(null); setActionError(null); qc.invalidateQueries({ queryKey: ['comments', contractId] }); })
+      .catch(() => setActionError('Modification impossible.'));
   };
   const items = q.data?.items ?? [];
   return (
@@ -97,7 +107,7 @@ export function CommentsBlock({ contractId }: { contractId: string }) {
                       <button type="button" className="text-lsi underline" onClick={() => resolve(c.id, !c.resolvedAt)}>
                         {c.resolvedAt ? 'Rouvrir' : 'Résoudre'}
                       </button>
-                      {c.visibility === 'INTERNAL' && (
+                      {c.visibility === 'INTERNAL' && canShare && (
                         <button type="button" className="text-lsi underline" onClick={() => share(c.id)}>
                           Partager avec le client
                         </button>
@@ -144,6 +154,7 @@ export function CommentsBlock({ contractId }: { contractId: string }) {
         <p className="mt-2 text-sm text-amber-700">⚠ Ce commentaire sera visible du client dans son portail.</p>
       )}
       {send.isError && <p className="mt-2 text-sm text-red-600">Publication impossible.</p>}
+      {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
     </Card>
   );
 }
