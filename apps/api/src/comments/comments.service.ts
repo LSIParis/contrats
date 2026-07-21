@@ -76,6 +76,7 @@ export class CommentsService {
   async share(scope: Scope, contractId: string, commentId: string, now: Date) {
     return withScope(scope, async (tx) => {
       const cm = await this.loadComment(tx, contractId, commentId);
+      if (cm.deletedAt) throw new ConflictException({ code: 'COMMENT_DELETED', detail: 'Commentaire supprimé.' });
       if (cm.visibility === 'SHARED') throw new ConflictException({ code: 'ALREADY_SHARED', detail: 'Commentaire déjà partagé.' });
       await tx.comment.update({ where: { id: commentId }, data: { visibility: 'SHARED', updatedAt: now } });
       return { ok: true as const };

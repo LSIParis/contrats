@@ -97,4 +97,13 @@ describe('commentaires — actions & états', () => {
     const c = await seedContract(); const m = await seedComment(c, fx.amUserId, 'INTERNAL');
     await req('sess-tech', 'delete', `/v1/contracts/${c}/comments/${m}`).expect(403);
   });
+
+  test('partager un commentaire supprimé → 409 (pas de divulgation d’existence)', async () => {
+    const c = await seedContract(); const m = await seedComment(c, fx.amUserId, 'INTERNAL');
+    await req('sess-am-a', 'delete', `/v1/contracts/${c}/comments/${m}`).expect(200);
+    await req('sess-am-a', 'patch', `/v1/contracts/${c}/comments/${m}/share`).expect(409);
+    // le commentaire reste INTERNAL (non partagé au client)
+    const list = await req('sess-am-a', 'get', `/v1/contracts/${c}/comments`).expect(200);
+    expect(list.body.items.find((i: any) => i.id === m).visibility).toBe('INTERNAL');
+  });
 });
