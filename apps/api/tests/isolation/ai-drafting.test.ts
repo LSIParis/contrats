@@ -24,7 +24,7 @@ beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CONTRACT_DRAFTER).useValue(stubDrafter).compile();
   app = mod.createNestApplication();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   await app.init();
   fx = await seedTwoCustomers();
   const s = app.get(SessionService);

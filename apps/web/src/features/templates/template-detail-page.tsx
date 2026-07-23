@@ -104,6 +104,12 @@ export function TemplateDetailPage() {
             error={aiDraft.error instanceof ApiError ? aiDraft.error.message : aiDraft.error ? 'Erreur.' : undefined}
             onGenerate={(input) => aiDraft.mutate(input)}
           />
+          {aiDraft.data && aiDraft.data.suggestedVariables.length > 0 && (
+            <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm">
+              <span className="font-medium text-gray-700">Variables détectées : </span>
+              <span className="text-gray-600">{aiDraft.data.suggestedVariables.join(', ')}</span>
+            </div>
+          )}
         </Card>
       )}
       <Card title="Versions">
