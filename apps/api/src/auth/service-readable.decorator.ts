@@ -8,5 +8,5 @@ import { SetMetadata } from '@nestjs/common';
  * service — explicite et greppable, pour que la surface exposée à la clé
  * reste exactement l'ensemble des routes revues.
  */
-export const IS_SERVICE_READABLE_KEY = 'isServiceReadable';
+export const IS_SERVICE_READABLE_KEY = 'lsi:isServiceReadable';
 export const ServiceReadable = () => SetMetadata(IS_SERVICE_READABLE_KEY, true);

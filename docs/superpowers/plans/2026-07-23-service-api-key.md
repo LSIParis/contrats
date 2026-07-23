@@ -60,7 +60,7 @@ import { SetMetadata } from '@nestjs/common';
  * service — explicite et greppable, pour que la surface exposée à la clé
  * reste exactement l'ensemble des routes revues.
  */
-export const IS_SERVICE_READABLE_KEY = 'isServiceReadable';
+export const IS_SERVICE_READABLE_KEY = 'lsi:isServiceReadable';
 export const ServiceReadable = () => SetMetadata(IS_SERVICE_READABLE_KEY, true);
 ```
 
@@ -89,7 +89,7 @@ Add the decorator above the two GET handlers (leave everything else unchanged):
 - [ ] **Step 3: Typecheck + confirm no regression**
 
 ```bash
-pnpm --filter @lsi/api typecheck
+pnpm --filter @lsi/api exec tsc --noEmit
 pnpm --filter @lsi/api test -- --run tests/isolation/client-portal-guard.test.ts
 ```
 Expected: typecheck clean ; the existing guard test still passes (the decorator is inert until Task 2 wires the guard to read it).
@@ -305,7 +305,7 @@ Expected: 5 tests PASS (valid key sees both contracts ; invalid/absent → 401 ;
 - [ ] **Step 5: Run the FULL suite + typecheck to confirm no regression**
 
 ```bash
-pnpm --filter @lsi/api typecheck
+pnpm --filter @lsi/api exec tsc --noEmit
 pnpm --filter @lsi/api test -- --run
 ```
 Expected: all tests green, including `tests/structural/scope-surface.test.ts` (unchanged public surface) and the ~200 isolation tests (unaffected — none send `x-api-key`).
@@ -398,7 +398,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 - [ ] **Step 3: Typecheck + commit**
 
 ```bash
-pnpm --filter @lsi/api typecheck
+pnpm --filter @lsi/api exec tsc --noEmit
 git add .env.example apps/api/scripts/seed-demo-contracts.ts
 git commit -m "chore(auth): document CONTRACT_SERVICE_API_KEY + optional demo-contracts seed"
 ```
