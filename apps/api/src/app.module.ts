@@ -68,6 +68,11 @@ import { AuditController } from './audit/audit.controller.js';
 import { AuditReadService } from './audit/audit-read.service.js';
 import { TemplatesController } from './templates/templates.controller.js';
 import { TemplatesService } from './templates/templates.service.js';
+import { AiDraftingController } from './ai-drafting/ai-drafting.controller.js';
+import { AiDraftingService } from './ai-drafting/ai-drafting.service.js';
+import { CONTRACT_DRAFTER } from './ai-drafting/contract-drafter.port.js';
+import { ClaudeContractDrafter } from './ai-drafting/claude-contract-drafter.js';
+import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-drafter.js';
 
 @Module({
   imports: [
@@ -137,6 +142,7 @@ import { TemplatesService } from './templates/templates.service.js';
     AuditController,
     HealthController,
     TemplatesController,
+    AiDraftingController,
   ],
   providers: [
     ContractsService,
@@ -152,6 +158,15 @@ import { TemplatesService } from './templates/templates.service.js';
     AuditService,
     AuditReadService,
     TemplatesService,
+    AiDraftingService,
+    {
+      // Claude si la clé est fournie (prod), sinon un adaptateur qui renvoie 503.
+      // Le service dépend du PORT, pas de l'adaptateur : en test, le port est
+      // overridé par un stub. `new Anthropic()` (dans ClaudeContractDrafter) n'est
+      // instancié que si ANTHROPIC_API_KEY est présente, jamais en CI.
+      provide: CONTRACT_DRAFTER,
+      useFactory: () => (process.env.ANTHROPIC_API_KEY ? new ClaudeContractDrafter() : new UnavailableContractDrafter()),
+    },
     RedisProvider,
     SessionService,
     MagicLinkService,
