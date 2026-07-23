@@ -71,4 +71,17 @@ describe('bibliothèque de modèles', () => {
     await req('sess-am', 'get', '/v1/templates').expect(403);
     await req('sess-admin', 'get', '/v1/templates/00000000-0000-7000-8000-000000000000').expect(404);
   });
+
+  test('re-publier est idempotent (ne réécrit pas la provenance) ; un déprécié ne se publie pas', async () => {
+    const id = await newTemplate();
+    await req('sess-admin', 'put', `/v1/templates/${id}/content`).send({ bodyHtml: '<p>Corps</p>' }).expect(200);
+    await req('sess-admin', 'post', `/v1/templates/${id}/publish`).expect(201);
+    const first = (await req('sess-admin', 'get', `/v1/templates/${id}`).expect(200)).body.currentVersion.publishedAt;
+    await req('sess-admin', 'post', `/v1/templates/${id}/publish`).expect(201); // ré-appel
+    const again = (await req('sess-admin', 'get', `/v1/templates/${id}`).expect(200)).body.currentVersion.publishedAt;
+    expect(again).toBe(first); // provenance inchangée
+    // déprécier puis publier → 409
+    await req('sess-admin', 'post', `/v1/templates/${id}/deprecate`).expect(201);
+    await req('sess-admin', 'post', `/v1/templates/${id}/publish`).expect(409);
+  });
 });

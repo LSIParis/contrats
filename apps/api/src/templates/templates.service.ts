@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { withScope, uuidv7, type Scope } from '@lsi/persistence';
 import { sanitizeContractHtml } from '../documents/html-sanitizer.js';
 
@@ -93,9 +93,14 @@ export class TemplatesService {
   async publish(scope: Scope, id: string, now: Date, userId: string) {
     return withScope(scope, async (tx) => {
       const t = await this.load(tx, id);
+      if (t.status === 'DEPRECATED') throw new ConflictException({ code: 'DEPRECATED', detail: 'Un modèle déprécié ne peut pas être publié.' });
       if (!t.currentVersionId) throw new BadRequestException('Aucune version à publier.');
-      const cur = await tx.contractTemplateVersion.findUnique({ where: { id: t.currentVersionId }, select: { id: true, bodyHtml: true } });
-      if (!cur || cur.bodyHtml.trim() === '') throw new BadRequestException('Corps vide : rien à publier.');
+      const cur = await tx.contractTemplateVersion.findUnique({ where: { id: t.currentVersionId }, select: { id: true, bodyHtml: true, isImmutable: true } });
+      if (!cur) throw new BadRequestException('Aucune version à publier.');
+      // Idempotent : re-publier un modèle déjà publié ne RÉÉCRIT PAS la
+      // provenance (publishedAt/publishedByUserId) d'une version figée.
+      if (t.status === 'PUBLISHED' && cur.isImmutable) return { ok: true as const };
+      if (cur.bodyHtml.trim() === '') throw new BadRequestException('Corps vide : rien à publier.');
       await tx.contractTemplateVersion.update({ where: { id: cur.id }, data: { isImmutable: true, publishedAt: now, publishedByUserId: userId } });
       await tx.contractTemplate.update({ where: { id }, data: { status: 'PUBLISHED', updatedAt: now } });
       return { ok: true as const };
