@@ -84,6 +84,13 @@ export const signerStatusLabel = (s: string): string => SIGNER_STATUS_FR[s] ?? s
 export const reminderStatusLabel = (s: string): string => REMINDER_STATUS_FR[s] ?? s;
 export const partyLabel = (s: string): string => PARTY_FR[s] ?? s;
 export const contractCategoryLabel = (s: string): string => CONTRACT_CATEGORY_FR[s] ?? s;
+
+const TEMPLATE_STATUS_FR: Record<string, string> = {
+  DRAFT: 'Brouillon',
+  PUBLISHED: 'Publié',
+  DEPRECATED: 'Déprécié',
+};
+export const templateStatusLabel = (s: string): string => TEMPLATE_STATUS_FR[s] ?? s;
 export const billingFrequencyLabel = (s: string): string => BILLING_FREQUENCY_FR[s] ?? s;
 export const roleLabel = (s: string): string => ROLE_FR[s] ?? s;
 export const userKindLabel = (s: string): string => USER_KIND_FR[s] ?? s;

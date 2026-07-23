@@ -12,6 +12,8 @@ import { CustomerNewPage } from './features/customers/customer-new-page.js';
 import { CustomerDetailPage } from './features/customers/customer-detail-page.js';
 import { UsersPage } from './features/users/users-page.js';
 import { AuditPage } from './features/audit/audit-page.js';
+import { TemplatesPage } from './features/templates/templates-page.js';
+import { TemplateDetailPage } from './features/templates/template-detail-page.js';
 import { PortalApp } from './portal/portal-app.js';
 
 function InternalRoutes() {
@@ -31,6 +33,8 @@ function InternalRoutes() {
         <Route path="/reminders" element={<div>Rappels</div>} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/templates/:id" element={<TemplateDetailPage />} />
       </Route>
     </Routes>
   );
