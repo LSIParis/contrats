@@ -5,7 +5,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { timingSafeEqual } from 'node:crypto';
+import { adminScope, findTenantBySlug } from '@lsi/persistence';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
+import { IS_SERVICE_READABLE_KEY } from './service-readable.decorator.js';
 import { SessionService, type Session } from './session.service.js';
 import { SESSION_COOKIE } from './cookie.js';
 
@@ -13,7 +16,6 @@ export interface ScopedRequest {
   session?: Session;
   cookies?: Record<string, string>;
   headers: Record<string, string | string[] | undefined>;
-  /** Posé par Express ; utilisé par ClientPortalGuard pour confiner /v1/portal/*. */
   path?: string;
   url?: string;
 }
@@ -21,15 +23,14 @@ export interface ScopedRequest {
 /**
  * Guard GLOBAL de scope. (§10.5)
  *
- * Enregistré via APP_GUARD : il s'applique à TOUTES les routes, présentes et
- * futures. C'est la raison principale du choix NestJS plutôt que Next.js
- * (§9.2) : avec des route handlers, le scoping serait une convention — 35
- * handlers, 35 occasions d'oublier, et l'oubli ne casse rien, il élargit
- * silencieusement le périmètre. Ici, une route nouvelle est gardée par
- * défaut ; s'en soustraire exige @Public(), qui est visible en revue.
+ * Deux chemins d'authentification :
+ *  1. Cookie de session (SSO M365) — prioritaire, inchangé.
+ *  2. Clé d'API de service (header X-Api-Key), UNIQUEMENT sur les routes
+ *     @ServiceReadable() (lecture seule des contrats), pour l'intégration
+ *     serveur-à-serveur du ticketing.
  *
- * Le scope N'EST JAMAIS lu depuis la requête (RM-29) : ni URL, ni body, ni
- * query, ni header. Il vient de la session serveur, résolue au login.
+ * Le scope N'EST JAMAIS lu depuis la requête (RM-29) : il vient de la session
+ * serveur (cookie) ou d'un scope de service dérivé en base (clé d'API).
  */
 @Injectable()
 export class ScopeGuard implements CanActivate {
@@ -46,28 +47,70 @@ export class ScopeGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = ctx.switchToHttp().getRequest<ScopedRequest>();
+
+    // Chemin 1 : cookie de session, prioritaire et inchangé.
     const sessionId = this.readSessionCookie(req);
-    if (!sessionId) throw new UnauthorizedException('Session absente');
+    if (sessionId) {
+      const session = await this.sessions.get(sessionId);
+      if (!session) throw new UnauthorizedException('Session invalide ou expirée');
+      req.session = session;
+      return true;
+    }
 
-    // Lecture Redis à CHAQUE requête : c'est ce qui donne la révocation
-    // immédiate et un scope toujours frais (EC-17). Une session révoquée
-    // n'existe plus, la requête est refusée.
-    const session = await this.sessions.get(sessionId);
-    if (!session) throw new UnauthorizedException('Session invalide ou expirée');
+    // Chemin 2 : clé d'API de service, bornée aux routes @ServiceReadable.
+    const apiKey = this.readApiKey(req);
+    if (apiKey) {
+      const isServiceReadable = this.reflector.getAllAndOverride<boolean>(
+        IS_SERVICE_READABLE_KEY,
+        [ctx.getHandler(), ctx.getClass()],
+      );
+      if (!isServiceReadable) {
+        throw new UnauthorizedException('Clé API non autorisée sur cette route');
+      }
+      const expected = process.env.CONTRACT_SERVICE_API_KEY;
+      // Jamais valide sans configuration : la clé ne « marche » pas par défaut.
+      if (!expected || !this.constantTimeEquals(apiKey, expected)) {
+        throw new UnauthorizedException('Clé API invalide');
+      }
+      req.session = await this.buildServiceSession();
+      return true;
+    }
 
-    req.session = session;
-    return true;
+    throw new UnauthorizedException('Session absente');
   }
 
   private readSessionCookie(req: ScopedRequest): string | undefined {
-    // Cookie de session (nom centralisé : __Host-lsi_sess en prod, lsi_sess
-    // en dev — voir cookie.ts). Le préfixe __Host- interdit qu'un
-    // sous-domaine le pose et impose Secure + Path=/ (§13.1).
     const fromCookie = req.cookies?.[SESSION_COOKIE];
     if (fromCookie) return fromCookie;
-
-    // Utilisé par certains tests ; en production le cookie est seul.
     const h = req.headers['x-lsi-session'];
     return typeof h === 'string' ? h : undefined;
+  }
+
+  private readApiKey(req: ScopedRequest): string | undefined {
+    const h = req.headers['x-api-key'];
+    return typeof h === 'string' ? h : undefined;
+  }
+
+  /** Comparaison à temps constant (cf. docuseal.adapter) : un === fuit la
+   * position du premier octet divergent. */
+  private constantTimeEquals(a: string, b: string): boolean {
+    const ba = Buffer.from(a, 'utf8');
+    const bb = Buffer.from(b, 'utf8');
+    if (ba.length !== bb.length) return false;
+    return timingSafeEqual(ba, bb);
+  }
+
+  /** Session de service : scope admin (allCustomers) sur le tenant par défaut,
+   * résolu en base comme au login. Read-only garanti par @ServiceReadable. */
+  private async buildServiceSession(): Promise<Session> {
+    const tenantId = await findTenantBySlug(process.env.DEFAULT_TENANT_SLUG ?? 'lsi');
+    if (!tenantId) throw new UnauthorizedException('Tenant de service introuvable');
+    return {
+      sessionId: 'service:ticketing',
+      userId: 'service:ticketing',
+      tenantId,
+      roles: [],
+      scope: adminScope(tenantId, 'service:ticketing'),
+    };
   }
 }
