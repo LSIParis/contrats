@@ -20,6 +20,7 @@ import { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import { RefuseRenewalDto } from './dto/refuse-renewal.dto.js';
 import { AmendContractDto } from './dto/amend-contract.dto.js';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { ServiceReadable } from '../auth/service-readable.decorator.js';
 import type { Session } from '../auth/session.service.js';
 import { IsString, MinLength } from 'class-validator';
 
@@ -59,11 +60,13 @@ export class ContractsController {
   }
 
   @Get()
+  @ServiceReadable()
   async list(@CurrentScope() scope: Scope, @Query() q: ListContractsDto) {
     return this.contracts.list(scope, q);
   }
 
   @Get(':id')
+  @ServiceReadable()
   async findOne(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
     // 404 si hors scope, jamais 403 : un 403 confirmerait l'existence et
     // transformerait l'API en oracle d'énumération (RM-30).
