@@ -479,10 +479,10 @@ Expected: PASS (4 tests).
 Run:
 ```bash
 pnpm --filter @lsi/api test -- templates
-pnpm --filter @lsi/api typecheck
+pnpm --filter @lsi/api exec tsc --noEmit
 pnpm lint
 ```
-Expected: tout PASS. (Le typecheck valide le binding SDK de `ClaudeContractDrafter` — appliquer la variante de repli de l'étape 5 s'il échoue dessus.)
+Expected: tout PASS. (`apps/api` n'a pas de script `typecheck` — utiliser `exec tsc --noEmit`. Le typecheck valide le binding SDK de `ClaudeContractDrafter` — appliquer la variante de repli de l'étape 5 s'il échoue dessus.)
 
 - [ ] **Step 10: Scanner le diff pour tout secret, puis commit**
 
