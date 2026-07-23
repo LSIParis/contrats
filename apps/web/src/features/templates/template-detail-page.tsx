@@ -7,6 +7,7 @@ import { Button } from '../../ui/button.js';
 import { Card } from '../../ui/card.js';
 import { Table } from '../../ui/table.js';
 import { contractCategoryLabel, templateStatusLabel } from '../../lib/labels.js';
+import { AiDraftPanel } from './ai-draft-panel.js';
 
 interface CurrentVersion {
   id: string; versionNumber: number; bodyHtml: string; isImmutable: boolean; publishedAt: string | null;
@@ -39,6 +40,12 @@ export function TemplateDetailPage() {
   const deprecate = useMutation({
     mutationFn: () => apiPost<{ ok: true }>(`/v1/templates/${id}/deprecate`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['template', id] }),
+  });
+
+  const aiDraft = useMutation({
+    mutationFn: (input: { prompt: string; context?: string }) =>
+      apiPost<{ bodyHtml: string; suggestedVariables: string[] }>(`/v1/templates/ai-draft`, { ...input, category: q.data!.category }),
+    onSuccess: (data) => setBodyHtml(data.bodyHtml),
   });
 
   if (q.isLoading) return <Spinner />;
@@ -90,6 +97,15 @@ export function TemplateDetailPage() {
           {deprecateError && <p className="text-sm text-red-600">{deprecateError}</p>}
         </div>
       </Card>
+      {t.currentVersion && !t.currentVersion.isImmutable && (
+        <Card title="Rédiger avec l'IA">
+          <AiDraftPanel
+            generating={aiDraft.isPending}
+            error={aiDraft.error instanceof ApiError ? aiDraft.error.message : aiDraft.error ? 'Erreur.' : undefined}
+            onGenerate={(input) => aiDraft.mutate(input)}
+          />
+        </Card>
+      )}
       <Card title="Versions">
         {t.versions.length === 0 ? (
           <p className="text-gray-400">Aucune version.</p>
