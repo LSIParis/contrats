@@ -66,6 +66,8 @@ import { AuditService } from './audit/audit.service.js';
 import { AuditInterceptor } from './audit/audit.interceptor.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditReadService } from './audit/audit-read.service.js';
+import { TemplatesController } from './templates/templates.controller.js';
+import { TemplatesService } from './templates/templates.service.js';
 
 @Module({
   imports: [
@@ -134,6 +136,7 @@ import { AuditReadService } from './audit/audit-read.service.js';
     NotificationsController,
     AuditController,
     HealthController,
+    TemplatesController,
   ],
   providers: [
     ContractsService,
@@ -148,6 +151,7 @@ import { AuditReadService } from './audit/audit-read.service.js';
     NotificationsService,
     AuditService,
     AuditReadService,
+    TemplatesService,
     RedisProvider,
     SessionService,
     MagicLinkService,
