@@ -16,6 +16,7 @@ export interface ScopedRequest {
   session?: Session;
   cookies?: Record<string, string>;
   headers: Record<string, string | string[] | undefined>;
+  /** Posé par Express ; utilisé par ClientPortalGuard pour confiner /v1/portal/*. */
   path?: string;
   url?: string;
 }
