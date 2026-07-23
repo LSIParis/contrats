@@ -318,8 +318,10 @@ describe('aide IA à la rédaction', () => {
 
 - [ ] **Step 3: Lancer le test pour vérifier l'échec**
 
-Run: `pnpm --filter @lsi/api test:integration -- ai-drafting`
+Run: `pnpm --filter @lsi/api test -- ai-drafting`
 Expected: FAIL (module `ai-draft.dto`/contrôleur introuvable, ou route 404).
+
+> Les tests d'isolation (`tests/isolation/**`) tournent via le script **`test`** (config par défaut, `globalSetup` Testcontainers) — PAS `test:integration`, dont la config ne matche que `tests/integration/**`.
 
 - [ ] **Step 4: Créer le DTO**
 
@@ -469,14 +471,14 @@ AiDraftingService,
 
 - [ ] **Step 8: Lancer le test d'isolation (succès attendu)**
 
-Run: `pnpm --filter @lsi/api test:integration -- ai-drafting`
+Run: `pnpm --filter @lsi/api test -- ai-drafting`
 Expected: PASS (4 tests).
 
 - [ ] **Step 9: Non-régression des modèles + typecheck + lint**
 
 Run:
 ```bash
-pnpm --filter @lsi/api test:integration -- templates
+pnpm --filter @lsi/api test -- templates
 pnpm --filter @lsi/api typecheck
 pnpm lint
 ```
