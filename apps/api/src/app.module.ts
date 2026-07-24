@@ -48,6 +48,8 @@ import { SignatureActionsService } from './signature/signature-actions.service.j
 import { ESIGNATURE_PROVIDER } from './signature/provider.token.js';
 import { DOCUMENT_RENDERER } from './documents/renderer.token.js';
 import { GotenbergRenderer } from './documents/gotenberg.renderer.js';
+import { DOCX_RENDERER } from './documents/docx-renderer.port.js';
+import { HtmlToDocxRenderer } from './documents/html-to-docx.renderer.js';
 import { DOCUMENT_STORAGE } from './documents/document-storage.port.js';
 import { S3Storage } from './documents/s3-storage.js';
 import { InMemoryStorage } from './documents/in-memory-storage.js';
@@ -204,6 +206,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     // et ce qui permet de tester la logique d'envoi sans DocuSeal ni Chromium.
     { provide: ESIGNATURE_PROVIDER, useExisting: DocusealAdapter },
     { provide: DOCUMENT_RENDERER, useClass: GotenbergRenderer },
+    { provide: DOCX_RENDERER, useClass: HtmlToDocxRenderer },
     {
       // LE point clé de l'architecture (§9.2, §10.5).
       //

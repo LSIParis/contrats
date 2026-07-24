@@ -9,11 +9,16 @@ import { withScope, uuidv7, type Scope } from '@lsi/persistence';
 import { EDITABLE_STATUSES, type DocumentRenderer } from '@lsi/domain';
 import { sanitizeContractHtml } from '../documents/html-sanitizer.js';
 import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
+import { DOCX_RENDERER } from '../documents/docx-renderer.port.js';
+import type { DocxRenderer } from '../documents/docx-renderer.port.js';
 import type { SaveContentDto } from './dto/save-content.dto.js';
 
 @Injectable()
 export class ContentService {
-  constructor(@Inject(DOCUMENT_RENDERER) private readonly renderer: DocumentRenderer) {}
+  constructor(
+    @Inject(DOCUMENT_RENDERER) private readonly renderer: DocumentRenderer,
+    @Inject(DOCX_RENDERER) private readonly docx: DocxRenderer,
+  ) {}
 
   async saveContent(scope: Scope, id: string, dto: SaveContentDto) {
     return withScope(scope, async (tx) => {
@@ -86,22 +91,28 @@ export class ContentService {
     });
   }
 
+  private async renderable(tx: any, id: string): Promise<{ html: string; title: string }> {
+    const c = await tx.contract.findUnique({ where: { id }, select: { id: true, title: true, currentVersionId: true } });
+    if (!c) throw new NotFoundException('Contrat introuvable');
+    if (!c.currentVersionId) throw new UnprocessableEntityException('Aucune version à exporter');
+    const version = await tx.contractVersion.findUnique({ where: { id: c.currentVersionId }, select: { bodyHtml: true } });
+    if (!version) throw new UnprocessableEntityException('Version introuvable');
+    return { html: version.bodyHtml, title: c.title };
+  }
+
   /** Rendu PDF de la version courante — via Gotenberg (aperçu, non signé). */
   async previewPdf(scope: Scope, id: string): Promise<Buffer> {
     return withScope(scope, async (tx) => {
-      const c = await tx.contract.findUnique({
-        where: { id },
-        select: { id: true, title: true, currentVersionId: true },
-      });
-      if (!c) throw new NotFoundException('Contrat introuvable');
-      if (!c.currentVersionId) throw new UnprocessableEntityException('Aucune version à prévisualiser');
-      const version = await tx.contractVersion.findUnique({
-        where: { id: c.currentVersionId },
-        select: { bodyHtml: true },
-      });
-      if (!version) throw new UnprocessableEntityException('Version introuvable');
-      const rendered = await this.renderer.render({ html: version.bodyHtml, documentTitle: c.title });
+      const { html, title } = await this.renderable(tx, id);
+      const rendered = await this.renderer.render({ html, documentTitle: title });
       return rendered.pdf;
+    });
+  }
+
+  async exportDocx(scope: Scope, id: string): Promise<Buffer> {
+    return withScope(scope, async (tx) => {
+      const { html, title } = await this.renderable(tx, id);
+      return this.docx.renderDocx(html, title);
     });
   }
 }

@@ -1,10 +1,18 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { withScope, uuidv7, type Scope } from '@lsi/persistence';
+import type { DocumentRenderer } from '@lsi/domain';
 import { sanitizeContractHtml } from '../documents/html-sanitizer.js';
 import { extractVariables, variablesSchemaOf } from './template-variables.js';
+import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
+import { DOCX_RENDERER, type DocxRenderer } from '../documents/docx-renderer.port.js';
 
 @Injectable()
 export class TemplatesService {
+  constructor(
+    @Inject(DOCUMENT_RENDERER) private readonly pdf: DocumentRenderer,
+    @Inject(DOCX_RENDERER) private readonly docx: DocxRenderer,
+  ) {}
+
   private async load(tx: any, id: string) {
     const t = await tx.contractTemplate.findUnique({
       where: { id },
@@ -99,6 +107,31 @@ export class TemplatesService {
       await this.load(tx, id);
       await tx.contractTemplate.update({ where: { id }, data: { status: 'DEPRECATED', updatedAt: now } });
       return { ok: true as const };
+    });
+  }
+
+  private async renderableOf(tx: any, id: string): Promise<{ html: string; title: string }> {
+    const t = await this.load(tx, id); // lève NotFound (404) hors scope — méthode privée existante
+    const cur = t.currentVersionId
+      ? await tx.contractTemplateVersion.findUnique({ where: { id: t.currentVersionId }, select: { bodyHtml: true } })
+      : null;
+    const html = cur?.bodyHtml ?? '';
+    if (html.trim() === '') throw new UnprocessableEntityException('Corps vide : rien à exporter.');
+    return { html, title: t.name };
+  }
+
+  async exportPdf(scope: Scope, id: string): Promise<Buffer> {
+    return withScope(scope, async (tx) => {
+      const { html, title } = await this.renderableOf(tx, id);
+      const rendered = await this.pdf.render({ html, documentTitle: title });
+      return rendered.pdf;
+    });
+  }
+
+  async exportDocx(scope: Scope, id: string): Promise<Buffer> {
+    return withScope(scope, async (tx) => {
+      const { html, title } = await this.renderableOf(tx, id);
+      return this.docx.renderDocx(html, title);
     });
   }
 }

@@ -99,6 +99,12 @@ export function TemplateDetailPage() {
               {deprecate.isPending ? 'Dépréciation…' : 'Déprécier'}
             </button>
           </div>
+          {t.currentVersion && (
+            <div className="flex flex-wrap gap-3 text-sm">
+              <a href={`/v1/templates/${t.id}/export.pdf`} className="text-lsi hover:underline">Télécharger PDF</a>
+              <a href={`/v1/templates/${t.id}/export.docx`} className="text-lsi hover:underline">Télécharger DOCX</a>
+            </div>
+          )}
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}
           {publishError && <p className="text-sm text-red-600">{publishError}</p>}
           {deprecateError && <p className="text-sm text-red-600">{deprecateError}</p>}
