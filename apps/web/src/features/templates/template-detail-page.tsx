@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPut, ApiError } from '../../lib/api.js';
@@ -50,6 +50,8 @@ export function TemplateDetailPage() {
       apiPost<{ bodyHtml: string; suggestedVariables: string[] }>(`/v1/templates/ai-draft`, { ...input, category: q.data!.category }),
     onSuccess: (data) => setInject((prev) => ({ html: data.bodyHtml, nonce: (prev?.nonce ?? 0) + 1 })),
   });
+
+  useEffect(() => { setInject(undefined); }, [id]);
 
   if (q.isLoading) return <Spinner />;
   if (q.error || !q.data) return <p className="text-red-600">Modèle introuvable.</p>;

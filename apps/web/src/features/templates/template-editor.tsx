@@ -12,7 +12,14 @@ interface Props {
 
 export function TemplateEditor({ initialHtml, onChange, onEmptyChange, inject }: Props) {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        horizontalRule: false,
+        codeBlock: false,
+        code: false,
+      }),
+    ],
     content: initialHtml,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
