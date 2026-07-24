@@ -9,6 +9,18 @@ function escapeHtml(s: string): string {
 }
 
 /**
+ * Retire les balises chargeant une ressource DISTANTE (<img>). Défense en
+ * profondeur : @turbodocx/html-to-docx va chercher les `<img src>` distants
+ * pour les embarquer (deps axios/follow-redirects), ce qui est une surface
+ * SSRF côté API. Le bodyHtml est déjà assaini en amont (allowlist du
+ * sanitizer SANS `img`), mais on ne dépend PAS de ce couplage : on strippe
+ * aussi ici, pour que ce renderer reste sûr même si l'allowlist change.
+ */
+export function stripRemoteResources(html: string): string {
+  return html.replace(/<img\b[^>]*>/gi, '');
+}
+
+/**
  * HTML → DOCX via @turbodocx/html-to-docx (pur JS). Le HTML reçu est déjà
  * assaini en amont. On l'enveloppe d'un document minimal (titre + police
  * serif) pour un rendu Word propre.
@@ -16,7 +28,8 @@ function escapeHtml(s: string): string {
 @Injectable()
 export class HtmlToDocxRenderer implements DocxRenderer {
   async renderDocx(html: string, title: string): Promise<Buffer> {
-    const doc = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${html}</body></html>`;
+    const safe = stripRemoteResources(html);
+    const doc = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${safe}</body></html>`;
     const out = await HTMLtoDOCX(doc, null, { title: escapeHtml(title), font: 'Georgia' });
     // La lib peut renvoyer un Buffer, un ArrayBuffer ou un Blob selon l'env.
     if (Buffer.isBuffer(out)) return out;
