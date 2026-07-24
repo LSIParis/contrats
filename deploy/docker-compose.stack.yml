@@ -192,6 +192,11 @@ services:
       BREVO_API_KEY: ${BREVO_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-contrats@lsi-maintenance.fr}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-LSI Maintenance}
+      # Aide IA à la rédaction de contrat (sous-projet B). OPTIONNEL : sans
+      # cette clé dans l'env de la stack, POST /v1/templates/ai-draft renvoie
+      # 503 (dégradation gracieuse) et le reste de l'app fonctionne. Secret :
+      # JAMAIS dans le dépôt (public) — uniquement dans l'env Portainer.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       # Lié UNIQUEMENT à l'IP du tunnel WireGuard (10.99.0.2 par défaut).
       # L'API n'est donc joignable QUE par nginx-pm via le tunnel chiffré,
