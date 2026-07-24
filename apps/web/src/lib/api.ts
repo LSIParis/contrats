@@ -38,6 +38,24 @@ export async function apiPost<T>(
   return res.json() as Promise<T>;
 }
 
+/** POST multipart (upload de fichier). Pas de Content-Type : le navigateur
+ *  pose lui-même le boundary `multipart/form-data`. */
+export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { accept: 'application/json' }, body: form });
+  if (res.status === 401) throw new Unauthorized();
+  if (!res.ok) {
+    let message = `Erreur ${res.status}`;
+    try {
+      const b = await res.json();
+      message = Array.isArray(b?.message) ? b.message.join(', ') : (b?.message ?? b?.detail ?? message);
+    } catch {
+      /* corps non-JSON : on garde le message par défaut */
+    }
+    throw new ApiError(res.status, message);
+  }
+  return res.json() as Promise<T>;
+}
+
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
     method: 'PUT',

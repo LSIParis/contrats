@@ -4,6 +4,7 @@ import { AppShell } from './shell/app-shell.js';
 import { DashboardPage } from './features/dashboard/dashboard-page.js';
 import { ContractsPage } from './features/contracts/contracts-page.js';
 import { ContractNewPage } from './features/contracts/contract-new-page.js';
+import { ContractImportPage } from './features/contracts/contract-import-page.js';
 import { ContractDetailPage } from './features/contracts/contract-detail-page.js';
 import { ContractEditPage } from './features/contracts/contract-edit-page.js';
 import { VersionsPage } from './features/contracts/versions-page.js';
@@ -27,6 +28,7 @@ function InternalRoutes() {
         <Route path="/customers/:id" element={<CustomerDetailPage />} />
         <Route path="/contracts" element={<ContractsPage />} />
         <Route path="/contracts/new" element={<ContractNewPage />} />
+        <Route path="/contracts/import" element={<ContractImportPage />} />
         <Route path="/contracts/:id/edit" element={<ContractEditPage />} />
         <Route path="/contracts/:id/versions" element={<VersionsPage />} />
         <Route path="/contracts/:id" element={<ContractDetailPage />} />

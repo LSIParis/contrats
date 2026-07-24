@@ -79,6 +79,11 @@ enum ContractType {
   AMENDMENT
 }
 
+enum ContractOrigin {
+  NATIVE
+  IMPORTED
+}
+
 /// §7.1. EXPIRING_SOON et ARCHIVED n'en font PAS partie :
 ///   - EXPIRING_SOON est dérivé de end_date (RM-02) — un état que seul un job
 ///     saurait produire ferait dépendre la vérité métier du scheduler.
@@ -429,6 +434,16 @@ model Contract {
   type      ContractType     @default(MAIN)
   status    ContractStatus   @default(DRAFT)
   category  ContractCategory @default(MAINTENANCE)
+
+  /// Provenance : NATIVE (créé dans l'app) vs IMPORTED (enregistré depuis
+  /// l'existant, signé hors application — pas de preuve DocuSeal).
+  origin ContractOrigin @default(NATIVE)
+
+  /// Document importé (PDF/DOCX signé hors app). NULL pour un contrat NATIVE.
+  importedDocumentKey         String? @map("imported_document_key")
+  importedDocumentName        String? @map("imported_document_name")
+  importedDocumentSha256      String? @map("imported_document_sha256") @db.Char(64)
+  importedDocumentContentType String? @map("imported_document_content_type")
 
   /// Référence FIGÉE vers la version de modèle utilisée. NULL si from scratch.
   /// Savoir quel texte type a servi est indispensable en litige.

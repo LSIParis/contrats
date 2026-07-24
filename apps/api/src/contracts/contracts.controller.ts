@@ -9,11 +9,17 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import type { Scope } from '@lsi/persistence';
 import { ContractsService } from './contracts.service.js';
 import { SendForSignatureService } from '../signature/send-for-signature.service.js';
 import { CreateContractDto } from './dto/create-contract.dto.js';
+import { ImportContractDto } from './dto/import-contract.dto.js';
 import { SendForSignatureDto } from './dto/send-for-signature.dto.js';
 import { ListContractsDto } from './dto/list-contracts.dto.js';
 import { TerminateContractDto } from './dto/terminate-contract.dto.js';
@@ -23,6 +29,7 @@ import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.
 import { ServiceReadable } from '../auth/service-readable.decorator.js';
 import type { Session } from '../auth/session.service.js';
 import { IsString, MinLength } from 'class-validator';
+import { slugifyFilename } from '../documents/filename.js';
 
 class ReasonDto {
   @IsString()
@@ -59,6 +66,21 @@ export class ContractsController {
     return this.contracts.create(scope, dto, new Date());
   }
 
+  @Post('import')
+  @UseInterceptors(FileInterceptor('document', { limits: { fileSize: 20 * 1024 * 1024 } }))
+  async import(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() session: Session,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: ImportContractDto,
+  ) {
+    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    if (!file) throw new BadRequestException('Document manquant.');
+    const ALLOWED = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!ALLOWED.includes(file.mimetype)) throw new BadRequestException('Format non supporté (PDF ou DOCX).');
+    return this.contracts.importContract(scope, dto, file, new Date());
+  }
+
   @Get()
   @ServiceReadable()
   async list(@CurrentScope() scope: Scope, @Query() q: ListContractsDto) {
@@ -77,6 +99,15 @@ export class ContractsController {
   async signedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
     // URL présignée à durée courte : jamais d'URL S3 durable en base (§10.7).
     return this.contracts.signedDocumentUrl(scope, id);
+  }
+
+  @Get(':id/imported-document')
+  async importedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const { buffer, name, contentType } = await this.contracts.getImportedDocument(scope, id);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(name, 'document')}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(buffer);
   }
 
   @Get(':id/allowed-actions')

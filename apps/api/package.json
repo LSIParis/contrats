@@ -43,6 +43,7 @@
     "@testcontainers/redis": "^12.0.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.9.0",
     "@types/sanitize-html": "^2.16.1",
     "@types/supertest": "^6.0.2",
