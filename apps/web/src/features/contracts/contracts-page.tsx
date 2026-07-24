@@ -36,7 +36,12 @@ export function ContractsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Contrats</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Contrats</h1>
+        <Link to="/contracts/import" className="text-sm text-lsi hover:underline">
+          Importer un contrat existant
+        </Link>
+      </div>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}

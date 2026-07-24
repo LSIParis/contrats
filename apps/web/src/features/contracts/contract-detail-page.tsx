@@ -32,8 +32,10 @@ interface Detail {
     endDate: string | null;
     noticePeriodDays: number | null;
     archivedAt: string | null;
+    origin: 'NATIVE' | 'IMPORTED';
   };
   customer: { name: string };
+  importedDocument: { name: string } | null;
   signatureRequest: SignatureData | null;
   reminders: Reminder[];
   timeline: Event[];
@@ -83,7 +85,12 @@ export function ContractDetailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">{contract.reference} — {contract.title}</h1>
-          <p className="text-gray-500">{customer.name} · <StatusBadge status={contract.status} /></p>
+          <p className="text-gray-500">
+            {customer.name} · <StatusBadge status={contract.status} />
+            {contract.origin === 'IMPORTED' && (
+              <span className="ml-2 rounded bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">Importé</span>
+            )}
+          </p>
           <p className="text-sm text-gray-400">
             {contract.startDate ? new Date(contract.startDate).toLocaleDateString('fr-FR') : '—'}
             {' → '}
@@ -136,8 +143,25 @@ export function ContractDetailPage() {
             <a href={`/v1/contracts/${contract.id}/export.docx`} className="text-lsi hover:underline">Télécharger DOCX</a>
           )}
           <Link to={`/contracts/${contract.id}/versions`} className="text-lsi hover:underline">Historique</Link>
-          {!contract.currentVersionId && <span className="text-gray-400">Aucun contenu rédigé.</span>}
+          {!contract.currentVersionId && contract.origin !== 'IMPORTED' && (
+            <span className="text-gray-400">Aucun contenu rédigé.</span>
+          )}
         </div>
+        {contract.origin === 'IMPORTED' && (
+          <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm">
+            <p className="font-medium text-gray-700">Document importé (signé hors application)</p>
+            {q.data.importedDocument ? (
+              <a
+                href={`/v1/contracts/${contract.id}/imported-document`}
+                className="text-lsi hover:underline"
+              >
+                Télécharger le document
+              </a>
+            ) : (
+              <span className="text-gray-400">Document indisponible.</span>
+            )}
+          </div>
+        )}
       </Card>
       <SignersBlock
         contractId={contract.id}
