@@ -52,17 +52,17 @@ export class ContentController {
 
   @Get(':id/export.pdf')
   async exportPdf(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
-    const pdf = await this.content.previewPdf(scope, id);
+    const { buffer, title } = await this.content.exportPdf(scope, id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('contrat')}.pdf"`);
-    res.send(pdf);
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'contrat')}.pdf"`);
+    res.send(buffer);
   }
 
   @Get(':id/export.docx')
   async exportDocx(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
-    const docx = await this.content.exportDocx(scope, id);
+    const { buffer, title } = await this.content.exportDocx(scope, id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('contrat')}.docx"`);
-    res.send(docx);
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'contrat')}.docx"`);
+    res.send(buffer);
   }
 }

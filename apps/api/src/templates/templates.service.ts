@@ -120,18 +120,18 @@ export class TemplatesService {
     return { html, title: t.name };
   }
 
-  async exportPdf(scope: Scope, id: string): Promise<Buffer> {
+  async exportPdf(scope: Scope, id: string): Promise<{ buffer: Buffer; title: string }> {
     return withScope(scope, async (tx) => {
       const { html, title } = await this.renderableOf(tx, id);
       const rendered = await this.pdf.render({ html, documentTitle: title });
-      return rendered.pdf;
+      return { buffer: rendered.pdf, title };
     });
   }
 
-  async exportDocx(scope: Scope, id: string): Promise<Buffer> {
+  async exportDocx(scope: Scope, id: string): Promise<{ buffer: Buffer; title: string }> {
     return withScope(scope, async (tx) => {
       const { html, title } = await this.renderableOf(tx, id);
-      return this.docx.renderDocx(html, title);
+      return { buffer: await this.docx.renderDocx(html, title), title };
     });
   }
 }

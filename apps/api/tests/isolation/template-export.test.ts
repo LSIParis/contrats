@@ -39,8 +39,11 @@ describe('export modèle', () => {
     const pdf = await getAs('sess-admin', `/v1/templates/${id}/export.pdf`).expect(200);
     expect(pdf.headers['content-type']).toContain('application/pdf');
     expect(pdf.headers['content-disposition']).toContain('attachment');
+    // Nom de fichier = vrai nom du modèle slugifié ('Maintenance standard').
+    expect(pdf.headers['content-disposition']).toContain('filename="Maintenance-standard.pdf"');
     const docx = await getAs('sess-admin', `/v1/templates/${id}/export.docx`).expect(200);
     expect(docx.headers['content-type']).toContain('officedocument.wordprocessingml.document');
+    expect(docx.headers['content-disposition']).toContain('filename="Maintenance-standard.docx"');
   });
 
   test('rôle non autorisé (ACCOUNT_MANAGER) → 403', async () => {

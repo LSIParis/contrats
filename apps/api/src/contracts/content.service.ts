@@ -109,10 +109,20 @@ export class ContentService {
     });
   }
 
-  async exportDocx(scope: Scope, id: string): Promise<Buffer> {
+  /** Export (téléchargement) : renvoie le binaire ET le titre du contrat,
+   *  pour que le contrôleur nomme le fichier avec le vrai titre. */
+  async exportPdf(scope: Scope, id: string): Promise<{ buffer: Buffer; title: string }> {
     return withScope(scope, async (tx) => {
       const { html, title } = await this.renderable(tx, id);
-      return this.docx.renderDocx(html, title);
+      const rendered = await this.renderer.render({ html, documentTitle: title });
+      return { buffer: rendered.pdf, title };
+    });
+  }
+
+  async exportDocx(scope: Scope, id: string): Promise<{ buffer: Buffer; title: string }> {
+    return withScope(scope, async (tx) => {
+      const { html, title } = await this.renderable(tx, id);
+      return { buffer: await this.docx.renderDocx(html, title), title };
     });
   }
 }
