@@ -129,6 +129,12 @@ export function ContractDetailPage() {
           {contract.currentVersionId && (
             <a href={`/v1/contracts/${contract.id}/preview.pdf`} target="_blank" rel="noopener" className="text-lsi hover:underline">Aperçu PDF</a>
           )}
+          {contract.currentVersionId && (
+            <a href={`/v1/contracts/${contract.id}/export.pdf`} className="text-lsi hover:underline">Télécharger PDF</a>
+          )}
+          {contract.currentVersionId && (
+            <a href={`/v1/contracts/${contract.id}/export.docx`} className="text-lsi hover:underline">Télécharger DOCX</a>
+          )}
           <Link to={`/contracts/${contract.id}/versions`} className="text-lsi hover:underline">Historique</Link>
           {!contract.currentVersionId && <span className="text-gray-400">Aucun contenu rédigé.</span>}
         </div>
