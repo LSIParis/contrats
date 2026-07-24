@@ -122,25 +122,36 @@ export class ContractsService {
       await this.storage.put(key, file.buffer, { tenantId: scope.tenantId, customerId: dto.customerId }, file.mimetype);
       const sha256 = createHash('sha256').update(file.buffer).digest('hex');
 
-      await tx.contract.create({
-        data: {
-          id, tenantId: scope.tenantId, customerId: dto.customerId,
-          reference: dto.reference, title: dto.title, type: dto.type ?? 'MAIN',
-          status: 'ACTIVE', origin: 'IMPORTED', category: dto.category ?? 'MAINTENANCE',
-          currentVersionId: null,
-          startDate: dto.startDate ? new Date(dto.startDate) : null,
-          endDate: dto.endDate ? new Date(dto.endDate) : null,
-          noticePeriodDays: dto.noticePeriodDays ?? null,
-          amountCents: dto.amountCents !== undefined ? BigInt(dto.amountCents) : null,
-          billingFrequency: 'MONTHLY',
-          signedAt: dto.signedAt ? new Date(dto.signedAt) : null,
-          activatedAt: dto.startDate ? new Date(dto.startDate) : now,
-          importedDocumentKey: key, importedDocumentName: file.originalname,
-          importedDocumentSha256: sha256, importedDocumentContentType: file.mimetype,
-          ownerUserId: scope.userId, createdAt: now, updatedAt: now,
-          createdByUserId: scope.userId, updatedByUserId: scope.userId,
-        },
-      });
+      try {
+        await tx.contract.create({
+          data: {
+            id, tenantId: scope.tenantId, customerId: dto.customerId,
+            reference: dto.reference, title: dto.title, type: 'MAIN',
+            status: 'ACTIVE', origin: 'IMPORTED', category: dto.category ?? 'MAINTENANCE',
+            currentVersionId: null,
+            startDate: dto.startDate ? new Date(dto.startDate) : null,
+            endDate: dto.endDate ? new Date(dto.endDate) : null,
+            noticePeriodDays: dto.noticePeriodDays ?? null,
+            amountCents: dto.amountCents !== undefined ? BigInt(dto.amountCents) : null,
+            billingFrequency: 'MONTHLY',
+            signedAt: dto.signedAt ? new Date(dto.signedAt) : null,
+            activatedAt: dto.startDate ? new Date(dto.startDate) : now,
+            importedDocumentKey: key, importedDocumentName: file.originalname,
+            importedDocumentSha256: sha256, importedDocumentContentType: file.mimetype,
+            ownerUserId: scope.userId, createdAt: now, updatedAt: now,
+            createdByUserId: scope.userId, updatedByUserId: scope.userId,
+          },
+        });
+      } catch (e) {
+        // Le pré-check `findFirst` ci-dessus est TOCTOU : une course
+        // concurrente sur (tenantId, reference) viole la contrainte unique
+        // et Prisma lève P2002 — on la traduit en 409 plutôt que de laisser
+        // fuiter une erreur brute en 500 (même filet que renew/amend).
+        if ((e as { code?: string }).code === 'P2002') {
+          throw new ConflictException({ code: 'REF_DUP', detail: 'Un contrat avec cette référence existe déjà.' });
+        }
+        throw e;
+      }
       return { id };
     });
   }
@@ -171,6 +182,18 @@ export class ContractsService {
       // pour cette session. Le comportement sûr est le comportement par
       // défaut — on n'a pas à y penser (RM-30).
       if (!c) throw new NotFoundException('Contrat introuvable');
+
+      // Ne JAMAIS renvoyer la clé objet S3 / le sha256 / le content-type du
+      // document importé au client : ce sont des détails d'implémentation du
+      // stockage (chemin tenant/customer, empreinte du fichier), pas des
+      // données métier. L'accès sûr au document passe par `importedDocument`
+      // (nom seulement) et par la route dédiée /imported-document.
+      const {
+        importedDocumentKey: _importedDocumentKey,
+        importedDocumentSha256: _importedDocumentSha256,
+        importedDocumentContentType: _importedDocumentContentType,
+        ...contractPublic
+      } = c;
 
       const sigReq = await tx.signatureRequest.findFirst({
         where: { contractId: id },
@@ -243,7 +266,7 @@ export class ContractsService {
         : null;
 
       return {
-        contract: c,
+        contract: contractPublic,
         customer: c.customer,
         importedDocument: c.importedDocumentKey ? { name: c.importedDocumentName } : null,
         signers,

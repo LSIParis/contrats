@@ -36,6 +36,11 @@ describe('import de contrat existant', () => {
     expect(detail.body.contract.status).toBe('ACTIVE');
     expect(detail.body.contract.origin).toBe('IMPORTED');
     expect(detail.body.importedDocument?.name).toBe('bail.pdf');
+    // Fix A : la clé objet S3 et le sha256 du document importé ne doivent
+    // JAMAIS fuiter dans la réponse de détail (chemin tenant/customer,
+    // empreinte du fichier — accès sûr via importedDocument.name / route dédiée).
+    expect(detail.body.contract.importedDocumentKey).toBeUndefined();
+    expect(detail.body.contract.importedDocumentSha256).toBeUndefined();
     const doc = await request(app.getHttpServer()).get(`/v1/contracts/${id}/imported-document`).set('x-lsi-session', 'sess-am-a').expect(200);
     expect(doc.headers['content-type']).toContain('application/pdf');
     expect(doc.headers['content-disposition']).toContain('attachment');

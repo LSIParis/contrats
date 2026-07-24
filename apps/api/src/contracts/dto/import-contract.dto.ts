@@ -2,13 +2,14 @@ import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, 
 import { Type } from 'class-transformer';
 
 /** Métadonnées d'un contrat importé (multipart : les nombres/dates arrivent
- *  en chaîne → @Type coerce). tenantId JAMAIS ici (vient de la session). */
+ *  en chaîne → @Type coerce). tenantId JAMAIS ici (vient de la session).
+ *  Pas de `type` : un import crée toujours un contrat MAIN (§ import) — un
+ *  avenant importé serait orphelin (parentContractId null). */
 export class ImportContractDto {
   @IsUUID('7') customerId!: string;
   @IsString() @IsNotEmpty() @MaxLength(100) reference!: string;
   @IsString() @IsNotEmpty() @MaxLength(300) title!: string;
 
-  @IsOptional() @IsEnum(['MAIN', 'AMENDMENT']) type?: 'MAIN' | 'AMENDMENT';
   @IsOptional() @IsEnum(['MAINTENANCE', 'SUPPORT', 'HOSTING', 'SLA', 'OTHER'])
   category?: 'MAINTENANCE' | 'SUPPORT' | 'HOSTING' | 'SLA' | 'OTHER';
 

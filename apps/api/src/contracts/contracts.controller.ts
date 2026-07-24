@@ -106,6 +106,7 @@ export class ContractsController {
     const { buffer, name, contentType } = await this.contracts.getImportedDocument(scope, id);
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(name, 'document')}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(buffer);
   }
 
