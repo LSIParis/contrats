@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import type { Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
+import { slugifyFilename } from '../documents/filename.js';
 import { TemplatesService } from './templates.service.js';
 import { CreateTemplateDto } from './dto/create-template.dto.js';
 import { SaveTemplateContentDto } from './dto/save-template-content.dto.js';
@@ -40,5 +42,23 @@ export class TemplatesController {
   @Post(':id/deprecate')
   deprecate(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string) {
     assertRole(s, [...ROLES]); return this.templates.deprecate(scope, id, new Date());
+  }
+
+  @Get(':id/export.pdf')
+  async exportPdf(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    assertRole(s, [...ROLES]);
+    const pdf = await this.templates.exportPdf(scope, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('modele')}.pdf"`);
+    res.send(pdf);
+  }
+
+  @Get(':id/export.docx')
+  async exportDocx(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    assertRole(s, [...ROLES]);
+    const docx = await this.templates.exportDocx(scope, id);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('modele')}.docx"`);
+    res.send(docx);
   }
 }
