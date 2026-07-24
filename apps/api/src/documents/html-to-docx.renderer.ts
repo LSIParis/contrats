@@ -17,7 +17,7 @@ function escapeHtml(s: string): string {
 export class HtmlToDocxRenderer implements DocxRenderer {
   async renderDocx(html: string, title: string): Promise<Buffer> {
     const doc = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${html}</body></html>`;
-    const out = await HTMLtoDOCX(doc, null, { title, font: 'Georgia' });
+    const out = await HTMLtoDOCX(doc, null, { title: escapeHtml(title), font: 'Georgia' });
     // La lib peut renvoyer un Buffer, un ArrayBuffer ou un Blob selon l'env.
     if (Buffer.isBuffer(out)) return out;
     if (out instanceof ArrayBuffer) return Buffer.from(out);

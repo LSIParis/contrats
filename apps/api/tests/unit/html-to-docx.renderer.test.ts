@@ -9,4 +9,9 @@ describe('HtmlToDocxRenderer', () => {
     // Un .docx est une archive ZIP : les 4 premiers octets sont 50 4B 03 04.
     expect(buf.subarray(0, 4).toString('hex')).toBe('504b0304');
   });
+
+  test('un titre contenant « < » (XML) ne fait pas planter et produit un DOCX valide', async () => {
+    const buf = await new HtmlToDocxRenderer().renderDocx('<p>Corps</p>', 'Société <SARL> Dupont');
+    expect(buf.subarray(0, 4).toString('hex')).toBe('504b0304');
+  });
 });
