@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { withScope, uuidv7, type Scope } from '@lsi/persistence';
 import {
@@ -17,6 +18,7 @@ import {
   type DocumentStorage,
 } from '../documents/document-storage.port.js';
 import type { CreateContractDto } from './dto/create-contract.dto.js';
+import type { ImportContractDto } from './dto/import-contract.dto.js';
 import type { ListContractsDto } from './dto/list-contracts.dto.js';
 import type { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import type { AmendContractDto } from './dto/amend-contract.dto.js';
@@ -91,6 +93,71 @@ export class ContractsService {
       });
 
       return contract;
+    });
+  }
+
+  /**
+   * Enregistrement d'un contrat existant (déjà signé hors LSI) : pas de
+   * cycle DRAFT→…→ACTIVE, on crée directement en ACTIVE/IMPORTED avec le
+   * document source comme preuve. L'unicité de référence est vérifiée
+   * AVANT de stocker le fichier — pas d'objet orphelin en cas de 409.
+   */
+  async importContract(
+    scope: Scope,
+    dto: ImportContractDto,
+    file: { buffer: Buffer; mimetype: string; originalname: string },
+    now: Date,
+  ): Promise<{ id: string }> {
+    return withScope(scope, async (tx) => {
+      const customer = await tx.customer.findUnique({ where: { id: dto.customerId } });
+      if (!customer) throw new NotFoundException('Client introuvable');
+      // Unicité de référence AVANT de stocker le fichier (pas d'objet orphelin).
+      const dup = await tx.contract.findFirst({ where: { reference: dto.reference }, select: { id: true } });
+      if (dup) throw new ConflictException({ code: 'REF_DUP', detail: 'Un contrat avec cette référence existe déjà.' });
+
+      const id = uuidv7();
+      const ext = file.mimetype === 'application/pdf' ? 'pdf' : 'docx';
+      const key = `t/${scope.tenantId}/c/${dto.customerId}/imported/${id}.${ext}`;
+      assertKeyMatchesScope(key, { tenantId: scope.tenantId, customerId: dto.customerId });
+      await this.storage.put(key, file.buffer, { tenantId: scope.tenantId, customerId: dto.customerId }, file.mimetype);
+      const sha256 = createHash('sha256').update(file.buffer).digest('hex');
+
+      await tx.contract.create({
+        data: {
+          id, tenantId: scope.tenantId, customerId: dto.customerId,
+          reference: dto.reference, title: dto.title, type: dto.type ?? 'MAIN',
+          status: 'ACTIVE', origin: 'IMPORTED', category: dto.category ?? 'MAINTENANCE',
+          currentVersionId: null,
+          startDate: dto.startDate ? new Date(dto.startDate) : null,
+          endDate: dto.endDate ? new Date(dto.endDate) : null,
+          noticePeriodDays: dto.noticePeriodDays ?? null,
+          amountCents: dto.amountCents !== undefined ? BigInt(dto.amountCents) : null,
+          billingFrequency: 'MONTHLY',
+          signedAt: dto.signedAt ? new Date(dto.signedAt) : null,
+          activatedAt: dto.startDate ? new Date(dto.startDate) : now,
+          importedDocumentKey: key, importedDocumentName: file.originalname,
+          importedDocumentSha256: sha256, importedDocumentContentType: file.mimetype,
+          ownerUserId: scope.userId, createdAt: now, updatedAt: now,
+          createdByUserId: scope.userId, updatedByUserId: scope.userId,
+        },
+      });
+      return { id };
+    });
+  }
+
+  /**
+   * Téléchargement du document source d'un contrat importé (§ import).
+   * La clé et le scope objet viennent du contrat en base, jamais de
+   * l'appelant : seule source fiable pour reconstruire l'ObjectScope.
+   */
+  async getImportedDocument(scope: Scope, id: string): Promise<{ buffer: Buffer; name: string; contentType: string }> {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { customerId: true, importedDocumentKey: true, importedDocumentName: true, importedDocumentContentType: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      if (!c.importedDocumentKey) throw new NotFoundException('Aucun document importé');
+      const buffer = await this.storage.get(c.importedDocumentKey, { tenantId: scope.tenantId, customerId: c.customerId });
+      if (!buffer) throw new NotFoundException('Document introuvable');
+      return { buffer, name: c.importedDocumentName ?? 'document', contentType: c.importedDocumentContentType ?? 'application/octet-stream' };
     });
   }
 
