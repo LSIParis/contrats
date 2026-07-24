@@ -34,10 +34,12 @@ describe('export contrat', () => {
     const pdf = await req('sess-am-a', `/v1/contracts/${fx.customerA.contractId}/export.pdf`).expect(200);
     expect(pdf.headers['content-type']).toContain('application/pdf');
     expect(pdf.headers['content-disposition']).toContain('attachment');
+    // Nom de fichier = vrai titre du contrat slugifié ('Contrat Dupont SAS').
+    expect(pdf.headers['content-disposition']).toContain('filename="Contrat-Dupont-SAS.pdf"');
 
     const docx = await req('sess-am-a', `/v1/contracts/${fx.customerA.contractId}/export.docx`).expect(200);
     expect(docx.headers['content-type']).toContain('officedocument.wordprocessingml.document');
-    expect(docx.headers['content-disposition']).toContain('.docx');
+    expect(docx.headers['content-disposition']).toContain('filename="Contrat-Dupont-SAS.docx"');
   });
 
   test('contrat hors scope → 404', async () => {

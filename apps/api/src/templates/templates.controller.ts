@@ -47,18 +47,18 @@ export class TemplatesController {
   @Get(':id/export.pdf')
   async exportPdf(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
     assertRole(s, [...ROLES]);
-    const pdf = await this.templates.exportPdf(scope, id);
+    const { buffer, title } = await this.templates.exportPdf(scope, id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('modele')}.pdf"`);
-    res.send(pdf);
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'modele')}.pdf"`);
+    res.send(buffer);
   }
 
   @Get(':id/export.docx')
   async exportDocx(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
     assertRole(s, [...ROLES]);
-    const docx = await this.templates.exportDocx(scope, id);
+    const { buffer, title } = await this.templates.exportDocx(scope, id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('modele')}.docx"`);
-    res.send(docx);
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'modele')}.docx"`);
+    res.send(buffer);
   }
 }
