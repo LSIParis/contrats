@@ -8,6 +8,7 @@ import { Card } from '../../ui/card.js';
 import { Table } from '../../ui/table.js';
 import { contractCategoryLabel, templateStatusLabel } from '../../lib/labels.js';
 import { AiDraftPanel } from './ai-draft-panel.js';
+import { TemplateEditor } from './template-editor.js';
 
 interface CurrentVersion {
   id: string; versionNumber: number; bodyHtml: string; isImmutable: boolean; publishedAt: string | null;
@@ -26,6 +27,8 @@ export function TemplateDetailPage() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['template', id], queryFn: () => apiGet<Detail>(`/v1/templates/${id}`) });
   const [bodyHtml, setBodyHtml] = useState<string | null>(null);
+  const [editorEmpty, setEditorEmpty] = useState(true);
+  const [inject, setInject] = useState<{ html: string; nonce: number } | undefined>(undefined);
 
   const save = useMutation({
     mutationFn: (html: string) => apiPut<{ versionId: string; versionNumber: number }>(`/v1/templates/${id}/content`, { bodyHtml: html }),
@@ -45,18 +48,18 @@ export function TemplateDetailPage() {
   const aiDraft = useMutation({
     mutationFn: (input: { prompt: string; context?: string }) =>
       apiPost<{ bodyHtml: string; suggestedVariables: string[] }>(`/v1/templates/ai-draft`, { ...input, category: q.data!.category }),
-    onSuccess: (data) => setBodyHtml(data.bodyHtml),
+    onSuccess: (data) => setInject((prev) => ({ html: data.bodyHtml, nonce: (prev?.nonce ?? 0) + 1 })),
   });
 
   if (q.isLoading) return <Spinner />;
   if (q.error || !q.data) return <p className="text-red-600">Modèle introuvable.</p>;
 
   const t = q.data;
-  const html = bodyHtml ?? t.currentVersion?.bodyHtml ?? '';
+  const saveHtml = bodyHtml ?? t.currentVersion?.bodyHtml ?? '';
   const saveError = save.error instanceof ApiError ? save.error.message : save.error ? 'Erreur.' : undefined;
   const publishError = publish.error instanceof ApiError ? publish.error.message : publish.error ? 'Erreur.' : undefined;
   const deprecateError = deprecate.error instanceof ApiError ? deprecate.error.message : deprecate.error ? 'Erreur.' : undefined;
-  const canPublish = t.status !== 'PUBLISHED' && html.trim().length > 0;
+  const canPublish = t.status !== 'PUBLISHED' && !editorEmpty;
 
   return (
     <div className="space-y-6">
@@ -66,13 +69,15 @@ export function TemplateDetailPage() {
       </div>
       <Card title="Contenu">
         <div className="space-y-3">
-          <textarea
-            className="w-full min-h-[240px] rounded border p-3 text-sm font-mono"
-            value={html}
-            onChange={(e) => setBodyHtml(e.target.value)}
+          <TemplateEditor
+            key={`${t.id}:${t.currentVersion?.id ?? 'none'}`}
+            initialHtml={t.currentVersion?.bodyHtml ?? ''}
+            onChange={setBodyHtml}
+            onEmptyChange={setEditorEmpty}
+            inject={inject}
           />
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => save.mutate(html)} disabled={save.isPending}>
+            <Button onClick={() => save.mutate(saveHtml)} disabled={save.isPending}>
               {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
             <button
