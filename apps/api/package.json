@@ -22,6 +22,7 @@
     "@nestjs/serve-static": "^4.0.2",
     "@swc-node/register": "^1.12.0",
     "@swc/core": "^1.15.43",
+    "@turbodocx/html-to-docx": "^1.22.0",
     "bullmq": "^5.80.8",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
