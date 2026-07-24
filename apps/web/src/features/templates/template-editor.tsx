@@ -35,7 +35,6 @@ export function TemplateEditor({ initialHtml, onChange, onEmptyChange, inject }:
     if (!editor) return;
     onChange(editor.getHTML());
     onEmptyChange?.(editor.isEmpty);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
   // Injection d'un brouillon (ex. IA) : recharge le contenu quand nonce change.
@@ -44,7 +43,6 @@ export function TemplateEditor({ initialHtml, onChange, onEmptyChange, inject }:
     editor.commands.setContent(inject.html);
     onChange(editor.getHTML());
     onEmptyChange?.(editor.isEmpty);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inject?.nonce]);
 
   const tb = 'rounded border px-2 py-1 text-sm hover:bg-gray-100';
