@@ -34,6 +34,8 @@ describe('import de contrat existant', () => {
     const id = res.body.id as string;
     const detail = await request(app.getHttpServer()).get(`/v1/contracts/${id}`).set('x-lsi-session', 'sess-am-a').expect(200);
     expect(detail.body.contract.status).toBe('ACTIVE');
+    expect(detail.body.contract.origin).toBe('IMPORTED');
+    expect(detail.body.importedDocument?.name).toBe('bail.pdf');
     const doc = await request(app.getHttpServer()).get(`/v1/contracts/${id}/imported-document`).set('x-lsi-session', 'sess-am-a').expect(200);
     expect(doc.headers['content-type']).toContain('application/pdf');
     expect(doc.headers['content-disposition']).toContain('attachment');

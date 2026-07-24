@@ -245,6 +245,7 @@ export class ContractsService {
       return {
         contract: c,
         customer: c.customer,
+        importedDocument: c.importedDocumentKey ? { name: c.importedDocumentName } : null,
         signers,
         approval,
         // Conservé pour le composant SignatureBlock du cockpit, qui lit
