@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { type Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
+import { slugifyFilename } from '../documents/filename.js';
 import { ContentService } from './content.service.js';
 import { SaveContentDto } from './dto/save-content.dto.js';
 
@@ -47,5 +48,21 @@ export class ContentController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="apercu.pdf"');
     res.send(pdf);
+  }
+
+  @Get(':id/export.pdf')
+  async exportPdf(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const pdf = await this.content.previewPdf(scope, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('contrat')}.pdf"`);
+    res.send(pdf);
+  }
+
+  @Get(':id/export.docx')
+  async exportDocx(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const docx = await this.content.exportDocx(scope, id);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename('contrat')}.docx"`);
+    res.send(docx);
   }
 }

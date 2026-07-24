@@ -8,6 +8,7 @@ import type {
   RenderedDocument,
 } from '@lsi/domain';
 import { ProviderError } from '@lsi/domain';
+import type { DocxRenderer } from '../../src/documents/docx-renderer.port.js';
 
 /**
  * Provider contrôlable, pour tester la LOGIQUE d'envoi.
@@ -116,5 +117,14 @@ export class FakeRenderer implements DocumentRenderer {
     // Un PDF minimal mais réel : commence par %PDF-, donc reconnaissable.
     const pdf = Buffer.from(`%PDF-1.7\n% ${req.documentTitle}\n${req.html}\n%%EOF`, 'utf8');
     return { pdf, sha256: createHash('sha256').update(pdf).digest('hex') };
+  }
+}
+
+/** Rendu DOCX déterministe : un Buffer reconnaissable (préfixe ZIP PK). */
+export class FakeDocxRenderer implements DocxRenderer {
+  lastHtml = '';
+  async renderDocx(html: string, title: string): Promise<Buffer> {
+    this.lastHtml = html;
+    return Buffer.concat([Buffer.from('504b0304', 'hex'), Buffer.from(`\n${title}\n${html}`, 'utf8')]);
   }
 }
