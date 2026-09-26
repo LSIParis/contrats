@@ -330,10 +330,13 @@ describe('§11.3 — contenu de la demande', () => {
     expect(createHash('sha256').update(cmd.pdf).digest('hex')).toBe(cmd.pdfSha256);
   });
 
-  test('paraphe de chaque page : pied de page seulement si DOCUSEAL_INITIALS_FOOTER=true', async () => {
+  test('paraphe de chaque page : seulement si DOCUSEAL_INITIALS_FOOTER=true ; référence et pagination toujours', async () => {
     delete process.env.DOCUSEAL_INITIALS_FOOTER;
     await send(contractId);
-    expect(renderer.lastFooter).toBeUndefined();
+    // Pied de page v2 : référence + « page X / Y » sur chaque page, SANS balise de paraphe.
+    expect(renderer.lastFooter).toContain('<span class="pageNumber"></span>');
+    expect(renderer.lastFooter).toContain('<span class="totalPages"></span>');
+    expect(renderer.lastFooter).not.toContain('type=initials');
   });
 
   test('paraphe activé : un paraphe par rôle, numéro de page du moteur', async () => {

@@ -83,3 +83,50 @@
 | 18 | Nouvelles valeurs d'énumération du cycle de vie (séparées : règle PostgreSQL 55P04) |
 | 19 | Cycle de vie : acceptation, reconduction, préavis en mois, résiliation programmée, périodes (backfill **testé** `app_backfill_initial_periods`) |
 | 20 | Import (`contract_imports`) et échéancier (`deadlines`, rappels rattachés) |
+| 22 | Lot 2 : bibliothèque de clauses versionnée, composition des modèles, clauses et annexes des versions de contrat, revues de clauses, variables manquantes |
+
+## 6. Contrats types, clauses, variables, annexes (lot 2)
+
+```
+clause_library_items ──< clause_library_item_versions (immuables)
+        ▲                              ▲
+        │ code = clause_key            │ épinglée
+contract_template_versions ──< template_clauses (position, required)
+        │  + default_annexes, default_pricing
+        ▼ (création d'un contrat : COPIE)
+contract_versions ──< contract_clauses (figées, origin TEMPLATE|LIBRARY|CUSTOM|AI)
+        │         ──< annexes (SLA, ASSETS, PRICING_GRID, DPA_ART28, OTHER)
+        └── body_html = document composé (articles numérotés + annexes)
+contract_clause_reviews (append-only) : revue humaine, obligatoire pour les clauses IA
+```
+
+- **Une mise à jour de modèle ne modifie jamais un contrat émis** : à la
+  création, les clauses du modèle sont **copiées** dans la version 1 du
+  contrat ; le modèle ne pointe que des versions de clauses **épinglées**.
+- **Variables typées** (`packages/domain/src/templates/variables.ts`) :
+  registre (`client.raisonSociale`, `contrat.dureeMois`,
+  `sla.delaiIntervention`…) validé par Zod ; une variable hors registre est
+  refusée sauf déclaration par le modèle. Les valeurs sont **échappées** au
+  rendu ; une variable sans valeur devient un marqueur visible
+  `[à compléter : …]`, comptée dans `contracts.missing_variables`, et bloque
+  la soumission en revue (garde V2-VAR). Pré-remplissage : client,
+  prestataire, dates et préavis du contrat.
+- **Écarts au modèle** (`clause-diff.ts`) : clauses ajoutées, modifiées,
+  retirées (dont obligatoires), calculés sur `clause_key` avec normalisation
+  typographique ; exposés par `GET /v1/contracts/:id/structure` et à
+  surligner en revue interne.
+- **Document composé** (`compose.ts`) : titre, référence, « Article N —
+  Titre », annexes chacune sur une nouvelle page. C'est `body_html` qui est
+  prévisualisé, exporté, rendu en PDF figé (SHA-256) et signé ; le pied de page
+  (référence, « page X / Y », paraphes DocuSeal si activés) est ajouté au rendu.
+- **HTML assaini** à l'écriture (liste blanche : titres, paragraphes, listes,
+  liens, tableaux simples, `mark`) ; rendu Gotenberg sans JavaScript ni
+  réseau.
+- **Revue des clauses IA** : une validation porte sur un TEXTE ; elle suit la
+  clause d'une version à l'autre tant que son corps est inchangé et tombe dès
+  qu'il change. Aucune décision n'est recopiée : l'historique est relu.
+  L'éditeur libre est fermé aux contrats `origin = AI`.
+- **Négociation / acceptation** : `send-to-client`, `negotiate`,
+  `reopen-negotiation`, acceptation portail (`/v1/portal/contracts/:id/accept`,
+  identité de session, IP) ou enregistrée par LSI (pièce justificative
+  obligatoire) → `contract_acceptances`.

@@ -235,6 +235,46 @@ enum DeadlineStatus {
   OBSOLETE
 }
 
+enum ClauseCategory {
+  OBJET
+  DUREE
+  PRIX
+  SLA
+  RESPONSABILITE
+  RGPD
+  CONFIDENTIALITE
+  PROPRIETE_INTELLECTUELLE
+  ASSURANCE
+  RESILIATION
+  DIVERS
+}
+
+enum ClauseOrigin {
+  TEMPLATE
+  LIBRARY
+  CUSTOM
+  AI
+}
+
+enum ClauseRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AnnexKind {
+  SLA
+  ASSETS
+  PRICING_GRID
+  DPA_ART28
+  OTHER
+}
+
+enum ClauseReviewDecision {
+  APPROVED
+  REJECTED
+}
+
 enum ReminderStatus {
   PENDING
   SENT
@@ -316,6 +356,7 @@ model Tenant {
   contracts    Contract[]
   featureFlags TenantFeatureFlag[]
   settings     TenantSetting[]
+  clauseItems  ClauseLibraryItem[]
 
   @@map("tenants")
 }
@@ -477,6 +518,8 @@ model ContractTemplate {
   currentVersionId String?          @map("current_version_id") @db.Uuid
   createdAt        DateTime         @map("created_at")
   updatedAt        DateTime         @map("updated_at")
+  /// Exemple fourni avec l'application : affiché « DÉMONSTRATION » (brief §4).
+  isDemo           Boolean          @default(false) @map("is_demo")
 
   tenant   Tenant                    @relation(fields: [tenantId], references: [id])
   versions ContractTemplateVersion[]
@@ -499,9 +542,14 @@ model ContractTemplateVersion {
   publishedByUserId String?  @map("published_by_user_id") @db.Uuid
   isImmutable       Boolean  @default(false) @map("is_immutable")
   createdAt         DateTime @map("created_at")
+  /// Annexes par défaut [{ kind, title, bodyHtml }], copiées dans chaque contrat.
+  defaultAnnexes    Json     @default("[]") @map("default_annexes")
+  /// Barème par défaut (lignes @lsi/pricing), repris par la tarification.
+  defaultPricing    Json     @default("[]") @map("default_pricing")
 
   template  ContractTemplate @relation(fields: [templateId, tenantId], references: [id, tenantId], onDelete: Cascade)
   contracts Contract[]
+  clauses   TemplateClause[]
 
   @@unique([templateId, versionNumber])
   @@unique([id, tenantId])
@@ -577,6 +625,8 @@ model Contract {
   terminationEffectiveDate DateTime?   @map("termination_effective_date") @db.Date
   /// Clauses IA pas encore validées par un humain (V2-AI).
   unreviewedAiClauses      Int         @default(0) @map("unreviewed_ai_clauses")
+  /// Variables du contrat type encore sans valeur (V2-VAR, migration 22).
+  missingVariables         Int         @default(0) @map("missing_variables")
 
   signedAt     DateTime? @map("signed_at")
   activatedAt  DateTime? @map("activated_at")
@@ -617,6 +667,9 @@ model Contract {
   periods           ContractPeriod[]
   imports           ContractImport[]
   deadlines         Deadline[]
+  clauses           ContractClause[]
+  clauseReviews     ContractClauseReview[]
+  annexes           Annex[]
 
   /// Clé candidate composite portant le scope complet : cible de TOUTES
   /// les FK des tables filles (§8.4).
@@ -650,6 +703,8 @@ model ContractVersion {
 
   contract    Contract             @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
   acceptances ContractAcceptance[]
+  clauses     ContractClause[]
+  annexes     Annex[]
 
   @@unique([contractId, versionNumber])
   @@unique([id, tenantId, customerId])
@@ -1207,3 +1262,135 @@ model Deadline {
   @@index([tenantId, customerId, contractId], map: "deadlines_contract_idx")
   @@map("deadlines")
 }
+
+// ===========================================================================
+// Lot 2 — bibliothèque de clauses, modèles structurés, clauses et annexes
+// (migration 22) — docs/contrats/01-domaine.md §6
+// ===========================================================================
+
+model ClauseLibraryItem {
+  id               String         @id @db.Uuid
+  tenantId         String         @map("tenant_id") @db.Uuid
+  code             String
+  category         ClauseCategory
+  title            String
+  archivedAt       DateTime?      @map("archived_at")
+  currentVersionId String?        @map("current_version_id") @db.Uuid
+  isDemo           Boolean        @default(false) @map("is_demo")
+  createdAt        DateTime       @map("created_at")
+  updatedAt        DateTime       @map("updated_at")
+
+  tenant   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  versions ClauseLibraryItemVersion[]
+
+  @@unique([tenantId, code], map: "clause_library_items_code_key")
+  @@unique([id, tenantId], map: "clause_library_items_scope_key")
+  @@map("clause_library_items")
+}
+
+/// IMMUABLE (UPDATE/DELETE révoqués) : les modèles et contrats pointent une version précise.
+model ClauseLibraryItemVersion {
+  id              String   @id @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  itemId          String   @map("item_id") @db.Uuid
+  versionNumber   Int      @map("version_number")
+  bodyHtml        String   @map("body_html")
+  variables       String[] @default([])
+  changeNote      String?  @map("change_note")
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @map("created_at")
+
+  item            ClauseLibraryItem @relation(fields: [itemId, tenantId], references: [id, tenantId], map: "clause_versions_item_fk", onDelete: NoAction, onUpdate: NoAction)
+  templateClauses TemplateClause[]
+
+  @@unique([itemId, versionNumber], map: "clause_versions_number_key")
+  @@unique([id, tenantId], map: "clause_versions_scope_key")
+  @@map("clause_library_item_versions")
+}
+
+/// Composition d'une version de modèle : clauses de bibliothèque ÉPINGLÉES.
+model TemplateClause {
+  tenantId          String  @map("tenant_id") @db.Uuid
+  templateVersionId String  @map("template_version_id") @db.Uuid
+  position          Int
+  clauseVersionId   String  @map("clause_version_id") @db.Uuid
+  required          Boolean @default(false)
+
+  templateVersion ContractTemplateVersion  @relation(fields: [templateVersionId, tenantId], references: [id, tenantId], map: "template_clauses_version_fk", onDelete: Cascade, onUpdate: NoAction)
+  clauseVersion   ClauseLibraryItemVersion @relation(fields: [clauseVersionId, tenantId], references: [id, tenantId], map: "template_clauses_clause_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([templateVersionId, position])
+  @@map("template_clauses")
+}
+
+/// Clause d'une VERSION de contrat — figée avec elle (écriture unique).
+model ContractClause {
+  id                    String         @id @db.Uuid
+  tenantId              String         @map("tenant_id") @db.Uuid
+  customerId            String         @map("customer_id") @db.Uuid
+  contractId            String         @map("contract_id") @db.Uuid
+  versionId             String         @map("version_id") @db.Uuid
+  position              Int
+  /// Identifiant STABLE d'une version à l'autre (diff, revue IA).
+  clauseKey             String         @map("clause_key")
+  category              ClauseCategory
+  title                 String
+  bodyHtml              String         @map("body_html")
+  origin                ClauseOrigin
+  sourceClauseVersionId String?        @map("source_clause_version_id") @db.Uuid
+  aiRisk                ClauseRisk?    @map("ai_risk")
+  aiJustification       String?        @map("ai_justification")
+  aiSources             Json?          @map("ai_sources")
+
+  version  ContractVersion        @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_clauses_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  contract Contract               @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_clauses_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+  reviews  ContractClauseReview[]
+
+  @@unique([versionId, position], map: "contract_clauses_position_key")
+  @@unique([versionId, clauseKey], map: "contract_clauses_key_key")
+  @@unique([id, tenantId, customerId], map: "contract_clauses_scope_key")
+  @@index([tenantId, customerId, contractId], map: "contract_clauses_contract_idx")
+  @@map("contract_clauses")
+}
+
+/// Revue humaine d'une clause (obligatoire pour les clauses IA). Append-only.
+model ContractClauseReview {
+  id               String               @id @db.Uuid
+  tenantId         String               @map("tenant_id") @db.Uuid
+  customerId       String               @map("customer_id") @db.Uuid
+  contractId       String               @map("contract_id") @db.Uuid
+  clauseId         String               @map("clause_id") @db.Uuid
+  decision         ClauseReviewDecision
+  comment          String?
+  reviewedByUserId String               @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime             @map("reviewed_at")
+
+  clause   ContractClause @relation(fields: [clauseId, tenantId, customerId], references: [id, tenantId, customerId], map: "clause_reviews_clause_fk", onDelete: NoAction, onUpdate: NoAction)
+  contract Contract       @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "clause_reviews_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, clauseId], map: "clause_reviews_clause_idx")
+  @@map("contract_clause_reviews")
+}
+
+/// Annexe d'une version de contrat (SLA, actifs, grille tarifaire, DPA art. 28…).
+model Annex {
+  id         String    @id @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  contractId String    @map("contract_id") @db.Uuid
+  versionId  String    @map("version_id") @db.Uuid
+  position   Int
+  kind       AnnexKind
+  title      String
+  /// NULL pour une annexe GÉNÉRÉE au rendu (grille tarifaire, liste d'actifs).
+  bodyHtml   String?   @map("body_html")
+  data       Json?
+
+  version  ContractVersion @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "annexes_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  contract Contract        @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "annexes_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([versionId, position], map: "annexes_position_key")
+  @@index([tenantId, customerId, contractId], map: "annexes_contract_idx")
+  @@map("annexes")
+}
+

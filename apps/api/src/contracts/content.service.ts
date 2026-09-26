@@ -6,7 +6,11 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { withScope, uuidv7, type Scope } from '@lsi/persistence';
-import { EDITABLE_STATUSES, type DocumentRenderer } from '@lsi/domain';
+import {
+  applyEvent, BusinessRuleError, documentFooterHtml, extractVariables, InvalidTransitionError,
+  type ContractEvent, type DocumentRenderer,
+} from '@lsi/domain';
+import { persistTransition, toContractSnapshot } from './snapshot.js';
 import { sanitizeContractHtml } from '../documents/html-sanitizer.js';
 import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
 import { DOCX_RENDERER } from '../documents/docx-renderer.port.js';
@@ -22,17 +26,30 @@ export class ContentService {
 
   async saveContent(scope: Scope, id: string, dto: SaveContentDto) {
     return withScope(scope, async (tx) => {
-      const c = await tx.contract.findUnique({
-        where: { id },
-        select: { id: true, tenantId: true, customerId: true, status: true },
-      });
+      const c = await tx.contract.findUnique({ where: { id } });
       if (!c) throw new NotFoundException('Contrat introuvable');
-      const EDITABLE_OR_APPROVED = [...EDITABLE_STATUSES, 'APPROVED'] as const;
-      if (!EDITABLE_OR_APPROVED.includes(c.status as (typeof EDITABLE_OR_APPROVED)[number])) {
+      // Un projet IA se révise clause par clause (revue humaine obligatoire,
+      // brief §6) : l'éditeur libre contournerait cette revue.
+      if (c.origin === 'AI') {
         throw new ConflictException({
-          code: 'RM-04',
-          detail: 'Le contenu ne peut être édité que sur un brouillon, un contrat renvoyé, ou un contrat approuvé (qui repasse alors en brouillon).',
+          code: 'V2-AI',
+          detail: 'Contrat rédigé par IA : modifier le contenu via l’éditeur de clauses, pour que chaque clause reste revue.',
         });
+      }
+      // EDIT_CONTENT passe par la machine (verrouillage en signature, retour
+      // en brouillon d'un contrat validé, négociation : validation invalidée).
+      const event: ContractEvent = { type: 'EDIT_CONTENT', actorUserId: scope.userId };
+      let next;
+      try {
+        next = applyEvent(toContractSnapshot(c), event, new Date());
+      } catch (e) {
+        if (e instanceof InvalidTransitionError || e instanceof BusinessRuleError) {
+          throw new ConflictException({
+            code: 'RM-04',
+            detail: 'Le contenu ne peut être édité que sur un brouillon, un contrat renvoyé, en négociation, ou un contrat validé (qui repasse alors en brouillon).',
+          });
+        }
+        throw e;
       }
 
       const clean = sanitizeContractHtml(dto.bodyHtml);
@@ -51,15 +68,13 @@ export class ContentService {
         },
         select: { id: true, versionNumber: true },
       });
+      // Texte libre : une variable {{…}} laissée dans le corps compte comme
+      // « à compléter » et bloque la soumission (V2-VAR).
       await tx.contract.update({
         where: { id },
-        data: {
-          currentVersionId: version.id,
-          // RM-11 : éditer après validation invalide la validation.
-          ...(c.status === 'APPROVED' ? { status: 'DRAFT', approvedVersionId: null } : {}),
-          updatedAt: now, updatedByUserId: scope.userId,
-        },
+        data: { currentVersionId: version.id, missingVariables: extractVariables(clean).length, unreviewedAiClauses: 0 },
       });
+      await persistTransition(tx, id, event, next, now, scope.userId);
       return version;
     });
   }
@@ -91,20 +106,20 @@ export class ContentService {
     });
   }
 
-  private async renderable(tx: any, id: string): Promise<{ html: string; title: string }> {
-    const c = await tx.contract.findUnique({ where: { id }, select: { id: true, title: true, currentVersionId: true } });
+  private async renderable(tx: any, id: string): Promise<{ html: string; title: string; reference: string }> {
+    const c = await tx.contract.findUnique({ where: { id }, select: { id: true, title: true, reference: true, currentVersionId: true } });
     if (!c) throw new NotFoundException('Contrat introuvable');
     if (!c.currentVersionId) throw new UnprocessableEntityException('Aucune version à exporter');
     const version = await tx.contractVersion.findUnique({ where: { id: c.currentVersionId }, select: { bodyHtml: true } });
     if (!version) throw new UnprocessableEntityException('Version introuvable');
-    return { html: version.bodyHtml, title: c.title };
+    return { html: version.bodyHtml, title: c.title, reference: c.reference };
   }
 
   /** Rendu PDF de la version courante — via Gotenberg (aperçu, non signé). */
   async previewPdf(scope: Scope, id: string): Promise<Buffer> {
     return withScope(scope, async (tx) => {
-      const { html, title } = await this.renderable(tx, id);
-      const rendered = await this.renderer.render({ html, documentTitle: title });
+      const { html, title, reference } = await this.renderable(tx, id);
+      const rendered = await this.renderer.render({ html, documentTitle: title, footerHtml: documentFooterHtml(reference) });
       return rendered.pdf;
     });
   }
@@ -113,8 +128,8 @@ export class ContentService {
    *  pour que le contrôleur nomme le fichier avec le vrai titre. */
   async exportPdf(scope: Scope, id: string): Promise<{ buffer: Buffer; title: string }> {
     return withScope(scope, async (tx) => {
-      const { html, title } = await this.renderable(tx, id);
-      const rendered = await this.renderer.render({ html, documentTitle: title });
+      const { html, title, reference } = await this.renderable(tx, id);
+      const rendered = await this.renderer.render({ html, documentTitle: title, footerHtml: documentFooterHtml(reference) });
       return { buffer: rendered.pdf, title };
     });
   }

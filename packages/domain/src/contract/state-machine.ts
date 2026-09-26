@@ -132,7 +132,7 @@ export function allowedEvents(c: ContractSnapshot, now?: Date): ContractEventTyp
     switch (e) {
       case 'SUBMIT_FOR_REVIEW':
         return c.hasLsiSigner && c.hasClientSigner && c.hasRequiredAttachments && !!c.startDate && !!c.currentVersionId
-          && !c.hasUnreviewedAiClauses;
+          && !c.hasUnreviewedAiClauses && !c.hasMissingVariables;
       case 'SEND_TO_CLIENT':
         return currentIsApproved;
       case 'SEND_FOR_SIGNATURE':
@@ -218,6 +218,12 @@ export function applyEvent(
         throw new BusinessRuleError(
           'Projet généré par IA : chaque clause doit être validée par un humain avant la revue interne.',
           'V2-AI',
+        );
+      }
+      if (c.hasMissingVariables) {
+        throw new BusinessRuleError(
+          'Des variables du contrat type restent à compléter (marquées « à compléter » dans le texte).',
+          'V2-VAR',
         );
       }
       return { ...c, status: 'IN_REVIEW', submittedByUserId: event.actorUserId };

@@ -94,6 +94,8 @@ export interface ContractSnapshot {
   readonly hasUnreviewedAiClauses?: boolean;
   /** Date d'effet d'une résiliation programmée (TERMINATION_PENDING). */
   readonly terminationEffectiveDate?: Date | null;
+  /** Variables du contrat type encore sans valeur (`[à compléter : …]`). */
+  readonly hasMissingVariables?: boolean;
 }
 
 export type ContractEvent =

@@ -13,6 +13,7 @@ import {
   type ContractSnapshot,
 } from '@lsi/domain';
 import { persistTransition, toContractSnapshot } from './snapshot.js';
+import { StructureService } from '../structure/structure.service.js';
 import {
   DOCUMENT_STORAGE,
   assertKeyMatchesScope,
@@ -39,7 +40,10 @@ const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', '
  */
 @Injectable()
 export class ContractsService {
-  constructor(@Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage) {}
+  constructor(
+    @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
+    private readonly structure: StructureService,
+  ) {}
 
   async create(scope: Scope, dto: CreateContractDto, now: Date) {
     return withScope(scope, async (tx) => {
@@ -78,6 +82,12 @@ export class ContractsService {
         },
       });
 
+      if (dto.templateVersionId) {
+        // Clauses du modèle COPIÉES (jamais référencées) : une mise à jour du
+        // modèle ne modifiera pas ce contrat (brief §4).
+        await this.structure.initializeFromTemplate(tx, id, dto.templateVersionId, versionId, now, scope.userId);
+        return tx.contract.findUniqueOrThrow({ where: { id } });
+      }
       await tx.contractVersion.create({
         data: {
           id: versionId,

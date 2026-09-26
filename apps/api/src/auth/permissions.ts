@@ -76,6 +76,15 @@ export function can(roles: readonly RoleCode[], action: Action): boolean {
   return roles.some((r) => allowed.includes(r));
 }
 
+/** 403 si AUCUNE des actions n'est autorisée (lecture partagée par plusieurs métiers). */
+export function assertCanAny(session: Session, actions: readonly Action[]): void {
+  if (!actions.some((a) => can(session.roles, a))) {
+    throw new ForbiddenException(
+      `Action réservée : ${actions.join(' ou ')}. Vos rôles : ${session.roles.join(', ') || 'aucun'}.`,
+    );
+  }
+}
+
 /** 403 explicite si aucun des rôles de la session n'autorise l'action. */
 export function assertCan(session: Session, action: Action): void {
   if (!can(session.roles, action)) {

@@ -230,6 +230,15 @@ describe('verrouillage et signature', () => {
   });
 });
 
+describe('variables du contrat type', () => {
+  test('ne peut être soumis tant qu’une variable reste à compléter', () => {
+    expect(() =>
+      applyEvent(snap('DRAFT', { hasMissingVariables: true, approvedVersionId: null }), EVENTS.SUBMIT_FOR_REVIEW, NOW),
+    ).toThrow(/à compléter/);
+    expect(allowedEvents(snap('DRAFT', { hasMissingVariables: true }))).not.toContain('SUBMIT_FOR_REVIEW');
+  });
+});
+
 describe('contrat rédigé par IA', () => {
   test('ne peut être soumis tant qu’une clause IA n’est pas validée', () => {
     expect(() =>

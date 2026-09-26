@@ -29,6 +29,11 @@ import { ImportsService } from './imports/imports.service.js';
 import { HttpOcrClient, OCR_CLIENT } from './imports/ocr.client.js';
 import { DeadlinesController } from './deadlines/deadlines.controller.js';
 import { DeadlinesService } from './deadlines/deadlines.service.js';
+import { StructureController } from './structure/structure.controller.js';
+import { StructureService } from './structure/structure.service.js';
+import { ClauseLibraryService } from './structure/clause-library.service.js';
+import { NegotiationController } from './negotiation/negotiation.controller.js';
+import { AcceptanceService } from './negotiation/acceptance.service.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { ContentController } from './contracts/content.controller.js';
@@ -120,6 +125,8 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     TenantConfigController,
     ImportsController,
     DeadlinesController,
+    StructureController,
+    NegotiationController,
     TemplatesController,
     AiDraftingController,
   ],
@@ -127,6 +134,9 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     TenantConfigService,
     ImportsService,
     DeadlinesService,
+    StructureService,
+    ClauseLibraryService,
+    AcceptanceService,
     // Service OCR interne (réseau de la stack) ; remplacé par un faux en test.
     { provide: OCR_CLIENT, useFactory: () => new HttpOcrClient() },
     ContractsService,

@@ -18,6 +18,7 @@ import {
   type SubmitterCommand,
   hiddenTagHtml,
   initialsFooterHtml,
+  documentFooterHtml,
   signatureBlockTags,
   signerRoleLabel,
 } from '@lsi/domain';
@@ -153,7 +154,11 @@ export class SendForSignatureService {
     const rendered = await this.renderer.render({
       html: withSignatureBlock,
       documentTitle: `${contract.reference} — ${contract.title}`,
-      ...(process.env.DOCUSEAL_INITIALS_FOOTER === 'true' ? { footerHtml: initialsFooterHtml(roles) } : {}),
+      // Référence et pagination sur chaque page ; paraphes DocuSeal en plus si activés.
+      footerHtml: documentFooterHtml(
+        contract.reference,
+        process.env.DOCUSEAL_INITIALS_FOOTER === 'true' ? initialsFooterHtml(roles) : '',
+      ),
     });
 
     // Le scope est dans le CHEMIN de stockage (§10.7) : politiques IAM et

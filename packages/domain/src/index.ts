@@ -21,3 +21,6 @@ export * from './pseudonymization/pseudonymize.js';
 export * from './import-extraction/extract-metadata.js';
 export * from './contract/dates.js';
 export * from './contract/deadlines.js';
+export * from './templates/variables.js';
+export * from './templates/clause-diff.js';
+export * from './templates/compose.js';

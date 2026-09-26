@@ -10,7 +10,13 @@ import sanitizeHtml from 'sanitize-html';
  */
 export function sanitizeContractHtml(html: string): string {
   return sanitizeHtml(html, {
-    allowedTags: ['h1', 'h2', 'h3', 'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'a'],
+    allowedTags: [
+      'h1', 'h2', 'h3', 'h4', 'p', 'br', 'hr', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'a',
+      // Annexes (SLA, liste d'actifs, grilles) : tableaux simples, sans style.
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      // Marqueur visuel des variables « à compléter ».
+      'mark',
+    ],
     allowedAttributes: { a: ['href', 'title', 'target', 'rel'] },
     allowedSchemes: ['http', 'https', 'mailto'],
   });

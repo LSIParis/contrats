@@ -53,6 +53,7 @@ export function toContractSnapshot(c: any, extras: SnapshotExtras = {}): Contrac
     acceptedVersionId: c.acceptedVersionId ?? null,
     hasUnreviewedAiClauses: (c.unreviewedAiClauses ?? 0) > 0,
     terminationEffectiveDate: c.terminationEffectiveDate ?? null,
+    hasMissingVariables: (c.missingVariables ?? 0) > 0,
   };
 }
 
