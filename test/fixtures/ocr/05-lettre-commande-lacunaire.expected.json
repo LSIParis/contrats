@@ -1,0 +1,14 @@
+{
+  "prestataireRaisonSociale": null,
+  "prestataireSiren": null,
+  "clientRaisonSociale": null,
+  "clientSiren": null,
+  "dateSignature": "2021-06-07",
+  "dateEffet": "2021-06-07",
+  "dureeMois": null,
+  "reconduction": null,
+  "preavis": null,
+  "montantMensuelHtCentimes": 18000,
+  "montantAnnuelHtCentimes": 216000,
+  "indiceRevision": "IPC"
+}

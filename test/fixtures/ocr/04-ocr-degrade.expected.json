@@ -1,0 +1,14 @@
+{
+  "prestataireRaisonSociale": "ÉTA RÉSEAUX",
+  "prestataireSiren": "302401506",
+  "clientRaisonSociale": "THÊTA DISTRIBUTION",
+  "clientSiren": null,
+  "dateSignature": "2024-03-02",
+  "dateEffet": "2024-03-15",
+  "dureeMois": 24,
+  "reconduction": "TACITE",
+  "preavis": { "quantite": 2, "unite": "MOIS" },
+  "montantMensuelHtCentimes": 230000,
+  "montantAnnuelHtCentimes": null,
+  "indiceRevision": "SYNTEC"
+}
