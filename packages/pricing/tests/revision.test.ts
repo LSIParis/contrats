@@ -90,6 +90,8 @@ describe('revisionCoefficient', () => {
   });
 });
 
+// Les valeurs ci-dessous sont celles du tableau de docs/contrats/04-tarification.md §6.3 :
+// toute modification de l'une impose de modifier l'autre.
 describe('computeRevision — exemple chiffré documenté (04-tarification.md §6.3)', () => {
   test('Syntec S0=321.5, S1=333.2, a=0.15, b=0.85, P0=1250.00', () => {
     const r = computeRevision(
@@ -102,6 +104,7 @@ describe('computeRevision — exemple chiffré documenté (04-tarification.md §
     expect(r.S1).toMatchObject({ period: '2026-07', value: '333.2' });
     // Étapes, telles qu'écrites dans la documentation (40 chiffres significatifs) :
     expect(r.ratio.toString()).toBe('1.036391912908242612752721617418351477449');
+    expect(r.b.times(r.ratio).toString()).toBe('0.8809331259720062208398133748055987558317');
     expect(r.coefficient.toString()).toBe('1.030933125972006220839813374805598755832');
     expect(r.exact.toString()).toBe('1288.66640746500777604976671850699844479');
     expect(r.exact.toDecimalPlaces(6).toFixed(6)).toBe('1288.666407');

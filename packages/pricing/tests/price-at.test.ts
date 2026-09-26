@@ -330,6 +330,22 @@ describe('priceAt — révision native (exemple documenté 04-tarification.md §
     expect(lineOf(r, 'infog')).toMatchObject({ unitPrice: '1288.67', totalHtCents: 128867n });
   });
 
+  test('exemple 2 (§6.4) : 12 postes à P0 = 35,00 € — l’échelle du prix unitaire compte', () => {
+    const postes = line({
+      id: 'postes',
+      unitPrice: '35.00',
+      quantity: { source: 'FIXED', value: '12' },
+      revision: { indexCode: 'SYNTEC', a: '0.15', b: '0.85', referenceDate: '2025-09-15', revisionDate: '2026-09-01' },
+    });
+    // unitPriceScale = 6 : 36,082659 × 12 = 432,991908 → 432,99
+    const r6 = priceAt(input([postes]), '2026-09-15');
+    expect(lineOf(r6, 'postes')).toMatchObject({ unitPrice: '36.082659', totalHtCents: 43299n });
+    expect(stepsOf(r6, 'postes', 'REVISION')[0]?.result).toBe('36.08265940902021772939346811819595645412');
+    // unitPriceScale = 2 : 36,08 × 12 = 432,96
+    const r2 = priceAt(input([postes], { settings: { unitPriceScale: 2 } }), '2026-09-15');
+    expect(lineOf(r2, 'postes')).toMatchObject({ unitPrice: '36.08', totalHtCents: 43296n });
+  });
+
   test('avant la date de révision : P0, et la trace le dit', () => {
     const r = priceAt(input([revised]), '2026-08-31');
     expect(lineOf(r, 'infog').totalHtCents).toBe(125000n);
