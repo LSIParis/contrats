@@ -2,7 +2,8 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Res } from '@nestjs/c
 import type { FastifyReply } from 'fastify';
 import { sendFile } from '../common/http-io.js';
 import { type Scope } from '@lsi/persistence';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import type { Session } from '../auth/session.service.js';
 import { slugifyFilename } from '../documents/filename.js';
 import { ContentService } from './content.service.js';
@@ -19,7 +20,7 @@ export class ContentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SaveContentDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.content.saveContent(scope, id, dto);
   }
 

@@ -22,6 +22,8 @@ import { RemindersReadService } from './read/reminders.service.js';
 import { OIDC_PROVIDER } from './auth/oidc.port.js';
 import { EntraOidcProvider } from './auth/oidc-entra.adapter.js';
 import { HealthController } from './health/health.controller.js';
+import { TenantConfigController } from './tenant/tenant-config.controller.js';
+import { TenantConfigService } from './tenant/tenant-config.service.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { ContentController } from './contracts/content.controller.js';
@@ -109,10 +111,12 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     NotificationsController,
     AuditController,
     HealthController,
+    TenantConfigController,
     TemplatesController,
     AiDraftingController,
   ],
   providers: [
+    TenantConfigService,
     ContractsService,
     ContentService,
     CustomersService,

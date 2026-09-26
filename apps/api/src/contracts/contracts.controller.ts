@@ -24,7 +24,8 @@ import { ListContractsDto } from './dto/list-contracts.dto.js';
 import { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import { RefuseRenewalDto } from './dto/refuse-renewal.dto.js';
 import { AmendContractDto } from './dto/amend-contract.dto.js';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import { ServiceReadable } from '../auth/service-readable.decorator.js';
 import type { Session } from '../auth/session.service.js';
 import { IsString, MinLength } from 'class-validator';
@@ -61,7 +62,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Body() dto: CreateContractDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.contracts.create(scope, dto, new Date());
   }
 
@@ -71,7 +72,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Req() req: FastifyRequest,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.import');
     const { file, fields } = await readMultipart(req, 'document');
     const dto = await validateFields(ImportContractDto, fields);
     if (!file) throw new BadRequestException('Document manquant.');
@@ -119,7 +120,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.contracts.applyEvent(
       scope,
       id,
@@ -136,7 +137,7 @@ export class ContractsController {
   ) {
     // RM-10 : le rôle autorise, mais le DOMAINE refusera si l'acteur est
     // celui qui a soumis. Rôle, scope et état sont trois contrôles distincts.
-    assertRole(session, ['MSP_ADMIN', 'LEGAL_REVIEWER']);
+    assertCan(session, 'contracts.review');
     return this.contracts.applyEvent(
       scope,
       id,
@@ -152,7 +153,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReasonDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'LEGAL_REVIEWER']);
+    assertCan(session, 'contracts.review');
     return this.contracts.applyEvent(
       scope,
       id,
@@ -170,7 +171,7 @@ export class ContractsController {
     @Body() dto: SendForSignatureDto,
     @Headers('idempotency-key') idempotencyKey: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.sendForSignature');
 
     // Obligatoire, pas optionnelle. Sans clé, un timeout réseau suivi d'un
     // réessai enverrait DEUX invitations au client (§11.8). On refuse plutôt
@@ -196,7 +197,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TerminateContractDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.terminate(scope, id, dto, session, new Date());
   }
 
@@ -206,7 +207,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.renew(scope, id, session, new Date());
   }
 
@@ -217,7 +218,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RefuseRenewalDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.refuseRenewal(scope, id, dto.reason, session, new Date());
   }
 
@@ -228,7 +229,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AmendContractDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.contracts.amend(scope, id, dto, session, new Date());
   }
 
@@ -238,7 +239,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.archive(scope, id, session.userId, new Date());
   }
 
@@ -248,7 +249,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.unarchive(scope, id, session.userId, new Date());
   }
 
@@ -259,7 +260,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReasonDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.applyEvent(
       scope,
       id,

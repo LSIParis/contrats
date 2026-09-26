@@ -1,6 +1,6 @@
 import { IsArray, IsEmail, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
-const ROLE_CODES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'TECHNICIAN', 'CLIENT_SIGNER', 'CLIENT_VIEWER'] as const;
+const ROLE_CODES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER', 'TECHNICIAN', 'CLIENT_SIGNER', 'CLIENT_VIEWER'] as const;
 
 export class CreateUserDto {
   @IsEnum(['INTERNAL', 'CLIENT']) kind!: 'INTERNAL' | 'CLIENT';

@@ -40,3 +40,4 @@ export {
 export { createCustomer, CustomerSirenConflict, type NewCustomerInput } from './customer-write.js';
 export { appendAudit, verifyAuditChain, type AuditAppendInput } from './audit-write.js';
 export { pingDatabase } from './health.js';
+export { setTransitionContext } from './transition.js';

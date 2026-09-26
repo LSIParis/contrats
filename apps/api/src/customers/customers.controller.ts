@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { type Scope } from '@lsi/persistence';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import type { Session } from '../auth/session.service.js';
 import { CustomersService } from './customers.service.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
@@ -26,7 +27,7 @@ export class CustomersController {
     @CurrentSession() session: Session,
     @Body() dto: CreateCustomerDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'customers.write');
     return this.customers.create(scope, session, dto);
   }
 
@@ -37,7 +38,7 @@ export class CustomersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateContactDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'customers.write');
     return this.customers.addContact(scope, id, dto);
   }
 }

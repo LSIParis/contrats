@@ -53,6 +53,10 @@ enum RoleCode {
   TECHNICIAN
   CLIENT_SIGNER
   CLIENT_VIEWER
+  /// Signataire interne (brief : signataire_interne). Portée tous clients.
+  INTERNAL_SIGNATORY
+  /// Lecteur (brief : lecteur). Portée portefeuille, lecture seule.
+  READER
 }
 
 enum CustomerStatus {
@@ -218,6 +222,25 @@ enum InitiatedBy {
   CLIENT
 }
 
+/// Nature d'un fichier stocké (migration 17).
+enum StoredDocumentKind {
+  LEGACY_SCAN
+  OCR_TEXT
+  OCR_PDF
+  CONTRACT_PDF
+  SIGNED_PDF
+  SIGNATURE_AUDIT_TRAIL
+  TERMINATION_LETTER
+  ATTACHMENT
+}
+
+enum StoredDocumentOrigin {
+  UPLOAD
+  GENERATED
+  DOCUSEAL
+  OCR
+}
+
 // ===========================================================================
 // Classe « plateforme »
 // ===========================================================================
@@ -230,11 +253,13 @@ model Tenant {
   createdAt DateTime     @map("created_at")
   updatedAt DateTime     @map("updated_at")
 
-  users     User[]
-  roles     Role[]
-  customers Customer[]
-  templates ContractTemplate[]
-  contracts Contract[]
+  users        User[]
+  roles        Role[]
+  customers    Customer[]
+  templates    ContractTemplate[]
+  contracts    Contract[]
+  featureFlags TenantFeatureFlag[]
+  settings     TenantSetting[]
 
   @@map("tenants")
 }
@@ -346,6 +371,7 @@ model Customer {
   contracts     Contract[]
   clientUsers   User[]            @relation("ClientUsers")
   access        CustomerAccess[]
+  documents     StoredDocument[]
 
   /// Clé candidate composite : cible des FK porteuses de scope (§8.4).
   @@unique([id, tenantId])
@@ -509,6 +535,8 @@ model Contract {
   reminders         Reminder[]
   renewalRequests   RenewalRequest[]  @relation("ParentContract")
   cancellations     Cancellation[]
+  storedDocuments   StoredDocument[]
+  lifecycleEvents   LifecycleEvent[]
 
   /// Clé candidate composite portant le scope complet : cible de TOUTES
   /// les FK des tables filles (§8.4).
@@ -894,3 +922,91 @@ model Cancellation {
   @@index([tenantId, customerId, contractId])
   @@map("cancellations")
 }
+
+// ===========================================================================
+// Socle v2 (migration 17) — docs/contrats/01-domaine.md
+// ===========================================================================
+
+/// Feature flag par tenant. ABSENCE de ligne = désactivé (défaut du brief).
+model TenantFeatureFlag {
+  tenantId        String   @map("tenant_id") @db.Uuid
+  key             String
+  enabled         Boolean
+  updatedAt       DateTime @map("updated_at")
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([tenantId, key])
+  @@map("tenant_feature_flags")
+}
+
+/// Paramètre de tenant, validé par un schéma Zod par clé côté API.
+/// Jamais de secret ici.
+model TenantSetting {
+  tenantId        String   @map("tenant_id") @db.Uuid
+  key             String
+  value           Json
+  updatedAt       DateTime @map("updated_at")
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([tenantId, key])
+  @@map("tenant_settings")
+}
+
+/// Référentiel unique des fichiers. ÉCRITURE UNIQUE : UPDATE/DELETE révoqués
+/// au rôle applicatif. Pas d'updatedAt : son absence documente l'immuabilité.
+model StoredDocument {
+  id               String               @id @db.Uuid
+  tenantId         String               @map("tenant_id") @db.Uuid
+  customerId       String               @map("customer_id") @db.Uuid
+  contractId       String?              @map("contract_id") @db.Uuid
+  kind             StoredDocumentKind
+  origin           StoredDocumentOrigin
+  objectKey        String               @unique @map("object_key")
+  filename         String
+  contentType      String               @map("content_type")
+  sizeBytes        BigInt               @map("size_bytes")
+  /// Empreinte du fichier tel que reçu/produit : fonde la valeur probante.
+  sha256           String               @db.Char(64)
+  /// Copie OCR → original dont elle dérive.
+  derivedFromId    String?              @map("derived_from_id") @db.Uuid
+  uploadedByUserId String?              @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime             @map("created_at")
+
+  customer    Customer         @relation(fields: [customerId, tenantId], references: [id, tenantId], map: "stored_documents_customer_fk", onDelete: NoAction, onUpdate: NoAction)
+  contract    Contract?        @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "stored_documents_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+  derivedFrom StoredDocument?  @relation("Derivation", fields: [derivedFromId, tenantId, customerId], references: [id, tenantId, customerId], map: "stored_documents_derived_fk", onDelete: NoAction, onUpdate: NoAction)
+  derivatives StoredDocument[] @relation("Derivation")
+
+  @@unique([id, tenantId, customerId], map: "stored_documents_scope_key")
+  @@index([tenantId, customerId, contractId], map: "stored_documents_contract_idx")
+  @@index([tenantId, sha256], map: "stored_documents_sha_idx")
+  @@map("stored_documents")
+}
+
+/// Journal des transitions d'état. Écrit EXCLUSIVEMENT par le trigger
+/// `contracts_status_transition` (migration 17) : l'application ne peut ni
+/// l'alimenter à la main ni le réécrire (INSERT/UPDATE/DELETE révoqués).
+model LifecycleEvent {
+  id          String          @id @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  customerId  String          @map("customer_id") @db.Uuid
+  contractId  String          @map("contract_id") @db.Uuid
+  fromStatus  ContractStatus? @map("from_status")
+  toStatus    ContractStatus  @map("to_status")
+  event       String?
+  reason      String?
+  actorUserId String?         @map("actor_user_id") @db.Uuid
+  actorKind   ActorKind       @map("actor_kind")
+  occurredAt  DateTime        @map("occurred_at")
+  seq         BigInt          @default(autoincrement())
+
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "lifecycle_events_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, contractId, seq], map: "lifecycle_events_contract_idx")
+  @@map("lifecycle_events")
+}
+

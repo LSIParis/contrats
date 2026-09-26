@@ -19,11 +19,13 @@ const ROLE_LABEL: Record<string, string> = {
   MSP_ADMIN: 'Administrateur',
   ACCOUNT_MANAGER: 'Chargé de compte',
   LEGAL_REVIEWER: 'Relecteur juridique',
+  INTERNAL_SIGNATORY: 'Signataire interne',
+  READER: 'Lecteur',
   TECHNICIAN: 'Technicien',
   CLIENT_SIGNER: 'Signataire client',
   CLIENT_VIEWER: 'Lecteur client',
 };
-const INTERNAL_ROLES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'TECHNICIAN'];
+const INTERNAL_ROLES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER', 'TECHNICIAN'];
 const CLIENT_ROLES = ['CLIENT_SIGNER', 'CLIENT_VIEWER'];
 
 @Injectable()
