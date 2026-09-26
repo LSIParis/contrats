@@ -8,7 +8,9 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "start": "node --import @swc-node/register/esm-register src/main.ts",
-    "start:dev": "node --watch --import @swc-node/register/esm-register src/main.ts"
+    "start:dev": "node --watch --import @swc-node/register/esm-register src/main.ts",
+    "start:worker": "node --import @swc-node/register/esm-register src/worker.ts",
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/api"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.114.0",

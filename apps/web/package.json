@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/web"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",

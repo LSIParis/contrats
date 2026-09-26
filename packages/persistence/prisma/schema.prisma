@@ -488,6 +488,11 @@ model Contract {
   createdByUserId String   @map("created_by_user_id") @db.Uuid
   updatedByUserId String   @map("updated_by_user_id") @db.Uuid
 
+  /// Recherche plein texte : colonne GÉNÉRÉE par PostgreSQL (migration 4),
+  /// jamais écrite par l'application. Déclarée ici uniquement pour que le
+  /// contrôle de dérive (db:check-drift) la reconnaisse.
+  searchVector Unsupported("tsvector")? @default(dbgenerated()) @map("search_vector")
+
   tenant          Tenant                   @relation(fields: [tenantId], references: [id])
   customer        Customer                 @relation(fields: [customerId, tenantId], references: [id, tenantId])
   templateVersion ContractTemplateVersion? @relation(fields: [templateVersionId, tenantId], references: [id, tenantId])
@@ -513,6 +518,7 @@ model Contract {
   @@index([tenantId, customerId, endDate])
   @@index([tenantId, ownerUserId, status])
   @@index([tenantId, customerId, archivedAt])
+  @@index([searchVector], map: "contracts_search_idx", type: Gin)
   @@map("contracts")
 }
 
@@ -683,8 +689,8 @@ model Comment {
 
   resolvedAt       DateTime? @map("resolved_at")
   resolvedByUserId String?   @map("resolved_by_user_id") @db.Uuid
-  editedAt         DateTime? @map("edited_at")
-  deletedAt        DateTime? @map("deleted_at")
+  editedAt         DateTime? @map("edited_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedByUserId  String?   @map("deleted_by_user_id") @db.Uuid
   createdAt        DateTime  @map("created_at")
   updatedAt        DateTime  @map("updated_at")
@@ -834,7 +840,7 @@ model AuditLog {
 
   @@index([tenantId, customerId, occurredAt(sort: Desc)])
   @@index([tenantId, resourceType, resourceId, occurredAt(sort: Desc)])
-  @@index([tenantId, seq])
+  @@index([tenantId, seq], map: "audit_logs_tenant_seq_idx")
   @@map("audit_logs")
 }
 

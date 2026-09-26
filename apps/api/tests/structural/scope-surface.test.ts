@@ -54,6 +54,8 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
     expect(unguarded.sort()).toEqual([
       'GET /health',
       'GET /health/ready',
+      'GET /healthz',
+      'GET /readyz',
       'GET /v1/auth/callback',
       'GET /v1/auth/login',
       'GET /v1/portal/auth/verify',

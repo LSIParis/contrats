@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/domain"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
