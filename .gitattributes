@@ -1,0 +1,9 @@
+# Fins de ligne LF partout : les scripts shell et fichiers copiés dans les
+# images Docker cassent avec CRLF (/bin/sh^M: not found).
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+*.ico binary
