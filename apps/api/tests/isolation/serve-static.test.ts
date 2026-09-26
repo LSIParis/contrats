@@ -1,11 +1,12 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { NestFactory } from '@nestjs/core';
-import type { INestApplication } from '@nestjs/common';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import request from 'supertest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AppModule } from '../../src/app.module.js';
+import { configureApp, createFastifyAdapter } from '../../src/bootstrap.js';
 
 // `apps/web/dist` (le chemin lu par ServeStaticModule, cf. app.module.ts) —
 // on y dépose un index.html minimal pour que le repli SPA ait quelque chose
@@ -38,21 +39,21 @@ for (let dir = distDir; !existsSync(dir); dir = dirname(dir)) {
 }
 const MARKER = 'lsi-spa-fallback-marker';
 
-let app: INestApplication;
+let app: NestFastifyApplication;
 
 beforeAll(async () => {
   mkdirSync(distDir, { recursive: true });
   writeFileSync(indexPath, `<!doctype html><html><body>${MARKER}</body></html>`);
 
-  // NestFactory.create() = le vrai chemin de bootstrap (celui de src/main.ts),
-  // PAS Test.createTestingModule(...).createNestApplication(). Ce dernier ne
-  // garantit pas que le loader Express du ServeStaticModule s'enregistre
-  // réellement sur l'adaptateur HTTP : le repli SPA pourrait rester inerte
-  // et un test qui l'exercerait passerait sans rien prouver. On vérifie
-  // d'ailleurs explicitement, ci-dessous, que le repli est bien actif avant
-  // de s'appuyer dessus pour prouver l'invariant.
-  app = await NestFactory.create(AppModule, { logger: false });
+  // NestFactory.create() + configureApp() = le vrai chemin de bootstrap
+  // (celui de src/main.ts). Le repli SPA est assemblé par configureApp() —
+  // c'est donc lui qu'on exerce, pas une recomposition propre au test. On
+  // vérifie d'ailleurs explicitement, ci-dessous, que le repli est bien actif
+  // avant de s'appuyer dessus pour prouver l'invariant.
+  app = await NestFactory.create<NestFastifyApplication>(AppModule, createFastifyAdapter(), { logger: false });
+  await configureApp(app);
   await app.init();
+  await app.getHttpAdapter().getInstance().ready();
 });
 
 afterAll(async () => {

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Res } from '@nestjs/common';
 import { IsString, MaxLength, MinLength } from 'class-validator';
-import type { Response } from 'express';
+import type { FastifyReply } from 'fastify';
 import { type Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
@@ -28,9 +28,9 @@ export class PortalContractsController {
   }
 
   @Get('contracts/:id/sign')
-  async sign(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async sign(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     const url = await this.portal.signRedirectUrl(scope, id);
-    res.redirect(302, url);
+    void res.redirect(302, url);
   }
 
   @Get('me')

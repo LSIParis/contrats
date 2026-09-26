@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
@@ -12,9 +13,7 @@ let fx: TwoCustomerFixture;
 beforeAll(async () => {
   process.env.CONTRACT_SERVICE_API_KEY = KEY;
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  await app.init();
+  app = await createTestApp(mod);
   fx = await seedTwoCustomers();
   // Le tenant de service se résout via DEFAULT_TENANT_SLUG → aligner sur le tenant seedé.
   process.env.DEFAULT_TENANT_SLUG = fx.tenantSlug;

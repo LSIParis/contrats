@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { LoggerModule } from 'nestjs-pino';
 import { LOG_REDACT_PATHS, logReqSerializer } from './observability/logging.js';
-import { fileURLToPath } from 'node:url';
 import { uuidv7 } from '@lsi/persistence';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
@@ -87,42 +85,10 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
         // le loguer en clair = fuite d'auth dans stdout → Portainer → backups).
         redact: LOG_REDACT_PATHS,
         serializers: { req: logReqSerializer },
-        genReqId: (req: any, res: any) => {
-          const incoming = typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined;
-          const id = incoming ?? uuidv7();
-          res.setHeader('x-request-id', id);
-          return id;
-        },
+        // L'id est attribué par Fastify (bootstrap.ts, requestIdFor) et posé
+        // sur la requête brute : pino-http le reprend, sans en générer un autre.
+        genReqId: (req: any) => req.id ?? uuidv7(),
       },
-    }),
-    ServeStaticModule.forRoot({
-      // Le bundle Vite ; en dev il peut être absent (Vite sert lui-même) —
-      // ServeStatic renvoie alors 404 sur les routes SPA, ce qui est sans effet
-      // puisque le dev passe par le serveur Vite (proxy /v1 → 3001).
-      //
-      // ATTENTION : résolu depuis `import.meta.url` (l'emplacement RÉEL de ce
-      // fichier), JAMAIS depuis `process.cwd()`. En production, le CMD du
-      // Dockerfile est `pnpm --filter @lsi/api exec node ... src/main.ts` —
-      // `pnpm --filter <pkg> exec` lance le process avec cwd = le dossier du
-      // package (`/app/apps/api`), PAS la racine du repo. Un `join(cwd(),
-      // 'apps/web/dist')` visait donc `/app/apps/api/apps/web/dist`, qui
-      // n'existe pas : le build réel est le dossier frère `/app/apps/web/dist`.
-      // Résultat en prod : le SPA n'était JAMAIS servi (chaque route non-/v1
-      // tombait sur un sendFile d'un chemin absent). `import.meta.url` pointe
-      // sur ce fichier source (`.../apps/api/src/app.module.ts`, exécuté via
-      // SWC) et sa résolution relative est indépendante du cwd du process.
-      rootPath: fileURLToPath(new URL('../../web/dist', import.meta.url)),
-      // JAMAIS capturer l'API ni le healthcheck avec le repli index.html.
-      //
-      // ATTENTION : `@nestjs/serve-static@4.0.2` compile `exclude` avec
-      // `path-to-regexp@0.2.5` (Express 4). Dans CETTE version, un `*` nu
-      // (pas rattaché à un `:nom` ou `(...)`) est un ASTÉRISQUE LITTÉRAL,
-      // pas un joker — `/v1*` ne matche donc RIEN (ni `/v1`, ni `/v1/x`) et
-      // ne fait JAMAIS ce qu'on croit lire. C'est un piège classé « looks
-      // right, does nothing » : ne JAMAIS « simplifier » en `/v1*`.
-      // `/v1/:path*` (paramètre nommé + `*`) matche bien `/v1`, `/v1/x` et
-      // `/v1/x/y/z` — vérifié avec `pathToRegexp('/v1/:path*').exec(...)`.
-      exclude: ['/v1/:path*', '/health'],
     }),
   ],
   controllers: [

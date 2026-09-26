@@ -9,12 +9,11 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
   Res,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { readMultipart, sendFile, validateFields } from '../common/http-io.js';
 import type { Scope } from '@lsi/persistence';
 import { ContractsService } from './contracts.service.js';
 import { SendForSignatureService } from '../signature/send-for-signature.service.js';
@@ -67,14 +66,14 @@ export class ContractsController {
   }
 
   @Post('import')
-  @UseInterceptors(FileInterceptor('document', { limits: { fileSize: 20 * 1024 * 1024 } }))
   async import(
     @CurrentScope() scope: Scope,
     @CurrentSession() session: Session,
-    @UploadedFile() file: Express.Multer.File | undefined,
-    @Body() dto: ImportContractDto,
+    @Req() req: FastifyRequest,
   ) {
     assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    const { file, fields } = await readMultipart(req, 'document');
+    const dto = await validateFields(ImportContractDto, fields);
     if (!file) throw new BadRequestException('Document manquant.');
     const ALLOWED = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!ALLOWED.includes(file.mimetype)) throw new BadRequestException('Format non supporté (PDF ou DOCX).');
@@ -102,12 +101,9 @@ export class ContractsController {
   }
 
   @Get(':id/imported-document')
-  async importedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async importedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     const { buffer, name, contentType } = await this.contracts.getImportedDocument(scope, id);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(name, 'document')}"`);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.send(buffer);
+    sendFile(res, { body: buffer, contentType, filename: slugifyFilename(name, 'document') });
   }
 
   @Get(':id/allowed-actions')

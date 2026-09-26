@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeAll, beforeEach } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
 import { type INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import cookieParser from 'cookie-parser';
 import { AppModule } from '../../src/app.module.js';
 import { OIDC_PROVIDER } from '../../src/auth/oidc.port.js';
 import { FakeOidcProvider } from '../support/fake-oidc.js';
@@ -19,9 +19,7 @@ beforeAll(async () => {
     .overrideProvider(OIDC_PROVIDER)
     .useValue(oidc)
     .compile();
-  app = mod.createNestApplication({ rawBody: true });
-  app.use(cookieParser());
-  await app.init();
+  app = await createTestApp(mod);
 
   fx = await seedTwoCustomers();
   process.env.DEFAULT_TENANT_SLUG = fx.tenantSlug;

@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
@@ -46,7 +47,7 @@ async function seedSignableContractB(signerStatus: string, slug: string | null) 
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true })); await app.init();
+  app = await createTestApp(mod);
   fx = await seedTwoCustomers();
   clientUserId = uuidv7();
   await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => tx.user.create({ data: {

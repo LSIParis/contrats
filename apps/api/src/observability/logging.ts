@@ -8,6 +8,8 @@
 export const LOG_REDACT_PATHS = [
   'req.headers.cookie',
   'req.headers.authorization',
+  // Clés d'API de service (historique X-Api-Key) et publique (/api/v1).
+  'req.headers["x-api-key"]',
   'res.headers["set-cookie"]',
 ];
 

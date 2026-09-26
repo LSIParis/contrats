@@ -45,3 +45,6 @@ Thumbs.db
 .terraform/
 *.tfvars
 !*.tfvars.example
+
+# Worktrees et état local de Claude Code
+.claude/

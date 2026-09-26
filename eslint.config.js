@@ -32,7 +32,7 @@ const noRawUnsafe = [
 
 export default [
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/*.d.ts'],
+    ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/*.d.ts', '.claude/**', '**/coverage/**'],
   },
 
   // ---------------------------------------------------------------------

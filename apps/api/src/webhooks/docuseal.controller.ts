@@ -1,6 +1,6 @@
 import { Controller, Post, Headers, HttpCode, Req, BadRequestException } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
-import type { Request } from 'express';
+import type { FastifyRequest } from 'fastify';
 import { Public } from '../auth/public.decorator.js';
 import { DocusealWebhookService } from './docuseal-webhook.service.js';
 
@@ -22,7 +22,7 @@ export class DocusealWebhookController {
   @Post('docuseal')
   @HttpCode(200)
   async handle(
-    @Req() req: RawBodyRequest<Request>,
+    @Req() req: RawBodyRequest<FastifyRequest>,
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     // Le CORPS BRUT, pas le JSON reparsé. Un HMAC calculé sur

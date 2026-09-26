@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeAll, beforeEach } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import cookieParser from 'cookie-parser';
 import { AppModule } from '../../src/app.module.js';
 import { EMAIL_SENDER } from '../../src/notifications/email.token.js';
 import { FakeEmailSender } from '../support/fake-email.js';
@@ -19,10 +19,7 @@ beforeAll(async () => {
     .overrideProvider(EMAIL_SENDER)
     .useValue(email)
     .compile();
-  app = mod.createNestApplication({ rawBody: true });
-  app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  await app.init();
+  app = await createTestApp(mod);
 
   fx = await seedTwoCustomers();
   process.env.DEFAULT_TENANT_SLUG = fx.tenantSlug;

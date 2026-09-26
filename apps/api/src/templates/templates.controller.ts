@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import type { FastifyReply } from 'fastify';
+import { sendFile } from '../common/http-io.js';
 import type { Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
 import type { Session } from '../auth/session.service.js';
@@ -45,20 +46,20 @@ export class TemplatesController {
   }
 
   @Get(':id/export.pdf')
-  async exportPdf(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async exportPdf(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     assertRole(s, [...ROLES]);
     const { buffer, title } = await this.templates.exportPdf(scope, id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'modele')}.pdf"`);
-    res.send(buffer);
+    sendFile(res, { body: buffer, contentType: 'application/pdf', filename: `${slugifyFilename(title, 'modele')}.pdf` });
   }
 
   @Get(':id/export.docx')
-  async exportDocx(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async exportDocx(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     assertRole(s, [...ROLES]);
     const { buffer, title } = await this.templates.exportDocx(scope, id);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'modele')}.docx"`);
-    res.send(buffer);
+    sendFile(res, {
+      body: buffer,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: `${slugifyFilename(title, 'modele')}.docx`,
+    });
   }
 }

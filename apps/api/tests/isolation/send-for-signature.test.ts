@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
@@ -33,9 +34,7 @@ beforeAll(async () => {
     .useValue(renderer)
     .compile();
 
-  app = mod.createNestApplication({ rawBody: true });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  await app.init();
+  app = await createTestApp(mod);
 
   fx = await seedTwoCustomers();
 

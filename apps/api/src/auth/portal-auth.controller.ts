@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Query, Req, Res } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { IsEmail } from 'class-validator';
 import { findTenantBySlug } from '@lsi/persistence';
 import { Public } from './public.decorator.js';
@@ -43,24 +43,24 @@ export class PortalAuthController {
 
   @Public()
   @Get('verify')
-  async verify(@Query('token') token: string, @Res() res: Response) {
+  async verify(@Query('token') token: string, @Res() res: FastifyReply) {
     const appUrl = process.env.APP_URL ?? 'https://contrats.lsi-maintenance.fr';
     const result = token ? await this.magic.verify(token) : null;
     if (!result) {
       // Lien expiré ou déjà utilisé (§14.2) : redirection visible côté front,
       // pas de JSON — le lien magique est ouvert par le navigateur (GET direct).
-      res.redirect(302, `${appUrl}/portal/login?error=lien`);
+      void res.redirect(302, `${appUrl}/portal/login?error=lien`);
       return;
     }
     setSessionCookie(res, result.sessionId, result.ttl);
-    res.redirect(302, `${appUrl}/portal/contracts`);
+    void res.redirect(302, `${appUrl}/portal/contracts`);
   }
 
   @Public()
   @Post('logout')
   @HttpCode(200)
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const sid = (req as any).cookies?.[SESSION_COOKIE] ?? req.headers['x-lsi-session'];
+  async logout(@Req() req: FastifyRequest, @Res({ passthrough: true }) res: FastifyReply) {
+    const sid = req.cookies?.[SESSION_COOKIE] ?? req.headers['x-lsi-session'];
     if (typeof sid === 'string') await this.sessions.revoke(sid);
     clearSessionCookie(res);
     return { message: 'Déconnecté.' };

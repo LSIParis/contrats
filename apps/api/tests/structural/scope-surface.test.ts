@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { AppModule } from '../../src/app.module.js';
@@ -11,8 +12,7 @@ let routes: RouteInfo[];
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication();
-  await app.init();
+  app = await createTestApp(mod);
   routes = listRoutes(app);
 });
 
