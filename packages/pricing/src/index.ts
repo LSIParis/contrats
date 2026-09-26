@@ -26,3 +26,4 @@ export * from './overrides.js';
 export * from './trace.js';
 export * from './schedule.js';
 export * from './price-at.js';
+export * from './quantity.js';
