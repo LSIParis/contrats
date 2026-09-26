@@ -103,6 +103,8 @@ const ROLE_FR: Record<string, string> = {
   MSP_ADMIN: 'Administrateur',
   ACCOUNT_MANAGER: 'Chargé de compte',
   LEGAL_REVIEWER: 'Relecteur juridique',
+  INTERNAL_SIGNATORY: 'Signataire interne',
+  READER: 'Lecteur',
   TECHNICIAN: 'Technicien',
   CLIENT_SIGNER: 'Signataire client',
   CLIENT_VIEWER: 'Lecteur client',
@@ -143,6 +145,34 @@ export function commentAuthorLabel(kind: string): string {
 export function commentVisibilityLabel(visibility: string): string {
   return visibility === 'SHARED' ? 'Partagé client' : 'Interne';
 }
+
+/** Natures d'échéance (02-cycle-de-vie.md §6). */
+const DEADLINE_KIND_FR: Record<string, string> = {
+  PERIOD_END: 'Fin de période',
+  NOTICE_DEADLINE: 'Date limite de dénonciation',
+  RENEWAL_DECISION: 'Décision de renouvellement',
+  CHATEL_NOTICE: 'Information loi Chatel',
+  PRICE_REVISION: 'Révision tarifaire',
+  TERMINATION_EFFECTIVE: 'Prise d’effet de la résiliation',
+};
+export const deadlineKindLabel = (s: string): string => DEADLINE_KIND_FR[s] ?? s;
+
+/** États de l'OCR d'un contrat importé (03-import-existant.md). */
+const OCR_STATUS_FR: Record<string, string> = {
+  PENDING: 'En attente',
+  RUNNING: 'En cours',
+  DONE: 'Terminé',
+  FAILED: 'Échec',
+  SKIPPED: 'Non nécessaire',
+};
+export const ocrStatusLabel = (s: string): string => OCR_STATUS_FR[s] ?? s;
+
+const RENEWAL_MODE_FR: Record<string, string> = {
+  NONE: 'Aucune (terme ferme)',
+  TACIT: 'Tacite reconduction',
+  EXPRESS: 'Reconduction expresse',
+};
+export const renewalModeLabel = (s: string): string => RENEWAL_MODE_FR[s] ?? s;
 
 export function notificationTypeLabel(type: string): string {
   if (type === 'CLIENT_COMMENT') return 'Message client';

@@ -5,10 +5,12 @@ import { apiGet } from '../../lib/api.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Table } from '../../ui/table.js';
 import { StatusBadge } from '../../ui/badge.js';
+import { ImportedBadge } from './imported-badge.js';
 
 interface Row {
   id: string; reference: string; title: string;
   customer: { name: string }; status: string; endDate: string | null;
+  origin?: 'NATIVE' | 'IMPORTED';
 }
 interface ListResponse { data: Row[]; pagination: { nextCursor: string | null; hasMore: boolean }; }
 
@@ -39,7 +41,7 @@ export function ContractsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Contrats</h1>
         <Link to="/contracts/import" className="text-sm text-lsi hover:underline">
-          Importer un contrat existant
+          Importer des contrats existants
         </Link>
       </div>
       <input
@@ -63,9 +65,23 @@ export function ContractsPage() {
             {rows.map((c) => (
               <tr key={c.id} className="border-b hover:bg-gray-50">
                 <td className="py-2"><Link to={`/contracts/${c.id}`} className="text-lsi hover:underline">{c.reference}</Link></td>
-                <td>{c.title}</td>
+                <td>
+                  <span className="flex flex-wrap items-center gap-2">
+                    {c.title}
+                    {c.origin === 'IMPORTED' && <ImportedBadge />}
+                  </span>
+                </td>
                 <td>{c.customer.name}</td>
-                <td><StatusBadge status={c.status} /></td>
+                <td>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <StatusBadge status={c.status} />
+                    {c.status === 'IMPORTED_PENDING_VALIDATION' && (
+                      <Link to={`/contracts/${c.id}/import`} className="text-13 text-primary hover:underline">
+                        Valider l’import<span className="sr-only"> {c.reference}</span>
+                      </Link>
+                    )}
+                  </span>
+                </td>
                 <td>{c.endDate ? new Date(c.endDate).toLocaleDateString('fr-FR') : '—'}</td>
               </tr>
             ))}
