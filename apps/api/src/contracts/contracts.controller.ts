@@ -9,16 +9,14 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  Req,
   Res,
 } from '@nestjs/common';
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import { readMultipart, sendFile, validateFields } from '../common/http-io.js';
+import type { FastifyReply } from 'fastify';
+import { sendFile } from '../common/http-io.js';
 import type { Scope } from '@lsi/persistence';
 import { ContractsService } from './contracts.service.js';
 import { SendForSignatureService } from '../signature/send-for-signature.service.js';
 import { CreateContractDto } from './dto/create-contract.dto.js';
-import { ImportContractDto } from './dto/import-contract.dto.js';
 import { SendForSignatureDto } from './dto/send-for-signature.dto.js';
 import { ListContractsDto } from './dto/list-contracts.dto.js';
 import { TerminateContractDto } from './dto/terminate-contract.dto.js';
@@ -64,21 +62,6 @@ export class ContractsController {
   ) {
     assertCan(session, 'contracts.write');
     return this.contracts.create(scope, dto, new Date());
-  }
-
-  @Post('import')
-  async import(
-    @CurrentScope() scope: Scope,
-    @CurrentSession() session: Session,
-    @Req() req: FastifyRequest,
-  ) {
-    assertCan(session, 'contracts.import');
-    const { file, fields } = await readMultipart(req, 'document');
-    const dto = await validateFields(ImportContractDto, fields);
-    if (!file) throw new BadRequestException('Document manquant.');
-    const ALLOWED = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!ALLOWED.includes(file.mimetype)) throw new BadRequestException('Format non supporté (PDF ou DOCX).');
-    return this.contracts.importContract(scope, dto, file, new Date());
   }
 
   @Get()

@@ -7,4 +7,8 @@ export class CreateContactDto {
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsString() @MaxLength(120) jobTitle?: string;
   @IsOptional() @IsBoolean() isPrimary?: boolean;
+  /** Habilité à signer pour le client (signataire DocuSeal proposé). */
+  @IsOptional() @IsBoolean() isSignatory?: boolean;
+  /** Qualité à signer : gérant, président, DG, mandataire… (brief §1). */
+  @IsOptional() @IsString() @MaxLength(120) signingCapacity?: string;
 }

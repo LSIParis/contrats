@@ -49,26 +49,40 @@ export async function readMultipart(
   req: FastifyRequest,
   fileField: string,
 ): Promise<{ file: UploadedDocument | undefined; fields: Record<string, string> }> {
+  const { files, fields } = await readMultipartFiles(req, fileField, 1);
+  return { file: files[0], fields };
+}
+
+/**
+ * Variante multi-fichiers (dépôt par lot). Au-delà de `maxFiles` fichiers dans
+ * le champ attendu : 400, plutôt qu'une troncature silencieuse du lot.
+ */
+export async function readMultipartFiles(
+  req: FastifyRequest,
+  fileField: string,
+  maxFiles: number,
+): Promise<{ files: UploadedDocument[]; fields: Record<string, string> }> {
   if (!req.isMultipart()) throw new BadRequestException('Requête multipart/form-data attendue.');
   const fields: Record<string, string> = {};
-  let file: UploadedDocument | undefined;
+  const files: UploadedDocument[] = [];
   try {
     for await (const part of req.parts()) {
       if (part.type === 'file') {
         const buffer = await part.toBuffer();
         if (part.fieldname !== fileField) continue; // pièce inattendue : ignorée, jamais stockée
-        file = { buffer, originalname: part.filename, mimetype: part.mimetype, size: buffer.length };
+        if (files.length >= maxFiles) throw new BadRequestException(`Au plus ${maxFiles} fichier(s) par envoi.`);
+        files.push({ buffer, originalname: part.filename, mimetype: part.mimetype, size: buffer.length });
       } else {
         fields[part.fieldname] = String(part.value);
       }
     }
   } catch (e) {
-    if ((e as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') {
-      throw new PayloadTooLargeException('Fichier trop volumineux.');
-    }
+    const code = (e as { code?: string }).code;
+    if (code === 'FST_REQ_FILE_TOO_LARGE') throw new PayloadTooLargeException('Fichier trop volumineux.');
+    if (code === 'FST_FILES_LIMIT') throw new BadRequestException(`Au plus ${maxFiles} fichier(s) par envoi.`);
     throw e;
   }
-  return { file, fields };
+  return { files, fields };
 }
 
 /**

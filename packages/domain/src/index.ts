@@ -20,3 +20,4 @@ export * from './notifications/email-sender.port.js';
 export * from './pseudonymization/pseudonymize.js';
 export * from './import-extraction/extract-metadata.js';
 export * from './contract/dates.js';
+export * from './contract/deadlines.js';

@@ -153,26 +153,24 @@ export class LifecycleService {
       { endDate: c.endDate, noticePeriodDays: c.noticePeriodDays, reminderCycle: c.reminderCycle },
       now,
     );
-    for (const d of drafts) {
-      try {
-        await tx.reminder.create({
-          data: {
-            id: uuidv7(),
-            tenantId: c.tenantId,
-            customerId: c.customerId,
-            contractId: c.id,
-            kind: d.kind,
-            offsetDays: d.offsetDays,
-            cycle: d.cycle,
-            dueAt: d.dueAt,
-            status: d.status,
-            createdAt: now,
-          },
-        });
-      } catch (e: any) {
-        if (e?.code === 'P2002') continue; // déjà matérialisé (RM-24)
-        throw e;
-      }
-    }
+    // createMany + skipDuplicates (ON CONFLICT DO NOTHING) : dans une
+    // transaction PostgreSQL, une violation d'unicité rattrapée par un
+    // try/catch laisserait la transaction AVORTÉE (25P02) et ferait échouer
+    // l'activation elle-même.
+    await tx.reminder.createMany({
+      data: drafts.map((d) => ({
+        id: uuidv7(),
+        tenantId: c.tenantId,
+        customerId: c.customerId,
+        contractId: c.id,
+        kind: d.kind,
+        offsetDays: d.offsetDays,
+        cycle: d.cycle,
+        dueAt: d.dueAt,
+        status: d.status,
+        createdAt: now,
+      })),
+      skipDuplicates: true,
+    });
   }
 }

@@ -205,6 +205,34 @@ enum VirusScanStatus {
 enum ReminderKind {
   EXPIRY
   NOTICE_DEADLINE
+  // Échéancier v2 (migration 20)
+  PRICE_REVISION
+  RENEWAL_DECISION
+  CHATEL_NOTICE
+  TERMINATION_EFFECTIVE
+}
+
+enum OcrStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+  SKIPPED
+}
+
+enum DeadlineKind {
+  PERIOD_END
+  NOTICE_DEADLINE
+  PRICE_REVISION
+  RENEWAL_DECISION
+  CHATEL_NOTICE
+  TERMINATION_EFFECTIVE
+}
+
+enum DeadlineStatus {
+  OPEN
+  DONE
+  OBSOLETE
 }
 
 enum ReminderStatus {
@@ -587,6 +615,8 @@ model Contract {
   lifecycleEvents   LifecycleEvent[]
   acceptances       ContractAcceptance[]
   periods           ContractPeriod[]
+  imports           ContractImport[]
+  deadlines         Deadline[]
 
   /// Clé candidate composite portant le scope complet : cible de TOUTES
   /// les FK des tables filles (§8.4).
@@ -835,8 +865,11 @@ model Reminder {
   attempts   Int            @default(0)
   lastError  String?        @map("last_error")
   createdAt  DateTime       @map("created_at")
+  /// Échéance qui a produit ce rappel (migration 20), si applicable.
+  deadlineId String?        @map("deadline_id") @db.Uuid
 
   contract      Contract       @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  deadline      Deadline?      @relation(fields: [deadlineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   notifications Notification[]
 
   /// RM-24 : l'anti-doublon est une contrainte de BASE, pas de la logique
@@ -1032,6 +1065,10 @@ model StoredDocument {
   derivedFrom StoredDocument?  @relation("Derivation", fields: [derivedFromId, tenantId, customerId], references: [id, tenantId, customerId], map: "stored_documents_derived_fk", onDelete: NoAction, onUpdate: NoAction)
   derivatives StoredDocument[] @relation("Derivation")
 
+  importsAsOriginal ContractImport[] @relation("ImportOriginal")
+  importsAsOcrPdf   ContractImport[] @relation("ImportOcrPdf")
+  importsAsOcrText  ContractImport[] @relation("ImportOcrText")
+
   @@unique([id, tenantId, customerId], map: "stored_documents_scope_key")
   @@index([tenantId, customerId, contractId], map: "stored_documents_contract_idx")
   @@index([tenantId, sha256], map: "stored_documents_sha_idx")
@@ -1109,4 +1146,64 @@ model ContractPeriod {
   @@unique([contractId, periodNumber], map: "contract_periods_number_key")
   @@index([tenantId, customerId, contractId], map: "contract_periods_contract_idx")
   @@map("contract_periods")
+}
+
+// ===========================================================================
+// Lot 1 — import et échéancier (migration 20)
+// ===========================================================================
+
+/// Pipeline d'import d'un contrat existant : OCR → extraction → validation.
+model ContractImport {
+  id                 String    @id @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  customerId         String    @map("customer_id") @db.Uuid
+  contractId         String    @unique @map("contract_id") @db.Uuid
+  originalDocumentId String    @map("original_document_id") @db.Uuid
+  ocrPdfDocumentId   String?   @map("ocr_pdf_document_id") @db.Uuid
+  ocrTextDocumentId  String?   @map("ocr_text_document_id") @db.Uuid
+  ocrStatus          OcrStatus @default(PENDING) @map("ocr_status")
+  ocrAttempts        Int       @default(0) @map("ocr_attempts")
+  ocrPages           Int?      @map("ocr_pages")
+  ocrError           String?   @map("ocr_error")
+  /// Proposition : { champ: { value, confidence, evidence, method } }.
+  extraction         Json?
+  extractionMethod   String?   @map("extraction_method")
+  extractedAt        DateTime? @map("extracted_at")
+  /// Ce que l'humain a retenu, par qui, quand (CHECK : tout ou rien).
+  validatedFields    Json?     @map("validated_fields")
+  validatedByUserId  String?   @map("validated_by_user_id") @db.Uuid
+  validatedAt        DateTime? @map("validated_at")
+  createdByUserId    String    @map("created_by_user_id") @db.Uuid
+  createdAt          DateTime  @map("created_at")
+  updatedAt          DateTime  @map("updated_at")
+
+  contract Contract        @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_imports_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+  original StoredDocument  @relation("ImportOriginal", fields: [originalDocumentId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_imports_original_fk", onDelete: NoAction, onUpdate: NoAction)
+  ocrPdf   StoredDocument? @relation("ImportOcrPdf", fields: [ocrPdfDocumentId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_imports_ocr_pdf_fk", onDelete: NoAction, onUpdate: NoAction)
+  ocrText  StoredDocument? @relation("ImportOcrText", fields: [ocrTextDocumentId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_imports_ocr_text_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId], map: "contract_imports_scope_idx")
+  @@index([ocrStatus], map: "contract_imports_ocr_idx")
+  @@map("contract_imports")
+}
+
+/// Échéance matérialisée (02-cycle-de-vie §6). Unique par (contrat, nature, date).
+model Deadline {
+  id         String         @id @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  customerId String         @map("customer_id") @db.Uuid
+  contractId String         @map("contract_id") @db.Uuid
+  kind       DeadlineKind
+  dueDate    DateTime       @map("due_date") @db.Date
+  status     DeadlineStatus @default(OPEN)
+  details    Json           @default("{}")
+  computedAt DateTime       @map("computed_at")
+
+  contract  Contract   @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "deadlines_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+  reminders Reminder[]
+
+  @@unique([contractId, kind, dueDate], map: "deadlines_unique_key")
+  @@index([tenantId, status, dueDate], map: "deadlines_due_idx")
+  @@index([tenantId, customerId, contractId], map: "deadlines_contract_idx")
+  @@map("deadlines")
 }

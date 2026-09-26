@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { CaptureProofJob, JobQueue, SendReminderJob } from './job-queue.port.js';
+import type { CaptureProofJob, ImportOcrJob, JobQueue, SendReminderJob } from './job-queue.port.js';
 
 /**
  * File no-op — tests et processus sans worker configuré.
@@ -17,5 +17,9 @@ export class NoOpJobQueue implements JobQueue {
 
   async enqueueSendReminder(data: SendReminderJob): Promise<void> {
     this.log.debug(`enqueueSendReminder ignoré (no-op) : ${data.reminderId}`);
+  }
+
+  async enqueueImportOcr(data: ImportOcrJob): Promise<void> {
+    this.log.debug(`enqueueImportOcr ignoré (no-op) : ${data.importId}`);
   }
 }

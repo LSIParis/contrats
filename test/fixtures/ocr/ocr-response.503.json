@@ -1,0 +1,4 @@
+{
+  "error": "busy",
+  "detail": "trop de requêtes OCR simultanées"
+}

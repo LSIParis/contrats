@@ -24,7 +24,7 @@ function importReq(sess: string) {
 }
 
 describe('import de contrat existant', () => {
-  test('import → 201, contrat ACTIVE/IMPORTED, document récupérable', async () => {
+  test('import → 201, contrat IMPORTÉ À VALIDER (jamais actif sans validation humaine), document récupérable', async () => {
     const res = await importReq('sess-am-a')
       .field('customerId', fx.customerA.id).field('reference', 'IMP-001').field('title', 'Bail existant')
       .field('endDate', '2027-01-01').field('amountCents', '120000')
@@ -32,7 +32,8 @@ describe('import de contrat existant', () => {
       .expect(201);
     const id = res.body.id as string;
     const detail = await request(app.getHttpServer()).get(`/v1/contracts/${id}`).set('x-lsi-session', 'sess-am-a').expect(200);
-    expect(detail.body.contract.status).toBe('ACTIVE');
+    // Brief §3.5 : aucun contrat importé ne passe ACTIVE sans validation humaine.
+    expect(detail.body.contract.status).toBe('IMPORTED_PENDING_VALIDATION');
     expect(detail.body.contract.origin).toBe('IMPORTED');
     expect(detail.body.importedDocument?.name).toBe('bail.pdf');
     // Fix A : la clé objet S3 et le sha256 du document importé ne doivent

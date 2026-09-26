@@ -44,12 +44,26 @@ export class CustomersService {
       }
     }
 
-    return withScope(effective, (tx) =>
-      tx.customer.findUniqueOrThrow({
+    return withScope(effective, async (tx) => {
+      // Champs v2 (migration 19) : posés APRÈS la création, dans le scope de
+      // l'utilisateur — la fonction SECURITY DEFINER de création (migration 12)
+      // reste inchangée.
+      if (dto.isConsumer !== undefined || dto.externalRef !== undefined) {
+        try {
+          await tx.customer.update({
+            where: { id: created.id },
+            data: { isConsumer: dto.isConsumer ?? false, externalRef: dto.externalRef ?? null },
+          });
+        } catch (e: any) {
+          if (e?.code === 'P2002') throw new ConflictException('Référence externe déjà utilisée');
+          throw e;
+        }
+      }
+      return tx.customer.findUniqueOrThrow({
         where: { id: created.id },
-        select: { id: true, name: true, siren: true, country: true },
-      }),
-    );
+        select: { id: true, name: true, siren: true, country: true, isConsumer: true, externalRef: true },
+      });
+    });
   }
 
   list(scope: Scope) {
@@ -77,7 +91,7 @@ export class CustomersService {
         select: {
           id: true, name: true, legalName: true, siren: true, vatNumber: true,
           addressLine1: true, addressLine2: true, postalCode: true, city: true,
-          country: true, status: true,
+          country: true, status: true, isConsumer: true, externalRef: true,
         },
       });
       if (!customer) throw new NotFoundException('Client introuvable');
@@ -86,7 +100,7 @@ export class CustomersService {
         orderBy: [{ isPrimary: 'desc' }, { lastName: 'asc' }],
         select: {
           id: true, firstName: true, lastName: true, email: true,
-          phone: true, jobTitle: true, isPrimary: true,
+          phone: true, jobTitle: true, isPrimary: true, isSignatory: true, signingCapacity: true,
         },
       });
       return { customer, contacts };
@@ -106,9 +120,14 @@ export class CustomersService {
             firstName: dto.firstName, lastName: dto.lastName, email: dto.email,
             phone: dto.phone ?? null, jobTitle: dto.jobTitle ?? null,
             isPrimary: dto.isPrimary ?? false,
+            isSignatory: dto.isSignatory ?? false,
+            signingCapacity: dto.signingCapacity ?? null,
             createdAt: new Date(), updatedAt: new Date(),
           },
-          select: { id: true, firstName: true, lastName: true, email: true, isPrimary: true },
+          select: {
+            id: true, firstName: true, lastName: true, email: true, isPrimary: true,
+            isSignatory: true, signingCapacity: true,
+          },
         });
       } catch (e: any) {
         if (e?.code === 'P2002') throw new ConflictException('Un contact avec cet email existe déjà pour ce client');

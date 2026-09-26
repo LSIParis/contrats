@@ -28,6 +28,8 @@ export {
   findContractsToActivate,
   findContractsToExpire,
   findTerminationsDue,
+  findContractsForDeadlines,
+  findPendingOcrImports,
   type ScopeRef,
 } from './lifecycle-lookup.js';
 export { findDueReminders, type DueReminderRef } from './scheduler-lookup.js';

@@ -1,13 +1,16 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import { systemScope } from '@lsi/persistence';
 import { ProofCaptureService } from '../signature/proof-capture.service.js';
 import { bullConnection } from './bullmq-job-queue.js';
-import { QUEUE_NAME, type CaptureProofJob, type SendReminderJob } from './job-queue.port.js';
+import { JOB_QUEUE, QUEUE_NAME, type CaptureProofJob, type ImportOcrJob, type JobQueue, type SendReminderJob } from './job-queue.port.js';
 import { ReconciliationService } from './reconciliation.service.js';
 import { LifecycleService } from './lifecycle.service.js';
 import { ReminderDispatchService } from './reminder-dispatch.service.js';
 import { ReminderSendService } from './reminder-send.service.js';
+import { ImportsService } from '../imports/imports.service.js';
+import { DeadlinesService } from '../deadlines/deadlines.service.js';
+import { findPendingOcrImports } from '@lsi/persistence';
 
 const RECONCILE_EVERY_MS = 60 * 60 * 1_000; // horaire
 const LIFECYCLE_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien
@@ -28,6 +31,9 @@ const DISPATCH_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien (UC-08)
  *     et matérialise les rappels (RM-23).
  *   - dispatch-reminders  : découvre les rappels dus et enfile leurs envois.
  *   - send-reminder       : envoie un rappel (interne / client / escalade).
+ *   - import-ocr          : OCR + extraction d'un contrat importé (03-import-existant).
+ *   - deadlines-sweep     : recalcule l'échéancier et ses alertes (quotidien), et
+ *     réenfile les OCR restés en attente (filet si un job a été perdu).
  */
 @Injectable()
 export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -41,6 +47,9 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly lifecycle: LifecycleService,
     private readonly dispatch: ReminderDispatchService,
     private readonly reminderSend: ReminderSendService,
+    private readonly imports: ImportsService,
+    private readonly deadlines: DeadlinesService,
+    @Inject(JOB_QUEUE) private readonly queue: JobQueue,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -80,6 +89,20 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
             );
             return;
           }
+          case 'import-ocr': {
+            const d = job.data as ImportOcrJob;
+            const r = await this.imports.runOcr(d, new Date());
+            // Échec transitoire : nouvelle tentative différée (compteur en base).
+            if (r === 'RETRY') setTimeout(() => void this.queue.enqueueImportOcr(d), 60_000).unref();
+            return;
+          }
+          case 'deadlines-sweep': {
+            await this.deadlines.runAll(new Date());
+            for (const ref of await findPendingOcrImports()) {
+              await this.queue.enqueueImportOcr({ importId: ref.id, tenantId: ref.tenantId, customerId: ref.customerId });
+            }
+            return;
+          }
           default:
             this.log.warn(`job inconnu ignoré : ${job.name}`);
         }
@@ -103,6 +126,11 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
       'lifecycle-sweep',
       {},
       { repeat: { every: LIFECYCLE_EVERY_MS }, jobId: 'lifecycle-daily' },
+    );
+    await this.scheduler.add(
+      'deadlines-sweep',
+      {},
+      { repeat: { every: LIFECYCLE_EVERY_MS }, jobId: 'deadlines-daily' },
     );
     await this.scheduler.add(
       'dispatch-reminders',

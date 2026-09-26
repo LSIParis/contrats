@@ -20,7 +20,15 @@ export interface SendReminderJob {
  * Abstrait BullMQ : les services enfilent des jobs sans connaître Redis. En
  * test, une implémentation no-op (ou un fake) évite toute connexion.
  */
+export interface ImportOcrJob {
+  importId: string;
+  tenantId: string;
+  customerId: string;
+}
+
 export interface JobQueue {
   enqueueCaptureProof(data: CaptureProofJob): Promise<void>;
   enqueueSendReminder(data: SendReminderJob): Promise<void>;
+  /** OCR + extraction d'un contrat importé (03-import-existant §3). */
+  enqueueImportOcr(data: ImportOcrJob): Promise<void>;
 }

@@ -20,6 +20,8 @@ import { uuidv7 } from '@lsi/persistence';
 
 /** Taille maximale d'un upload (scans PDF). Alignée sur `client_max_body_size` du proxy. */
 export const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 50 * 1024 * 1024);
+/** Dépôt par lot : nombre maximal de fichiers dans une requête. */
+export const MAX_FILES_PER_REQUEST = 20;
 
 /**
  * Préfixes qui ne doivent JAMAIS tomber sur le repli SPA.
@@ -80,10 +82,11 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
   // valeur est un identifiant opaque résolu côté serveur (Redis).
   await app.register(fastifyCookie as never);
 
-  // Uploads (import de scans). Une seule pièce par requête, taille bornée :
-  // au-delà, 413 AVANT d'avoir tout lu en mémoire.
+  // Uploads (import de scans). Nombre de pièces et taille bornés : au-delà,
+  // refus AVANT d'avoir tout lu en mémoire. Chaque route fixe en plus son
+  // propre maximum (1 pour un dépôt unitaire, lot borné pour l'import par lot).
   await app.register(fastifyMultipart as never, {
-    limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 30 },
+    limits: { fileSize: MAX_UPLOAD_BYTES, files: MAX_FILES_PER_REQUEST, fields: 30 },
   });
 
   app.useGlobalPipes(

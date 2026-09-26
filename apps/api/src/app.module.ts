@@ -24,6 +24,11 @@ import { EntraOidcProvider } from './auth/oidc-entra.adapter.js';
 import { HealthController } from './health/health.controller.js';
 import { TenantConfigController } from './tenant/tenant-config.controller.js';
 import { TenantConfigService } from './tenant/tenant-config.service.js';
+import { ImportsController } from './imports/imports.controller.js';
+import { ImportsService } from './imports/imports.service.js';
+import { HttpOcrClient, OCR_CLIENT } from './imports/ocr.client.js';
+import { DeadlinesController } from './deadlines/deadlines.controller.js';
+import { DeadlinesService } from './deadlines/deadlines.service.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { ContentController } from './contracts/content.controller.js';
@@ -113,11 +118,17 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     AuditController,
     HealthController,
     TenantConfigController,
+    ImportsController,
+    DeadlinesController,
     TemplatesController,
     AiDraftingController,
   ],
   providers: [
     TenantConfigService,
+    ImportsService,
+    DeadlinesService,
+    // Service OCR interne (réseau de la stack) ; remplacé par un faux en test.
+    { provide: OCR_CLIENT, useFactory: () => new HttpOcrClient() },
     ContractsService,
     ContentService,
     CustomersService,

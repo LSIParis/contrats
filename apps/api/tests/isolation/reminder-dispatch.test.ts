@@ -30,6 +30,7 @@ class RecordingQueue implements JobQueue {
   async enqueueSendReminder(d: SendReminderJob): Promise<void> {
     this.reminderJobs.push(d);
   }
+  async enqueueImportOcr(): Promise<void> {}
 }
 
 let app: INestApplication;
