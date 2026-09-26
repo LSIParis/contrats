@@ -7,7 +7,8 @@
 #
 # Base Debian stable plutôt que l'image jbarlow83/ocrmypdf : paquets signés
 # Debian, langue `fra` explicite, image plus petite et épinglable.
-# Épinglée par digest ; mise à jour par Dependabot (écosystème docker, /deploy/ocr).
+# Épinglée par digest. ⚠ Le dependabot.yml de l'annexe A ne surveille que le
+# Dockerfile racine : ce digest se met à jour à la main (09-exploitation.md).
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 
 ARG SOURCE_URL=https://github.com/LSIParis/contrats

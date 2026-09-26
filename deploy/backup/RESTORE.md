@@ -5,7 +5,7 @@ PostgreSQL) et `minio/` (miroir des PDF signés + audits). Chiffrées (SSE),
 immuables (object lock).
 
 ## Pré-requis
-Un conteneur avec `mc` + `pg_restore` v16 (ex. le conteneur `backup` de la
+Un conteneur avec `mc` + `pg_restore` v17 (ex. le conteneur `backup` de la
 stack) où les alias `mc` `wasabi` et `local` sont configurés (l'entrypoint le
 fait au démarrage).
 
