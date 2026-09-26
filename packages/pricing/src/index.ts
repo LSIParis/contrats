@@ -20,3 +20,5 @@ export * from './formula/validate.js';
 export * from './types.js';
 export * from './indexes.js';
 export * from './revision.js';
+export * from './tiers.js';
+export * from './rules.js';
