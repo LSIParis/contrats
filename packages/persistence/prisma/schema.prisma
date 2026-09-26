@@ -316,6 +316,8 @@ model Tenant {
   contracts    Contract[]
   featureFlags TenantFeatureFlag[]
   settings     TenantSetting[]
+  priceIndexes PriceIndex[]
+  pricingRules PricingRule[]
 
   @@map("tenants")
 }
@@ -617,6 +619,8 @@ model Contract {
   periods           ContractPeriod[]
   imports           ContractImport[]
   deadlines         Deadline[]
+  pricingSchedules  PricingSchedule[]
+  priceOverrides    PriceOverride[]
 
   /// Clé candidate composite portant le scope complet : cible de TOUTES
   /// les FK des tables filles (§8.4).
@@ -1206,4 +1210,237 @@ model Deadline {
   @@index([tenantId, status, dueDate], map: "deadlines_due_idx")
   @@index([tenantId, customerId, contractId], map: "deadlines_contract_idx")
   @@map("deadlines")
+}
+
+// ===========================================================================
+// Lot 3 — tarification (migration 21) — docs/contrats/04-tarification.md §17
+// ===========================================================================
+// Montants JAMAIS en flottant : prix unitaires Decimal(20,6) en euros,
+// valeurs d'indice Decimal(18,6). Les totaux (centimes, bigint) ne sont pas
+// stockés : ils se RECALCULENT par le moteur (@lsi/pricing), à la date.
+
+enum PriceIndexValueSource {
+  MANUAL
+  IMPORT
+}
+
+enum PricingRuleType {
+  GRID
+  TIERS
+  VOLUME_DISCOUNT
+  COMMITMENT_DISCOUNT
+}
+
+/// DRAFT modifiable ; ACTIVE / SUPERSEDED immuables (trigger), sauf la
+/// clôture de validité à l'activation de la version suivante.
+enum PricingScheduleStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum PricingLineKind {
+  FLAT_MONTHLY
+  FLAT_YEARLY
+  UNIT
+  HOURLY
+  HOUR_PACK
+  SETUP_FEE
+  TIERED
+  DISCOUNT
+}
+
+enum PricingLineMode {
+  MANUAL
+  RULE
+  FORMULA
+}
+
+enum PricingRecurrence {
+  MONTHLY
+  YEARLY
+  ONE_OFF
+}
+
+enum PricingQuantitySource {
+  FIXED
+  PROVIDER
+}
+
+enum PriceOverrideStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  CANCELLED
+}
+
+/// Série d'indice (Syntec…) du tenant. Lisible par le portail client.
+model PriceIndex {
+  id              String   @id @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  /// Code stable référencé par les lignes (« SYNTEC »).
+  code            String
+  label           String
+  description     String?
+  /// Paramétrage du connecteur d'import ({ type: 'CSV', delimiter }). Jamais de secret.
+  connector       Json?
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @map("created_at")
+  updatedAt       DateTime @map("updated_at")
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  values PriceIndexValue[]
+
+  @@unique([tenantId, code], map: "price_indexes_code_key")
+  @@unique([id, tenantId], map: "price_indexes_scope_key")
+  @@map("price_indexes")
+}
+
+/// Valeur publiée d'un indice. APPEND-ONLY (UPDATE/DELETE révoqués) : une
+/// correction est une nouvelle ligne `supersedes` la précédente (révision + 1).
+/// La valeur retenue pour une période est la pointe de la chaîne.
+model PriceIndexValue {
+  id              String                @id @db.Uuid
+  tenantId        String                @map("tenant_id") @db.Uuid
+  indexId         String                @map("index_id") @db.Uuid
+  /// « YYYY-MM »
+  period          String                @db.Char(7)
+  value           Decimal               @db.Decimal(18, 6)
+  publishedAt     DateTime              @map("published_at") @db.Date
+  source          PriceIndexValueSource
+  /// 0 = valeur originale ; n = n-ième correction.
+  revision        Int                   @default(0)
+  supersedesId    String?               @unique(map: "price_index_values_supersedes_key") @map("supersedes_id") @db.Uuid
+  correctionReason String?              @map("correction_reason")
+  enteredByUserId String?               @map("entered_by_user_id") @db.Uuid
+  createdAt       DateTime              @map("created_at")
+
+  index        PriceIndex       @relation(fields: [indexId, tenantId], references: [id, tenantId], map: "price_index_values_index_fk", onDelete: NoAction, onUpdate: NoAction)
+  supersedes   PriceIndexValue? @relation("IndexValueCorrection", fields: [supersedesId, tenantId, indexId, period], references: [id, tenantId, indexId, period], map: "price_index_values_supersedes_fk", onDelete: NoAction, onUpdate: NoAction)
+  supersededBy PriceIndexValue[] @relation("IndexValueCorrection")
+
+  @@unique([id, tenantId, indexId, period], map: "price_index_values_chain_key")
+  @@unique([indexId, period, revision], map: "price_index_values_revision_key")
+  @@map("price_index_values")
+}
+
+/// Règle du catalogue du tenant (grille, paliers, remise volume/engagement).
+/// `definition` suit les types du moteur (PricingRule), validé par l'API.
+/// Jamais supprimée (DELETE révoqué) : archivée.
+model PricingRule {
+  id              String          @id @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  /// Identifiant de règle vu par le moteur (RuleRef.priceRuleId).
+  code            String
+  type            PricingRuleType
+  label           String
+  definition      Json
+  archivedAt      DateTime?       @map("archived_at")
+  createdByUserId String?         @map("created_by_user_id") @db.Uuid
+  updatedByUserId String?         @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime        @map("created_at")
+  updatedAt       DateTime        @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([tenantId, code], map: "pricing_rules_code_key")
+  @@map("pricing_rules")
+}
+
+/// Version datée du barème d'un contrat. Deux versions engagées (non DRAFT)
+/// d'un même contrat ne se chevauchent jamais (EXCLUDE gist, migration 21).
+model PricingSchedule {
+  id                String                @id @db.Uuid
+  tenantId          String                @map("tenant_id") @db.Uuid
+  customerId        String                @map("customer_id") @db.Uuid
+  contractId        String                @map("contract_id") @db.Uuid
+  versionNumber     Int                   @map("version_number")
+  status            PricingScheduleStatus @default(DRAFT)
+  validFrom         DateTime              @map("valid_from") @db.Date
+  /// Incluse ; null = sans fin.
+  validTo           DateTime?             @map("valid_to") @db.Date
+  currency          String                @default("EUR") @db.Char(3)
+  /// Durée d'engagement (remises d'engagement).
+  commitmentMonths  Int?                  @map("commitment_months")
+  note              String?
+  createdByUserId   String                @map("created_by_user_id") @db.Uuid
+  activatedByUserId String?               @map("activated_by_user_id") @db.Uuid
+  activatedAt       DateTime?             @map("activated_at")
+  supersededAt      DateTime?             @map("superseded_at")
+  createdAt         DateTime              @map("created_at")
+  updatedAt         DateTime              @map("updated_at")
+
+  contract Contract      @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "pricing_schedules_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+  lines    PricingLine[]
+
+  @@unique([id, tenantId, customerId], map: "pricing_schedules_scope_key")
+  @@unique([contractId, versionNumber], map: "pricing_schedules_version_key")
+  @@index([tenantId, customerId, contractId], map: "pricing_schedules_contract_idx")
+  @@map("pricing_schedules")
+}
+
+/// Ligne de barème. `lineKey` est STABLE d'une version à l'autre (c'est le
+/// `lineId` du moteur, et la cible des dérogations).
+model PricingLine {
+  id                  String                @id @db.Uuid
+  tenantId            String                @map("tenant_id") @db.Uuid
+  customerId          String                @map("customer_id") @db.Uuid
+  scheduleId          String                @map("schedule_id") @db.Uuid
+  lineKey             String                @map("line_key")
+  sortOrder           Int                   @default(0) @map("sort_order")
+  articleCode         String                @map("article_code")
+  label               String
+  unit                String
+  kind                PricingLineKind
+  mode                PricingLineMode
+  recurrence          PricingRecurrence?
+  vatRatePercent      Decimal               @map("vat_rate_percent") @db.Decimal(5, 2)
+  quantitySource      PricingQuantitySource @default(FIXED) @map("quantity_source")
+  quantity            Decimal?              @db.Decimal(20, 6)
+  providerArticleCode String?               @map("provider_article_code")
+  unitPrice           Decimal?              @map("unit_price") @db.Decimal(20, 6)
+  /// { tiers, rule, formula, revision, hourPack, discount } — types du moteur.
+  params              Json                  @default("{}")
+
+  schedule PricingSchedule @relation(fields: [scheduleId, tenantId, customerId], references: [id, tenantId, customerId], map: "pricing_lines_schedule_fk", onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([scheduleId, lineKey], map: "pricing_lines_key")
+  @@index([tenantId, customerId, scheduleId], map: "pricing_lines_scope_idx")
+  @@map("pricing_lines")
+}
+
+/// Dérogation ponctuelle, bornée, motivée. Double validation au-delà du seuil
+/// (`pricing.overrideApprovalThresholdPercent`) ; CHECK approbateur ≠ auteur.
+/// Prix, période, motif et auteur figés (GRANT UPDATE limité aux décisions).
+model PriceOverride {
+  id                     String              @id @db.Uuid
+  tenantId               String              @map("tenant_id") @db.Uuid
+  customerId             String              @map("customer_id") @db.Uuid
+  contractId             String              @map("contract_id") @db.Uuid
+  lineKey                String              @map("line_key")
+  unitPrice              Decimal             @map("unit_price") @db.Decimal(20, 6)
+  validFrom              DateTime            @map("valid_from") @db.Date
+  validTo                DateTime            @map("valid_to") @db.Date
+  reason                 String
+  /// Instantané informatif à la création ; le moteur recalcule l'écart à la date.
+  computedUnitPrice      Decimal?            @map("computed_unit_price") @db.Decimal(20, 6)
+  /// null = écart infini (prix calculé nul) ou non calculable.
+  gapPercent             Decimal?            @map("gap_percent") @db.Decimal(14, 4)
+  requiresSecondApproval Boolean             @map("requires_second_approval")
+  status                 PriceOverrideStatus
+  authorUserId           String              @map("author_user_id") @db.Uuid
+  approvedByUserId       String?             @map("approved_by_user_id") @db.Uuid
+  approvedAt             DateTime?           @map("approved_at")
+  rejectedByUserId       String?             @map("rejected_by_user_id") @db.Uuid
+  rejectedAt             DateTime?           @map("rejected_at")
+  rejectionReason        String?             @map("rejection_reason")
+  cancelledByUserId      String?             @map("cancelled_by_user_id") @db.Uuid
+  cancelledAt            DateTime?           @map("cancelled_at")
+  createdAt              DateTime            @map("created_at")
+  updatedAt              DateTime            @map("updated_at")
+
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "price_overrides_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, contractId, lineKey], map: "price_overrides_contract_idx")
+  @@map("price_overrides")
 }
