@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { withScope, type Scope } from '@lsi/persistence';
 import { CurrentScope, CurrentSession } from './current-scope.decorator.js';
 import type { Session } from './session.service.js';
+import { PERMISSIONS, can, type Action } from './permissions.js';
 
 /**
  * Résolution de l'identité de la session courante. (§13.2)
@@ -29,6 +30,9 @@ export class MeController {
       email: user?.email ?? null,
       kind: user?.kind ?? null,
       customerId: user?.customerId ?? null,
+      // Actions autorisées par les rôles de la session : l'interface s'y
+      // adapte sans recopier la matrice (permissions.ts reste la seule source).
+      permissions: (Object.keys(PERMISSIONS) as Action[]).filter((a) => can(session.roles, a)),
     };
   }
 }

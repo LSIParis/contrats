@@ -64,6 +64,34 @@ export function requestIdFor(raw: IncomingMessage): string {
   return id;
 }
 
+/**
+ * CSP de l'application. Aucune ressource tierce (polices auto-hébergées, pas
+ * de CDN) ; seule exception : l'origine DocuSeal, pour la signature intégrée
+ * (composant web + iframe `embed_src`, brief §7).
+ */
+export function contentSecurityPolicy(docusealUrl = process.env.DOCUSEAL_SIGN_URL ?? process.env.DOCUSEAL_URL): string {
+  let docuseal = '';
+  try {
+    if (docusealUrl) docuseal = ` ${new URL(docusealUrl).origin}`;
+  } catch {
+    docuseal = '';
+  }
+  return [
+    "default-src 'self'",
+    `script-src 'self'${docuseal}`,
+    // Attributs style en ligne (éditeur riche, composants) : pas de script.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    `connect-src 'self'${docuseal}`,
+    `frame-src 'self' blob:${docuseal}`,
+    "object-src 'self' blob:",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+}
+
 function parseTrustProxy(v: string | undefined): boolean | number | string {
   if (!v || v === 'false') return false;
   if (v === 'true') return true;
@@ -76,6 +104,19 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
 
   fastify.addHook('onRequest', async (req, reply) => {
     void reply.header('x-request-id', req.id);
+  });
+
+  // En-têtes de sécurité, posés par l'APPLICATION (elle seule connaît ses
+  // origines, dont DocuSeal pour la signature intégrée) — 09-exploitation §5.2.
+  const csp = contentSecurityPolicy();
+  fastify.addHook('onSend', async (_req, reply) => {
+    void reply.header('Content-Security-Policy', csp);
+    // SAMEORIGIN et non DENY : l'écran de validation d'import affiche le PDF
+    // original dans un cadre de la MÊME origine (03-import-existant §5).
+    void reply.header('X-Frame-Options', 'SAMEORIGIN');
+    void reply.header('X-Content-Type-Options', 'nosniff');
+    void reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    void reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   });
 
   // Cookie de session (§13.1). Aucun secret : le cookie n'est pas signé, sa

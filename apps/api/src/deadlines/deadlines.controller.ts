@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import type { Scope } from '@lsi/persistence';
 import { z } from 'zod';
 import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
@@ -24,6 +24,16 @@ export class DeadlinesController {
     const from = q.from ? new Date(q.from) : new Date();
     const to = q.to ? new Date(q.to) : new Date(from.getTime() + 120 * 86_400_000);
     return { items: await this.deadlines.list(scope, from, to) };
+  }
+
+  /**
+   * Recalcul immédiat de l'échéancier du tenant (après un changement des
+   * seuils d'alerte, par exemple), sans attendre le job quotidien.
+   */
+  @Post('admin/deadlines/recompute')
+  recompute(@CurrentScope() scope: Scope, @CurrentSession() session: Session) {
+    assertCan(session, 'tenant.configure');
+    return this.deadlines.runForTenant(scope.tenantId, new Date());
   }
 
   @Get('contracts/:id/deadlines')

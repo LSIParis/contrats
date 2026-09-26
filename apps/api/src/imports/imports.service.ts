@@ -306,8 +306,12 @@ export class ImportsService {
         },
       });
       if (!imp) throw new NotFoundException('Import introuvable');
+      const importer = imp.original.uploadedByUserId
+        ? await tx.user.findUnique({ where: { id: imp.original.uploadedByUserId }, select: { fullName: true } })
+        : null;
       return {
         contract: imp.contract,
+        importedBy: importer?.fullName ?? null,
         origin: 'LEGACY_IMPORT' as const,
         signatureMode: 'EXTERNAL_WET_SIGNATURE' as const,
         original: imp.original,

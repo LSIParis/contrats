@@ -84,10 +84,32 @@ export class ContractsController {
     return this.contracts.signedDocumentUrl(scope, id);
   }
 
+  /**
+   * Document source (ORIGINAL) d'un contrat importé. `?disposition=inline` :
+   * affichage dans l'écran de validation (cadre de même origine, CSP
+   * frame-ancestors 'self') ; par défaut, téléchargement.
+   */
   @Get(':id/imported-document')
-  async importedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
+  async importedDocument(
+    @CurrentScope() scope: Scope,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('disposition') disposition: string | undefined,
+    @Res() res: FastifyReply,
+  ) {
     const { buffer, name, contentType } = await this.contracts.getImportedDocument(scope, id);
-    sendFile(res, { body: buffer, contentType, filename: slugifyFilename(name, 'document') });
+    sendFile(res, {
+      body: buffer, contentType, filename: slugifyFilename(name, 'document'),
+      disposition: disposition === 'inline' ? 'inline' : 'attachment',
+    });
+  }
+
+  /**
+   * Journal des transitions (lifecycle_events, écrit par trigger) : qui, quand,
+   * de quel état vers lequel, par quel événement, pour quel motif.
+   */
+  @Get(':id/lifecycle')
+  lifecycle(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    return this.contracts.lifecycle(scope, id);
   }
 
   @Get(':id/allowed-actions')

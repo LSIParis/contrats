@@ -169,9 +169,14 @@ export class DeadlinesService {
     return withScope(scope, (tx) => this.recompute(tx, contractId, thresholds, now));
   }
 
+  /** Recalcul limité à un tenant (déclenché par son administrateur). */
+  runForTenant(tenantId: string, now: Date) {
+    return this.runAll(now, tenantId);
+  }
+
   /** Job quotidien : tous les contrats engagés, chacun dans son scope système. */
-  async runAll(now: Date): Promise<{ contracts: number; created: number; obsoleted: number; reminders: number }> {
-    const refs = await findContractsForDeadlines();
+  async runAll(now: Date, onlyTenantId?: string): Promise<{ contracts: number; created: number; obsoleted: number; reminders: number }> {
+    const refs = (await findContractsForDeadlines()).filter((r) => !onlyTenantId || r.tenantId === onlyTenantId);
     const thresholdsByTenant = new Map<string, number[]>();
     const total = { contracts: 0, created: 0, obsoleted: 0, reminders: 0 };
     for (const ref of refs) {

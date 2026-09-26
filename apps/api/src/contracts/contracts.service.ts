@@ -696,6 +696,24 @@ export class ContractsService {
     });
   }
 
+  async lifecycle(scope: Scope, id: string) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      const events = await tx.lifecycleEvent.findMany({ where: { contractId: id }, orderBy: { seq: 'asc' } });
+      const userIds = [...new Set(events.map((e) => e.actorUserId).filter((x): x is string => !!x))];
+      const users = await tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } });
+      const names = new Map(users.map((u) => [u.id, u.fullName]));
+      return {
+        items: events.map((e) => ({
+          at: e.occurredAt, from: e.fromStatus, to: e.toStatus, event: e.event, reason: e.reason,
+          actor: e.actorUserId ? { id: e.actorUserId, name: names.get(e.actorUserId) ?? null } : null,
+          actorKind: e.actorKind,
+        })),
+      };
+    });
+  }
+
   private async nextReference(tx: any, tenantId: string, now: Date): Promise<string> {
     const year = now.getUTCFullYear();
     const count = await tx.contract.count({ where: { reference: { startsWith: `LSI-${year}-` } } });
