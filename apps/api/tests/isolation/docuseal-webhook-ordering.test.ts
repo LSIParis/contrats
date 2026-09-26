@@ -253,7 +253,8 @@ describe('refus et expiration', () => {
     const st = await state();
     expect(st.request!.status).toBe('EXPIRED');
     expect(st.client!.status).toBe('VIEWED');
-    expect(st.contract!.status).toBe('PENDING_SIGNATURE');
+    // Brief §2 : EN_SIGNATURE → SIGNATURE_EXPIRÉE (v2).
+    expect(st.contract!.status).toBe('SIGNATURE_EXPIRED');
   });
 });
 

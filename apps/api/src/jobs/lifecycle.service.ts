@@ -5,8 +5,10 @@ import {
   uuidv7,
   findContractsToActivate,
   findContractsToExpire,
+  findTerminationsDue,
 } from '@lsi/persistence';
-import { applyEvent, planReminders, type ContractSnapshot } from '@lsi/domain';
+import { applyEvent, planReminders, type ContractEvent } from '@lsi/domain';
+import { persistTransition, toContractSnapshot } from '../contracts/snapshot.js';
 
 /**
  * Avancement automatique du cycle de vie des contrats. (§7, RM-06/07/23)
@@ -17,6 +19,8 @@ import { applyEvent, planReminders, type ContractSnapshot } from '@lsi/domain';
  *     calculés à l'envoi : un scheduler en panne ne les fait pas disparaître.
  *   - ACTIVE → EXPIRED (ou RENEWED si successeur signé) au terme, ce qui ANNULE
  *     les rappels encore en attente — un rappel obsolète est pire qu'aucun.
+ *   - TERMINATION_PENDING → TERMINATED à la date d'effet de la résiliation
+ *     (02-cycle-de-vie §3), ce qui annule aussi les rappels en attente.
  *
  * La découverte est hors scope (fonctions SECURITY DEFINER), mais chaque
  * transition s'applique DANS le scope résolu, sous RLS, via le domaine — le
@@ -27,13 +31,41 @@ import { applyEvent, planReminders, type ContractSnapshot } from '@lsi/domain';
 export class LifecycleService {
   private readonly log = new Logger(LifecycleService.name);
 
-  async run(now: Date): Promise<{ activated: number; expired: number }> {
+  async run(now: Date): Promise<{ activated: number; expired: number; terminated: number }> {
     const activated = await this.activateDue(now);
     const expired = await this.expireDue(now);
-    if (activated || expired) {
-      this.log.log(`cycle de vie : ${activated} activé(s), ${expired} expiré(s)`);
+    const terminated = await this.completeTerminations(now);
+    if (activated || expired || terminated) {
+      this.log.log(`cycle de vie : ${activated} activé(s), ${expired} expiré(s), ${terminated} résilié(s)`);
     }
-    return { activated, expired };
+    return { activated, expired, terminated };
+  }
+
+  private async completeTerminations(now: Date): Promise<number> {
+    const candidates = await findTerminationsDue();
+    let n = 0;
+    for (const ref of candidates) {
+      const ok = await withScope(systemScope(ref.tenantId, ref.customerId), async (tx) => {
+        const c = await tx.contract.findUnique({ where: { id: ref.id } });
+        if (!c || c.status !== 'TERMINATION_PENDING') return false;
+        const event: ContractEvent = { type: 'COMPLETE_TERMINATION' };
+        let next;
+        try {
+          next = applyEvent(toContractSnapshot(c), event, now);
+        } catch (e) {
+          this.log.warn(`résiliation non achevée sur ${c.id} : ${(e as Error).message}`);
+          return false;
+        }
+        await persistTransition(tx, c.id, event, next, now);
+        await tx.reminder.updateMany({
+          where: { contractId: c.id, status: 'PENDING' },
+          data: { status: 'CANCELLED' },
+        });
+        return true;
+      });
+      if (ok) n++;
+    }
+    return n;
   }
 
   private async activateDue(now: Date): Promise<number> {
@@ -53,9 +85,10 @@ export class LifecycleService {
         // documenté (RM-19, slot d'avenant ouvert).
         if (c.type === 'AMENDMENT') return false;
 
+        const event: ContractEvent = { type: 'ACTIVATE' };
         let next;
         try {
-          next = applyEvent(this.snapshot(c, false), { type: 'ACTIVATE' }, now);
+          next = applyEvent(toContractSnapshot(c), event, now);
         } catch (e) {
           this.log.warn(`activation ignorée sur ${c.id} : ${(e as Error).message}`);
           return false;
@@ -64,10 +97,7 @@ export class LifecycleService {
         // inchangé — on ne matérialise rien.
         if (next.status !== 'ACTIVE') return false;
 
-        await tx.contract.update({
-          where: { id: c.id },
-          data: { status: 'ACTIVE', activatedAt: now, updatedAt: now },
-        });
+        await persistTransition(tx, c.id, event, next, now);
         await this.materializeReminders(tx, c, now);
         return true;
       });
@@ -90,18 +120,16 @@ export class LifecycleService {
           : null;
         const hasSignedSuccessor = !!successor?.signedAt;
 
+        const event: ContractEvent = { type: 'EXPIRE' };
         let next;
         try {
-          next = applyEvent(this.snapshot(c, hasSignedSuccessor), { type: 'EXPIRE' }, now);
+          next = applyEvent(toContractSnapshot(c, { hasSignedSuccessor }), event, now);
         } catch (e) {
           this.log.warn(`expiration ignorée sur ${c.id} : ${(e as Error).message}`);
           return false;
         }
 
-        await tx.contract.update({
-          where: { id: c.id },
-          data: { status: next.status, updatedAt: now },
-        });
+        await persistTransition(tx, c.id, event, next, now);
         // RM-07 : annuler les rappels encore en attente du contrat expiré.
         await tx.reminder.updateMany({
           where: { contractId: c.id, status: 'PENDING' },
@@ -146,32 +174,5 @@ export class LifecycleService {
         throw e;
       }
     }
-  }
-
-  /**
-   * Snapshot plat pour le domaine. Seuls les champs lus par ACTIVATE/EXPIRE
-   * comptent (dates, successeur) ; le reste est renseigné honnêtement mais
-   * n'entre pas dans ces décisions.
-   */
-  private snapshot(c: any, hasSignedSuccessor: boolean): ContractSnapshot {
-    return {
-      id: c.id,
-      type: c.type,
-      status: c.status,
-      startDate: c.startDate,
-      endDate: c.endDate,
-      noticePeriodDays: c.noticePeriodDays,
-      currentVersionId: c.currentVersionId,
-      approvedVersionId: c.approvedVersionId,
-      submittedByUserId: null,
-      hasLsiSigner: true,
-      hasClientSigner: true,
-      hasRequiredAttachments: true,
-      openAmendmentExists: false,
-      hasSignedSuccessor,
-      signedAt: c.signedAt,
-      activatedAt: c.activatedAt,
-      terminatedAt: c.terminatedAt,
-    };
   }
 }

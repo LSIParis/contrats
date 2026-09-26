@@ -38,3 +38,11 @@ export async function findContractsToExpire(limit = 500): Promise<ScopeRef[]> {
   >`SELECT * FROM app_find_contracts_to_expire(${limit}::int)`;
   return rows.map(toRef);
 }
+
+/** Résiliations programmées dont la date d'effet est atteinte (02-cycle-de-vie §3). */
+export async function findTerminationsDue(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_terminations_due(${limit}::int)`;
+  return rows.map(toRef);
+}

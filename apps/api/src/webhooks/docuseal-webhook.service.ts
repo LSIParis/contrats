@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { withScope, systemScope, resolveWebhookScope, uuidv7 } from '@lsi/persistence';
-import { applyEvent, replanAfterEndDateChange, type NormalizedSignatureEvent } from '@lsi/domain';
+import { applyEvent, replanAfterEndDateChange, type ContractEvent, type NormalizedSignatureEvent } from '@lsi/domain';
+import { persistTransition, toContractSnapshot } from '../contracts/snapshot.js';
 import { DocusealAdapter } from '../signature/docuseal.adapter.js';
 import { JOB_QUEUE, type CaptureProofJob, type JobQueue } from '../jobs/job-queue.port.js';
 import { reconciliationEvents } from './reconciliation-events.js';
@@ -320,6 +321,10 @@ export class DocusealWebhookService {
           where: { id: sigReq.signatureRequestId },
           data: { status: 'EXPIRED', lastSyncedAt: now, updatedAt: now },
         });
+        // Brief §2 : EN_SIGNATURE → SIGNATURE_EXPIRÉE (retour en négociation
+        // ou renvoi possible ensuite). Hors ordre : un contrat déjà signé ou
+        // annulé refuse la transition, qui est alors journalisée sans effet.
+        await this.transition(tx, sigReq.contractId, { type: 'SIGNATURE_EXPIRE' }, now);
         return null;
       }
 
@@ -444,40 +449,17 @@ export class DocusealWebhookService {
    * sur la foi d'un webhook vérifié — mais toujours à travers les mêmes
    * règles que le reste.
    */
-  private async transition(tx: any, contractId: string, event: any, now: Date): Promise<void> {
+  private async transition(tx: any, contractId: string, event: ContractEvent, now: Date): Promise<void> {
     const c = await tx.contract.findUnique({ where: { id: contractId } });
     if (!c) return;
 
-    const snapshot = {
-      id: c.id,
-      type: c.type,
-      status: c.status,
-      startDate: c.startDate,
-      endDate: c.endDate,
-      noticePeriodDays: c.noticePeriodDays,
-      currentVersionId: c.currentVersionId,
-      approvedVersionId: c.approvedVersionId,
-      submittedByUserId: null,
-      hasLsiSigner: true,
-      hasClientSigner: true,
-      hasRequiredAttachments: true,
-      openAmendmentExists: false,
-      hasSignedSuccessor: c.successorContractId !== null,
-      signedAt: c.signedAt,
-      activatedAt: c.activatedAt,
-      terminatedAt: c.terminatedAt,
-    };
-
     try {
-      const next = applyEvent(snapshot, event, now);
-      await tx.contract.update({
-        where: { id: contractId },
-        data: {
-          status: next.status,
-          signedAt: next.signedAt ?? null,
-          updatedAt: now,
-        },
-      });
+      const next = applyEvent(
+        toContractSnapshot(c, { hasSignedSuccessor: c.successorContractId !== null }),
+        event,
+        now,
+      );
+      await persistTransition(tx, contractId, event, next, now);
     } catch (e) {
       // Un webhook en retard sur un contrat déjà annulé est un cas RÉEL, pas
       // un incident : on journalise et on laisse l'état en place plutôt que

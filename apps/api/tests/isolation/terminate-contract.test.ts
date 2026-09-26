@@ -5,6 +5,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
+import { LifecycleService } from '../../src/jobs/lifecycle.service.js';
 import { internalScope, adminScope, withScope, uuidv7 } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
@@ -54,17 +55,20 @@ async function cancellations(contractId: string) {
 }
 
 describe('POST /v1/contracts/:id/terminate', () => {
-  test('résilie en respectant le préavis → TERMINATED + Cancellation(TERMINATION)', async () => {
+  test('résilie en respectant le préavis → TERMINATION_PENDING jusqu’à la date d’effet + Cancellation(TERMINATION)', async () => {
+    // Brief §2 : ACTIVE → EN_RÉSILIATION → RÉSILIÉ. Tant que la date d'effet
+    // n'est pas atteinte, le contrat produit ses effets.
     const id = await seedActive();
     const res = await term(id, { reason: 'Fin de collaboration', effectiveDate: plus(31), initiatedBy: 'CLIENT' }).expect(201);
-    expect(res.body.status).toBe('TERMINATED');
+    expect(res.body.status).toBe('TERMINATION_PENDING');
     expect(res.body.noticeRespected).toBe(true);
     const [c, canc] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
-      await tx.contract.findUnique({ where: { id }, select: { status: true, terminatedAt: true } }),
+      await tx.contract.findUnique({ where: { id }, select: { status: true, terminatedAt: true, terminationEffectiveDate: true } }),
       await tx.cancellation.findMany({ where: { contractId: id } }),
     ]);
-    expect(c!.status).toBe('TERMINATED');
-    expect(c!.terminatedAt).toBeTruthy();
+    expect(c!.status).toBe('TERMINATION_PENDING');
+    expect(c!.terminatedAt).toBeNull();
+    expect(c!.terminationEffectiveDate!.toISOString().slice(0, 10)).toBe(plus(31));
     expect(canc).toHaveLength(1);
     expect(canc[0]).toMatchObject({ type: 'TERMINATION', initiatedBy: 'CLIENT', noticeRespected: true });
   });
@@ -76,7 +80,7 @@ describe('POST /v1/contracts/:id/terminate', () => {
     // refusée à tort (régression corrigée : isNoticeRespected).
     const id = await seedActive();
     const res = await term(id, { reason: 'Fin de collaboration', effectiveDate: plus(30), initiatedBy: 'CLIENT' }, 'sess-am').expect(201);
-    expect(res.body.status).toBe('TERMINATED');
+    expect(res.body.status).toBe('TERMINATION_PENDING');
     expect(res.body.noticeRespected).toBe(true);
   });
 
@@ -131,5 +135,41 @@ describe('POST /v1/contracts/:id/cancel — trace l\'annulation', () => {
     const canc = await cancellations(id);
     expect(canc).toHaveLength(1);
     expect(canc[0]).toMatchObject({ type: 'CANCELLATION', reason: 'Erreur de saisie' });
+  });
+});
+
+describe('achèvement de la résiliation par le job quotidien', () => {
+  test('à la date d’effet, TERMINATION_PENDING → TERMINATED, tracé dans lifecycle_events avec son motif', async () => {
+    const id = await seedActive();
+    await term(id, { reason: 'Fin de collaboration', effectiveDate: plus(31), initiatedBy: 'CLIENT' }).expect(201);
+
+    const lifecycle = app.get(LifecycleService);
+    // Avant la date d'effet : rien ne bouge.
+    await lifecycle.run(new Date());
+    const before = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => tx.contract.findUnique({ where: { id } }));
+    expect(before!.status).toBe('TERMINATION_PENDING');
+
+    // La découverte compare à CURRENT_DATE (base) : on ramène la date d'effet
+    // à aujourd'hui plutôt que de simuler l'horloge de PostgreSQL.
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.contract.update({ where: { id }, data: { terminationEffectiveDate: new Date(plus(0)) } }),
+    );
+    const r = await lifecycle.run(new Date());
+    expect(r.terminated).toBeGreaterThanOrEqual(1);
+
+    const [c, events] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.contract.findUnique({ where: { id } }),
+      await tx.lifecycleEvent.findMany({ where: { contractId: id }, orderBy: { seq: 'asc' } }),
+    ]);
+    expect(c!.status).toBe('TERMINATED');
+    expect(c!.terminatedAt).toBeTruthy();
+    expect(events.map((e) => [e.fromStatus, e.toStatus, e.event])).toEqual([
+      [null, 'ACTIVE', null],
+      ['ACTIVE', 'TERMINATION_PENDING', 'TERMINATE'],
+      ['TERMINATION_PENDING', 'TERMINATED', 'COMPLETE_TERMINATION'],
+    ]);
+    expect(events[1]!.reason).toBe('Fin de collaboration');
+    expect(events[1]!.actorUserId).toBe(fx.amUserId);
+    expect(events[2]!.actorKind).toBe('SYSTEM');
   });
 });

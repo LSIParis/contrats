@@ -27,6 +27,7 @@ export { findSignaturesNeedingProof } from './reconciliation-lookup.js';
 export {
   findContractsToActivate,
   findContractsToExpire,
+  findTerminationsDue,
   type ScopeRef,
 } from './lifecycle-lookup.js';
 export { findDueReminders, type DueReminderRef } from './scheduler-lookup.js';

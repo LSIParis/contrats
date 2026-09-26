@@ -86,6 +86,8 @@ enum ContractType {
 enum ContractOrigin {
   NATIVE
   IMPORTED
+  /// Projet rédigé par IA (brief §6) : revue humaine clause par clause.
+  AI
 }
 
 /// §7.1. EXPIRING_SOON et ARCHIVED n'en font PAS partie :
@@ -106,6 +108,32 @@ enum ContractStatus {
   RENEWED
   CANCELLED
   DECLINED
+  // v2 — docs/contrats/02-cycle-de-vie.md (migrations 18-19)
+  SENT_TO_CLIENT
+  IN_NEGOTIATION
+  ACCEPTED
+  SIGNATURE_EXPIRED
+  RENEWAL_DUE
+  TERMINATION_PENDING
+  IMPORTED_PENDING_VALIDATION
+}
+
+/// Reconduction (V2-H10). NONE = le contrat expire à son terme.
+enum RenewalMode {
+  NONE
+  TACIT
+  EXPRESS
+}
+
+enum AcceptanceMethod {
+  PORTAL
+  RECORDED_BY_STAFF
+}
+
+enum ContractPeriodKind {
+  INITIAL
+  TACIT_RENEWAL
+  EXPRESS_RENEWAL
 }
 
 enum BillingFrequency {
@@ -364,6 +392,10 @@ model Customer {
   notes        String?
   createdAt    DateTime       @map("created_at")
   updatedAt    DateTime       @map("updated_at")
+  /// Consommateur ou non-professionnel : obligation d'information Chatel.
+  isConsumer   Boolean        @default(false) @map("is_consumer")
+  /// Référence du client dans Client Help (ou saisie locale).
+  externalRef  String?        @map("external_ref")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -376,6 +408,7 @@ model Customer {
   /// Clé candidate composite : cible des FK porteuses de scope (§8.4).
   @@unique([id, tenantId])
   @@unique([tenantId, siren])
+  @@unique([tenantId, externalRef], map: "customers_tenant_external_ref_key")
   @@index([tenantId, status])
   @@map("customers")
 }
@@ -390,6 +423,8 @@ model CustomerContact {
   phone       String?
   jobTitle    String?  @map("job_title")
   isSignatory Boolean  @default(false) @map("is_signatory")
+  /// Qualité à signer (gérant, président, DG, mandataire…).
+  signingCapacity String? @map("signing_capacity")
   isPrimary   Boolean  @default(false) @map("is_primary")
   createdAt   DateTime @map("created_at")
   updatedAt   DateTime @map("updated_at")
@@ -502,6 +537,19 @@ model Contract {
   /// Incrémenté à chaque régénération de rappels (EC-12).
   reminderCycle Int @default(0) @map("reminder_cycle")
 
+  // --- v2 (migrations 18-19) ----------------------------------------------------
+  /// V2-ACC : version acceptée par le client, distincte de la signature.
+  acceptedVersionId        String?     @map("accepted_version_id") @db.Uuid
+  renewalMode              RenewalMode @default(NONE) @map("renewal_mode")
+  renewalPeriodMonths      Int?        @map("renewal_period_months")
+  /// Préavis en mois (exclusif de noticePeriodDays, CHECK en base).
+  noticePeriodMonths       Int?        @map("notice_period_months")
+  /// null = déduit du client (isConsumer) ; true/false = forcé.
+  chatelNotice             Boolean?    @map("chatel_notice")
+  terminationEffectiveDate DateTime?   @map("termination_effective_date") @db.Date
+  /// Clauses IA pas encore validées par un humain (V2-AI).
+  unreviewedAiClauses      Int         @default(0) @map("unreviewed_ai_clauses")
+
   signedAt     DateTime? @map("signed_at")
   activatedAt  DateTime? @map("activated_at")
   terminatedAt DateTime? @map("terminated_at")
@@ -537,6 +585,8 @@ model Contract {
   cancellations     Cancellation[]
   storedDocuments   StoredDocument[]
   lifecycleEvents   LifecycleEvent[]
+  acceptances       ContractAcceptance[]
+  periods           ContractPeriod[]
 
   /// Clé candidate composite portant le scope complet : cible de TOUTES
   /// les FK des tables filles (§8.4).
@@ -568,7 +618,8 @@ model ContractVersion {
   createdAt     DateTime @map("created_at")
   createdByUserId String @map("created_by_user_id") @db.Uuid
 
-  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  contract    Contract             @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], onDelete: Cascade)
+  acceptances ContractAcceptance[]
 
   @@unique([contractId, versionNumber])
   @@unique([id, tenantId, customerId])
@@ -1010,3 +1061,52 @@ model LifecycleEvent {
   @@map("lifecycle_events")
 }
 
+// ===========================================================================
+// Cycle de vie v2 (migrations 18-19)
+// ===========================================================================
+
+/// Trace de l'acceptation d'une VERSION par le client (brief §2 : distincte
+/// de la signature). Append-only (UPDATE/DELETE révoqués).
+model ContractAcceptance {
+  id               String           @id @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  customerId       String           @map("customer_id") @db.Uuid
+  contractId       String           @map("contract_id") @db.Uuid
+  versionId        String           @map("version_id") @db.Uuid
+  method           AcceptanceMethod
+  acceptedByUserId String?          @map("accepted_by_user_id") @db.Uuid
+  acceptedByName   String           @map("accepted_by_name")
+  acceptedByEmail  String           @map("accepted_by_email")
+  versionPdfSha256 String?          @map("version_pdf_sha256") @db.Char(64)
+  ip               String?
+  userAgent        String?          @map("user_agent")
+  acceptedAt       DateTime         @map("accepted_at")
+  /// Obligatoire si saisie par LSI (CHECK en base) : la pièce qui prouve.
+  evidenceNote     String?          @map("evidence_note")
+
+  contract Contract        @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_acceptances_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+  version  ContractVersion @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_acceptances_version_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, contractId], map: "contract_acceptances_contract_idx")
+  @@map("contract_acceptances")
+}
+
+/// Historique des périodes contractuelles (initiale, reconductions).
+model ContractPeriod {
+  id              String             @id @db.Uuid
+  tenantId        String             @map("tenant_id") @db.Uuid
+  customerId      String             @map("customer_id") @db.Uuid
+  contractId      String             @map("contract_id") @db.Uuid
+  periodNumber    Int                @map("period_number")
+  kind            ContractPeriodKind
+  startDate       DateTime           @map("start_date") @db.Date
+  endDate         DateTime           @map("end_date") @db.Date
+  createdByUserId String?            @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime           @map("created_at")
+
+  contract Contract @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "contract_periods_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([contractId, periodNumber], map: "contract_periods_number_key")
+  @@index([tenantId, customerId, contractId], map: "contract_periods_contract_idx")
+  @@map("contract_periods")
+}

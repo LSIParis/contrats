@@ -12,6 +12,7 @@ import {
   type ContractEvent,
   type ContractSnapshot,
 } from '@lsi/domain';
+import { persistTransition, toContractSnapshot } from './snapshot.js';
 import {
   DOCUMENT_STORAGE,
   assertKeyMatchesScope,
@@ -384,7 +385,7 @@ export class ContractsService {
         orderBy: { submittedAt: 'desc' },
       });
 
-      const snapshot = this.toSnapshot(c, approval?.submittedByUserId ?? null);
+      const snapshot = toContractSnapshot(c, { submittedByUserId: approval?.submittedByUserId ?? null });
 
       let next: ContractSnapshot;
       try {
@@ -457,18 +458,7 @@ export class ContractsService {
         });
       }
 
-      return tx.contract.update({
-        where: { id },
-        data: {
-          status: next.status,
-          approvedVersionId: next.approvedVersionId,
-          signedAt: next.signedAt ?? null,
-          activatedAt: next.activatedAt ?? null,
-          terminatedAt: next.terminatedAt ?? null,
-          updatedAt: now,
-          updatedByUserId: scope.userId,
-        },
-      });
+      return persistTransition(tx, id, event, next, now, scope.userId);
     });
   }
 
@@ -488,9 +478,13 @@ export class ContractsService {
 
       const effectiveDate = new Date(dto.effectiveDate);
       const isAdmin = session.roles.includes('MSP_ADMIN');
-      const snapshot = this.toSnapshot(c, null);
+      const snapshot = toContractSnapshot(c);
+      const event: ContractEvent = {
+        type: 'TERMINATE', actorUserId: session.userId, reason: dto.reason, effectiveDate, isAdmin, overrideReason: dto.overrideReason,
+      };
+      let next: ContractSnapshot;
       try {
-        applyEvent(snapshot, { type: 'TERMINATE', actorUserId: session.userId, reason: dto.reason, effectiveDate, isAdmin, overrideReason: dto.overrideReason }, now);
+        next = applyEvent(snapshot, event, now);
       } catch (e) {
         if (e instanceof InvalidTransitionError) {
           throw new ConflictException({ code: e.code, detail: e.message, currentStatus: e.currentStatus, allowedTransitions: e.allowedTransitions });
@@ -514,12 +508,12 @@ export class ContractsService {
         },
       });
 
-      await tx.contract.update({
-        where: { id },
-        data: { status: 'TERMINATED', terminatedAt: now, updatedAt: now, updatedByUserId: session.userId },
-      });
+      // L'état vient de la machine : TERMINATION_PENDING tant que la date
+      // d'effet n'est pas atteinte (le job quotidien achève la résiliation),
+      // TERMINATED si elle l'est déjà.
+      await persistTransition(tx, id, event, next, now, session.userId);
 
-      return { status: 'TERMINATED' as const, effectiveDate: dto.effectiveDate, noticeRespected };
+      return { status: next.status, effectiveDate: dto.effectiveDate, noticeRespected };
     });
   }
 
@@ -541,7 +535,7 @@ export class ContractsService {
       if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
       try {
-        assertCanRenew(this.toSnapshot(parent, null));
+        assertCanRenew(toContractSnapshot(parent));
       } catch (e) {
         if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
         throw e;
@@ -677,7 +671,7 @@ export class ContractsService {
       if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
       try {
-        assertCanAmend(this.toSnapshot(parent, null));
+        assertCanAmend(toContractSnapshot(parent));
       } catch (e) {
         if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
         throw e;
@@ -749,40 +743,8 @@ export class ContractsService {
         include: { signers: { select: { party: true } } },
       });
       if (!c) throw new NotFoundException('Contrat introuvable');
-      return allowedEvents(this.toSnapshot({ ...c, attachments: [], amendments: [] }, null));
+      return allowedEvents(toContractSnapshot({ ...c, amendments: [] }), new Date());
     });
-  }
-
-  private toSnapshot(c: any, submittedByUserId: string | null): ContractSnapshot {
-    const OPEN = ['CANCELLED', 'DECLINED', 'TERMINATED', 'EXPIRED', 'RENEWED'];
-    return {
-      id: c.id,
-      type: c.type,
-      status: c.status,
-      startDate: c.startDate,
-      endDate: c.endDate,
-      noticePeriodDays: c.noticePeriodDays,
-      currentVersionId: c.currentVersionId,
-      approvedVersionId: c.approvedVersionId,
-      submittedByUserId,
-      hasLsiSigner: (c.signers ?? []).some((s: any) => s.party === 'LSI'),
-      hasClientSigner: (c.signers ?? []).some((s: any) => s.party === 'CLIENT'),
-      // Simplification MVP : la notion de pièce jointe OBLIGATOIRE dépendra
-      // du modèle (ticket C-02). Aucune n'est obligatoire aujourd'hui.
-      hasRequiredAttachments: true,
-      openAmendmentExists: (c.amendments ?? []).some((a: any) => !OPEN.includes(a.status)),
-      // `successorContractId` est désormais posé dès la création d'un
-      // successeur DRAFT non signé (cf. `renew`) : un lien existant ne veut
-      // PAS dire « signé ». La transition EXPIRE→RENEWED n'est décidée que
-      // par le sweep de cycle de vie (lifecycle.service.ts), qui construit
-      // son propre snapshot à partir du VRAI `signedAt` du successeur. Ce
-      // snapshot générique ne doit donc jamais prétendre à un successeur
-      // signé à partir d'un simple lien (cf. signature-actions.service.ts).
-      hasSignedSuccessor: false,
-      signedAt: c.signedAt,
-      activatedAt: c.activatedAt,
-      terminatedAt: c.terminatedAt,
-    };
   }
 
   private async nextReference(tx: any, tenantId: string, now: Date): Promise<string> {
