@@ -23,3 +23,6 @@ export * from './revision.js';
 export * from './tiers.js';
 export * from './rules.js';
 export * from './overrides.js';
+export * from './trace.js';
+export * from './schedule.js';
+export * from './price-at.js';
