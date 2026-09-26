@@ -1,0 +1,68 @@
+# Configuration git-cliff : génère CHANGELOG.md à partir des Conventional Commits.
+#
+#   git cliff -o CHANGELOG.md                 # régénère tout l'historique
+#   git cliff --unreleased --tag v1.2.0 --prepend CHANGELOG.md   # avant de poser un tag
+#   git cliff --bumped-version                # propose la prochaine version SemVer
+#
+# Installation : https://git-cliff.org/docs/installation (binaire, cargo, npx git-cliff).
+
+[changelog]
+header = """
+# Journal des modifications
+
+Toutes les évolutions notables de l'application « Contrats ».
+Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
+versionnement [SemVer](https://semver.org/lang/fr/). Fichier généré par
+[git-cliff](https://git-cliff.org) à partir des Conventional Commits : ne pas
+éditer à la main les sections générées.
+
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Non publié]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}** : {% endif %}\
+{% if commit.breaking %}[**CASSANT**] {% endif %}\
+{{ commit.message | upper_first }} ({{ commit.id | truncate(length=7, end="") }})\
+{% endfor %}
+{% endfor %}\n
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9]+\\.[0-9]+\\.[0-9]+"
+topo_order = false
+sort_commits = "oldest"
+commit_preprocessors = [
+  # Retire les références de PR en fin de ligne : « (#12) ».
+  { pattern = '\s*\(#[0-9]+\)$', replace = "" },
+]
+commit_parsers = [
+  { message = "^Merge ", skip = true },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Fonctionnalités" },
+  { message = "^fix", group = "<!-- 1 -->Corrections" },
+  { message = "^perf", group = "<!-- 2 -->Performances" },
+  { message = "^refactor", group = "<!-- 3 -->Refactorisation" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Tests" },
+  { message = "^build", group = "<!-- 6 -->Construction" },
+  { message = "^ci", group = "<!-- 7 -->Intégration continue" },
+  { message = "^chore\\(deps\\)", group = "<!-- 8 -->Dépendances" },
+  { message = "^chore\\(docker\\)", group = "<!-- 8 -->Dépendances" },
+  { message = "^chore", group = "<!-- 9 -->Divers" },
+  { message = "^revert", group = "<!-- 9 -->Divers" },
+  # Types non standard (ex. « polish ») : conservés plutôt que perdus.
+  { message = ".*", group = "<!-- 9 -->Divers" },
+]
