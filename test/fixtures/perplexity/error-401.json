@@ -1,0 +1,14 @@
+{
+  "_comment": "Clé invalide, révoquée ou crédit épuisé (FAQ Perplexity : 401 couvre aussi le solde épuisé). Corps ErrorInfo {message, type, code}.",
+  "status": 401,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "Invalid API key provided.",
+      "type": "invalid_api_key",
+      "code": "401"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "_comment": "Requête refusée : ici un modèle inconnu. La référence documente 400 pour les requêtes invalides ; 422 est traité de la même façon par précaution.",
+  "status": 422,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "validation failed: model 'acme/unknown-model' is not supported",
+      "type": "invalid_request_error",
+      "code": "invalid_model"
+    }
+  }
+}
