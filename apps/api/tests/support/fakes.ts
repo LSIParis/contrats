@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import type {
+  CompletedDocuments,
   CreateSubmissionCommand,
+  CreateTemplateSubmissionCommand,
+  ProviderReadiness,
+  ProviderSubmissionState,
   DocumentRenderer,
   ESignatureProvider,
   ProviderSubmission,
@@ -67,6 +71,42 @@ export class FakeProvider implements ESignatureProvider {
     return this.created.get(externalId) ?? null;
   }
 
+  readonly templateCalls: CreateTemplateSubmissionCommand[] = [];
+
+  async createSubmissionFromTemplate(cmd: CreateTemplateSubmissionCommand): Promise<ProviderSubmission> {
+    this.templateCalls.push(cmd);
+    const id = String(++this.counter + 900_000);
+    return {
+      providerSubmissionId: id,
+      submitters: cmd.submitters.map((s, i) => ({
+        externalId: s.externalId,
+        providerSubmitterId: `${id}-${i}`,
+        slug: `slug${id}${i}`,
+      })),
+    };
+  }
+
+  /** État renvoyé par getSubmission — réglable par test (réconciliation). */
+  submissionState: ProviderSubmissionState | null = null;
+
+  async getSubmission(providerSubmissionId: string): Promise<ProviderSubmissionState> {
+    return (
+      this.submissionState ?? {
+        providerSubmissionId,
+        status: 'PENDING',
+        completedAt: null,
+        expireAt: null,
+        submitters: [],
+      }
+    );
+  }
+
+  readiness: ProviderReadiness = { reachable: true, tokenValid: true, detail: 'ok' };
+
+  async checkReadiness(): Promise<ProviderReadiness> {
+    return this.readiness;
+  }
+
   async remindSubmitter(providerSubmitterId: string): Promise<void> {
     if (this.failure) {
       const msg = this.failure;
@@ -86,9 +126,20 @@ export class FakeProvider implements ESignatureProvider {
   }
 
   async downloadSignedDocuments(providerSubmissionId: string): Promise<{ signedPdf: Buffer; auditTrail: Buffer | null }> {
+    const d = await this.downloadCompletedDocuments(providerSubmissionId);
+    return { signedPdf: d.mergedPdf, auditTrail: d.auditLogPdf };
+  }
+
+  readonly downloaded: string[] = [];
+
+  async downloadCompletedDocuments(providerSubmissionId: string): Promise<CompletedDocuments> {
+    this.downloaded.push(providerSubmissionId);
+    const signed = Buffer.from(`%PDF-1.7 signed ${providerSubmissionId}\n%%EOF`, 'utf8');
     return {
-      signedPdf: Buffer.from(`%PDF-1.7 signed ${providerSubmissionId}\n%%EOF`, 'utf8'),
-      auditTrail: Buffer.from(`%PDF-1.7 audit ${providerSubmissionId}\n%%EOF`, 'utf8'),
+      mergedPdf: signed,
+      auditLogPdf: Buffer.from(`%PDF-1.7 audit ${providerSubmissionId}\n%%EOF`, 'utf8'),
+      combinedPdf: null,
+      documents: [{ name: 'contrat', pdf: signed }],
     };
   }
 
