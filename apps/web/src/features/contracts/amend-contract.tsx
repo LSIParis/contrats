@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiPost, ApiError } from '../../lib/api.js';
+import { StatusBadge } from '../../ui/status-badge.js';
 
 const ADMIN_OR_AM = ['MSP_ADMIN', 'ACCOUNT_MANAGER'];
 
@@ -42,7 +43,7 @@ export function AmendContract({ contractId, status, roles, openAmendment, amends
         <p className="text-sm text-gray-600">Avenant de <Link className="text-lsi hover:underline" to={`/contracts/${amends.id}`}>{amends.reference}</Link></p>
       )}
       {openAmendment && (
-        <p className="text-sm text-gray-600">Avenant en cours → <Link className="text-lsi hover:underline" to={`/contracts/${openAmendment.id}`}>{openAmendment.reference}</Link> ({openAmendment.status})</p>
+        <p className="text-sm text-gray-600">Avenant en cours → <Link className="text-lsi hover:underline" to={`/contracts/${openAmendment.id}`}>{openAmendment.reference}</Link> <StatusBadge status={openAmendment.status} /></p>
       )}
       {canAct && amendable && !open && (
         <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => setOpen(true)}>Créer un avenant</button>
