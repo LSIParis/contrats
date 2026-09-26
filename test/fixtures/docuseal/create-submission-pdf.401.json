@@ -1,0 +1,7 @@
+{
+  "_comment": "POST /submissions/pdf — jeton X-Auth-Token invalide ou révoqué.",
+  "status": 401,
+  "body": {
+    "error": "Not authenticated"
+  }
+}

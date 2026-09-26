@@ -1,0 +1,7 @@
+{
+  "_comment": "POST /submissions/pdf — panne côté DocuSeal.",
+  "status": 500,
+  "body": {
+    "error": "Internal Server Error"
+  }
+}

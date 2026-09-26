@@ -1,0 +1,12 @@
+{
+  "_comment": "GET /templates?limit=1 — appel authentifié le plus léger : sonde de disponibilité.",
+  "status": 200,
+  "body": {
+    "data": [],
+    "pagination": {
+      "count": 0,
+      "next": null,
+      "prev": null
+    }
+  }
+}

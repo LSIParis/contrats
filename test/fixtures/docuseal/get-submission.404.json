@@ -1,0 +1,7 @@
+{
+  "_comment": "GET /submissions/{id} — inconnue ou archivée.",
+  "status": 404,
+  "body": {
+    "error": "Not found"
+  }
+}

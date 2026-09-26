@@ -1,0 +1,7 @@
+{
+  "_comment": "POST /submissions/pdf — payload refusé (champ inconnu : relevé contre l’instance réelle, 2026-07-17).",
+  "status": 422,
+  "body": {
+    "error": "Unknown field: Montant"
+  }
+}
