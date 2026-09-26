@@ -1,3 +1,59 @@
+@import './ui/theme/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Base reprise de lticket (apps/console/src/styles.css l. 64-80, 249-284).
+ * Posée dans @layer base : toute classe utilitaire d'une page garde la priorité.
+ */
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { color: var(--text); font-weight: 650; letter-spacing: -0.01em; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 15px; }
+
+  /* Champs (l. 270-284) : bordure forte, rayon 6 px, focus menthe visible (≥ 3:1). */
+  input:not([type='checkbox']):not([type='radio']):not([type='file']), textarea, select {
+    border-color: var(--border-strong);
+    background-color: var(--surface);
+    color: var(--text);
+  }
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: none;
+    border-color: var(--focus);
+    box-shadow: 0 0 0 3px rgba(19, 150, 108, .30);
+  }
+  input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
+
+  /* Un anneau de focus sur tout ce qui se clique (l. 237-253). :focus-visible, pas :focus. */
+  button:focus-visible, a:focus-visible, summary:focus-visible, [role='button']:focus-visible,
+  [role='tab']:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  [role='tab']:focus-visible { outline-offset: -2px; }
+}
+
+@layer utilities {
+  /* Entrée des modales (Dialog.tsx de lticket, keyframes `dialog-pop`). */
+  @keyframes dialog-pop { from { transform: scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* Entrée des toasts (styles.css l. 684-689, `session-preavis-entree`). */
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .anim-dialog { animation: dialog-pop 140ms ease-out; }
+    .anim-toast { animation: toast-in 160ms ease-out; }
+  }
+}
