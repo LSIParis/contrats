@@ -146,6 +146,23 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
+  # OCR — ocrmypdf + Tesseract fra (import des contrats scannés, brief §3)
+  #
+  # Construit localement depuis deploy/ocr ; en production, image GHCR
+  # contrats-ocr. L'app l'appelle via OCR_URL (OCR_URL=http://localhost:8081 en dev).
+  # Mêmes durcissements qu'en production : FS en lecture seule, /tmp en tmpfs.
+  # ---------------------------------------------------------------------
+  ocr:
+    build: deploy/ocr
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    ports:
+      - '${OCR_HOST_PORT:-8081}:8080'
+
+  # ---------------------------------------------------------------------
   # MinIO — S3 en local (§10.7)
   # ---------------------------------------------------------------------
   minio:

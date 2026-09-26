@@ -45,3 +45,7 @@ Thumbs.db
 .terraform/
 *.tfvars
 !*.tfvars.example
+
+# Python (service OCR)
+__pycache__/
+*.pyc
