@@ -1,0 +1,12 @@
+# Fins de ligne : tout ce qui est exécuté dans un conteneur Linux DOIT rester
+# en LF, même extrait sur un poste Windows (core.autocrlf=true). Un `migrate.sh`
+# en CRLF copié dans l'image fait échouer `sh` (« set: illegal option -\r »).
+* text=auto
+*.sh        text eol=lf
+*.py        text eol=lf
+Dockerfile  text eol=lf
+*.Dockerfile text eol=lf
+crontab     text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
