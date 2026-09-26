@@ -3,6 +3,7 @@ import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { createHash } from 'node:crypto';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
 import { ESIGNATURE_PROVIDER } from '../../src/signature/provider.token.js';
@@ -315,9 +316,35 @@ describe('§11.3 — contenu de la demande', () => {
     // de signature. Aucun champ pré-rempli (DocuSeal rejette les champs
     // inexistants — 422 « Unknown field »).
     await send(contractId);
-    expect(renderer.lastHtml).toContain('{{Signature;role=LSI Maintenance;type=signature}}');
-    expect(renderer.lastHtml).toContain('{{Signature;role=Client;type=signature}}');
+    expect(renderer.lastHtml).toContain('{{Signature LSI Maintenance;role=LSI Maintenance;type=signature;');
+    expect(renderer.lastHtml).toContain('{{Signature Client;role=Client;type=signature;');
+    // Date de signature automatique (datenow), non antidatable.
+    expect(renderer.lastHtml).toContain('{{Date Client;role=Client;type=datenow;');
     expect(provider.calls[0]!.submitters.every((s) => s.fields.length === 0)).toBe(true);
+  });
+
+  test('l’empreinte du PDF rendu accompagne la commande (revérifiée par l’adaptateur)', async () => {
+    await send(contractId);
+    const cmd = provider.calls[0]!;
+    expect(cmd.pdfSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(createHash('sha256').update(cmd.pdf).digest('hex')).toBe(cmd.pdfSha256);
+  });
+
+  test('paraphe de chaque page : pied de page seulement si DOCUSEAL_INITIALS_FOOTER=true', async () => {
+    delete process.env.DOCUSEAL_INITIALS_FOOTER;
+    await send(contractId);
+    expect(renderer.lastFooter).toBeUndefined();
+  });
+
+  test('paraphe activé : un paraphe par rôle, numéro de page du moteur', async () => {
+    process.env.DOCUSEAL_INITIALS_FOOTER = 'true';
+    try {
+      await send(contractId);
+    } finally {
+      delete process.env.DOCUSEAL_INITIALS_FOOTER;
+    }
+    expect(renderer.lastFooter).toContain('{{Paraphe Client p<span class="pageNumber"></span>;role=Client;type=initials');
+    expect(renderer.lastFooter).toContain('{{Paraphe LSI Maintenance p<span class="pageNumber"></span>;');
   });
 
   test('le 2FA email est transmis pour le signataire client', async () => {

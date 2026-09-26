@@ -3,6 +3,7 @@ import { withScope, systemScope, resolveWebhookScope, uuidv7 } from '@lsi/persis
 import { applyEvent, replanAfterEndDateChange, type NormalizedSignatureEvent } from '@lsi/domain';
 import { DocusealAdapter } from '../signature/docuseal.adapter.js';
 import { JOB_QUEUE, type CaptureProofJob, type JobQueue } from '../jobs/job-queue.port.js';
+import { reconciliationEvents } from './reconciliation-events.js';
 
 export type WebhookOutcome =
   | 'processed'
@@ -28,7 +29,8 @@ const CLOSED_REQUEST_STATUSES = new Set(['REVOKED', 'DECLINED', 'EXPIRED', 'COMP
  *
  * L'ORDRE DES ÉTAPES EST LA SÉCURITÉ. Le changer, c'est ouvrir une brèche :
  *
- *   1. vérifier le HMAC sur le CORPS BRUT — avant tout parsing
+ *   1. vérifier le HMAC sur le CORPS BRUT — avant tout parsing — puis, s'il
+ *      est configuré, le secret partagé d'en-tête (DOCUSEAL_WEBHOOK_HEADER_SECRET)
  *   2. parser
  *   3. idempotence : contrainte UNIQUE en base, pas un `if`
  *   4. RÉSOUDRE LE SCOPE DEPUIS NOTRE BASE — jamais depuis le payload
@@ -67,6 +69,43 @@ export class DocusealWebhookService {
     const event = this.provider.parseWebhook(payload);
     if (!event) return { status: 'unsupported_event' };
 
+    return this.process(event);
+  }
+
+  /**
+   * Applique un événement normalisé DÉJÀ AUTHENTIFIÉ.
+   *
+   * Point d'entrée commun au webhook (après HMAC) et à la réconciliation
+   * (`reconcileFromProvider`, qui fabrique des événements depuis l'état lu
+   * chez le provider). Ne JAMAIS l'exposer à une entrée non authentifiée.
+   *
+   * Tolérance à l'ordre : DocuSeal ne garantit ni l'ordre ni l'unicité des
+   * livraisons (réessais 48 h). Chaque effet est donc MONOTONE — un
+   * signataire SIGNED ne redevient jamais VIEWED, une demande close ne se
+   * rouvre pas — si bien que l'état final ne dépend pas de l'ordre d'arrivée.
+   */
+  /**
+   * Réconciliation d'UNE submission sans webhook reçu. (EC-06, brief §7)
+   *
+   * Relit l'état chez le provider (GET /submissions/{id}) et le fait passer
+   * par `process()` sous forme d'événements normalisés. Idempotent : une
+   * seconde passe est dédupliquée, et un webhook tardif reste sans effet.
+   *
+   * La DÉCOUVERTE des demandes à réconcilier (SENT / PARTIALLY_COMPLETED
+   * sans synchronisation récente, tous tenants confondus) exige une fonction
+   * SQL bornée analogue à `app_find_signatures_needing_proof` — voir
+   * 06-docuseal.md §Réconciliation.
+   */
+  async reconcileFromProvider(providerSubmissionId: string): Promise<WebhookOutcome[]> {
+    const state = await this.provider.getSubmission(providerSubmissionId);
+    const outcomes: WebhookOutcome[] = [];
+    for (const event of reconciliationEvents(state)) {
+      outcomes.push((await this.process(event)).status);
+    }
+    return outcomes;
+  }
+
+  async process(event: NormalizedSignatureEvent): Promise<{ status: WebhookOutcome }> {
     // --- 3. Résoudre le scope DEPUIS NOTRE BASE ---------------------------
     //
     // LE CŒUR DU DISPOSITIF.
@@ -222,6 +261,13 @@ export class DocusealWebhookService {
         return null; // journalisé, sans effet
 
       case 'FORM_DECLINED': {
+        // Hors ordre : un signataire qui a SIGNÉ ne peut plus refuser. Un
+        // refus qui arriverait après sa signature est une incohérence du
+        // provider, pas un fait métier — on ne défait pas une signature.
+        if (signer?.status === 'SIGNED') {
+          this.log.warn(`refus ignoré : signataire ${signer.id} a déjà signé`);
+          return null;
+        }
         if (signer) {
           await tx.contractSigner.update({
             where: { id: signer.id },
@@ -242,6 +288,10 @@ export class DocusealWebhookService {
       }
 
       case 'FORM_COMPLETED': {
+        // Hors ordre ou rejeu sous un autre horodatage : un signataire déjà
+        // SIGNED ne se re-signe pas (signedAt préservé), et la demande a déjà
+        // été avancée par l'événement qui l'a fait signer.
+        if (signer?.status === 'SIGNED') return null;
         if (signer) {
           await tx.contractSigner.update({
             where: { id: signer.id },
@@ -254,98 +304,15 @@ export class DocusealWebhookService {
         const remaining = await tx.contractSigner.count({
           where: { contractId: sigReq.contractId, status: { not: 'SIGNED' } },
         });
-        const allSigned = remaining === 0;
-
-        await tx.signatureRequest.update({
-          where: { id: sigReq.signatureRequestId },
-          data: {
-            status: allSigned ? 'COMPLETED' : 'PARTIALLY_COMPLETED',
-            lastSyncedAt: now,
-            updatedAt: now,
-          },
-        });
-        await this.transition(tx, sigReq.contractId, { type: 'SIGNER_SIGNED', allSigned }, now);
-
-        // Renouvellement (§6.12) : si le contrat qui vient d'être totalement
-        // signé est un SUCCESSEUR de renouvellement, sa signature vaut
-        // acceptation de l'offre — la RenewalRequest PENDING correspondante
-        // passe ACCEPTED. `updateMany` sur PENDING est idempotent : un
-        // rejeu du webhook ou une RenewalRequest déjà décidée est un no-op.
-        if (allSigned) {
-          const signed = await tx.contract.findUnique({
-            where: { id: sigReq.contractId },
-            select: { predecessorContractId: true },
+        if (remaining > 0) {
+          await tx.signatureRequest.update({
+            where: { id: sigReq.signatureRequestId },
+            data: { status: 'PARTIALLY_COMPLETED', lastSyncedAt: now, updatedAt: now },
           });
-          if (signed?.predecessorContractId) {
-            await tx.renewalRequest.updateMany({
-              where: { newContractId: sigReq.contractId, status: 'PENDING' },
-              data: { status: 'ACCEPTED', decidedAt: now },
-            });
-          }
-
-          // Avenant (§6.12, RM-18) : à la signature complète d'un avenant,
-          // reporter ses champs sur le parent + régénérer ses rappels (EC-12).
-          // Idempotent : l'événement webhook est dédupliqué (EC-05), donc ceci
-          // ne s'exécute qu'une fois.
-          const av = await tx.contract.findUnique({
-            where: { id: sigReq.contractId },
-            select: { type: true, parentContractId: true, endDate: true, amountCents: true },
-          });
-          if (av?.type === 'AMENDMENT' && av.parentContractId) {
-            const parent = await tx.contract.findUnique({
-              where: { id: av.parentContractId },
-              select: { id: true, tenantId: true, customerId: true, status: true, noticePeriodDays: true, reminderCycle: true },
-            });
-            if (parent && (parent.status === 'ACTIVE' || parent.status === 'SIGNED')) {
-              // Le report (endDate/amountCents) est INCONDITIONNEL sur un
-              // parent ACTIVE ou SIGNED — y compris un avenant montant-seul
-              // (sans endDate) sur un parent ACTIVE : sans ce report,
-              // amountCents restait silencieusement non reporté (bug revue
-              // finale). Seul le REPLAN des rappels a une condition
-              // supplémentaire (ACTIVE + endDate présent) : un avenant qui
-              // ne touche pas l'échéance n'a aucune raison de bumper le
-              // cycle de rappels.
-              if (parent.status === 'ACTIVE' && av.endDate) {
-                const { newCycle, reminders } = replanAfterEndDateChange(
-                  { endDate: av.endDate, noticePeriodDays: parent.noticePeriodDays, reminderCycle: parent.reminderCycle },
-                  now,
-                );
-                await tx.reminder.updateMany({ where: { contractId: parent.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
-                await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, reminderCycle: newCycle, updatedAt: now } });
-                for (const d of reminders) {
-                  await tx.reminder.create({ data: {
-                    id: uuidv7(), tenantId: parent.tenantId, customerId: parent.customerId, contractId: parent.id,
-                    kind: d.kind, offsetDays: d.offsetDays, cycle: d.cycle, dueAt: d.dueAt, status: d.status, createdAt: now,
-                  }});
-                }
-              } else {
-                // ACTIVE sans endDate (montant-seul), ou SIGNED (pas encore
-                // ACTIVE) : on reporte les champs, mais on ne replanifie PAS
-                // les rappels ici — soit ils sont posés à l'activation (sur
-                // la bonne date déjà reportée), soit l'échéance n'a pas
-                // changé et le cycle en cours reste valide.
-                await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, updatedAt: now } });
-              }
-            }
-            // Sinon (parent introuvable ou TERMINATED/CANCELLED/EXPIRED/
-            // RENEWED/…) : le parent est dans un état TERMINAL — l'avenant
-            // ne s'applique plus à rien de significatif. On ne touche à rien
-            // plutôt que de réécrire endDate/amountCents sur un contrat clos.
-          }
+          await this.transition(tx, sigReq.contractId, { type: 'SIGNER_SIGNED', allSigned: false }, now);
+          return null;
         }
-
-        // À complétion TOTALE : capturer le PDF signé et la piste d'audit
-        // (§11.6). Job ASYNCHRONE, enfilé APRÈS commit par handle() — jamais
-        // en ligne : DocuSeal réessaie sur timeout, et télécharger ici
-        // bloquerait la réponse et risquerait un double traitement.
-        if (allSigned) {
-          return {
-            signatureRequestId: sigReq.signatureRequestId,
-            tenantId: sigReq.tenantId,
-            customerId: sigReq.customerId,
-          };
-        }
-        return null;
+        return this.completeAll(tx, sigReq, now);
       }
 
       case 'SUBMISSION_EXPIRED': {
@@ -357,15 +324,116 @@ export class DocusealWebhookService {
       }
 
       case 'SUBMISSION_COMPLETED': {
-        await tx.signatureRequest.update({
-          where: { id: sigReq.signatureRequestId },
-          data: { lastSyncedAt: now, updatedAt: now },
+        // AUTORITAIRE : DocuSeal n'émet submission.completed que lorsque
+        // TOUTES les parties ont signé (documentation de l'API). Si un
+        // form.completed s'est perdu ou arrive après, on n'attend pas : tous
+        // les signataires passent SIGNED et la complétion s'applique. Le
+        // form.completed tardif trouvera ensuite une demande COMPLETED,
+        // close : il sera journalisé, sans effet.
+        await tx.contractSigner.updateMany({
+          where: { contractId: sigReq.contractId, status: { not: 'SIGNED' } },
+          data: { status: 'SIGNED', signedAt: now, updatedAt: now },
         });
-        return null;
+        return this.completeAll(tx, sigReq, now);
       }
     }
 
     return null;
+  }
+
+  /**
+   * Complétion TOTALE : demande COMPLETED, contrat SIGNED via le domaine,
+   * effets de renouvellement et d'avenant, puis job de capture de preuve.
+   *
+   * Atteinte au plus UNE fois par demande : ensuite la demande est
+   * COMPLETED, donc close, et tout événement ultérieur est court-circuité
+   * par la garde de process().
+   */
+  private async completeAll(
+    tx: any,
+    sigReq: { signatureRequestId: string; contractId: string; tenantId: string; customerId: string },
+    now: Date,
+  ): Promise<CaptureProofJob> {
+    await tx.signatureRequest.update({
+      where: { id: sigReq.signatureRequestId },
+      data: { status: 'COMPLETED', lastSyncedAt: now, updatedAt: now },
+    });
+    await this.transition(tx, sigReq.contractId, { type: 'SIGNER_SIGNED', allSigned: true }, now);
+
+    // Renouvellement (§6.12) : si le contrat qui vient d'être totalement
+    // signé est un SUCCESSEUR de renouvellement, sa signature vaut
+    // acceptation de l'offre — la RenewalRequest PENDING correspondante
+    // passe ACCEPTED. `updateMany` sur PENDING est idempotent : un
+    // rejeu du webhook ou une RenewalRequest déjà décidée est un no-op.
+    const signed = await tx.contract.findUnique({
+      where: { id: sigReq.contractId },
+      select: { predecessorContractId: true },
+    });
+    if (signed?.predecessorContractId) {
+      await tx.renewalRequest.updateMany({
+        where: { newContractId: sigReq.contractId, status: 'PENDING' },
+        data: { status: 'ACCEPTED', decidedAt: now },
+      });
+    }
+
+    // Avenant (§6.12, RM-18) : à la signature complète d'un avenant,
+    // reporter ses champs sur le parent + régénérer ses rappels (EC-12).
+    // Idempotent : l'événement webhook est dédupliqué (EC-05), donc ceci
+    // ne s'exécute qu'une fois.
+    const av = await tx.contract.findUnique({
+      where: { id: sigReq.contractId },
+      select: { type: true, parentContractId: true, endDate: true, amountCents: true },
+    });
+    if (av?.type === 'AMENDMENT' && av.parentContractId) {
+      const parent = await tx.contract.findUnique({
+        where: { id: av.parentContractId },
+        select: { id: true, tenantId: true, customerId: true, status: true, noticePeriodDays: true, reminderCycle: true },
+      });
+      if (parent && (parent.status === 'ACTIVE' || parent.status === 'SIGNED')) {
+        // Le report (endDate/amountCents) est INCONDITIONNEL sur un
+        // parent ACTIVE ou SIGNED — y compris un avenant montant-seul
+        // (sans endDate) sur un parent ACTIVE : sans ce report,
+        // amountCents restait silencieusement non reporté (bug revue
+        // finale). Seul le REPLAN des rappels a une condition
+        // supplémentaire (ACTIVE + endDate présent) : un avenant qui
+        // ne touche pas l'échéance n'a aucune raison de bumper le
+        // cycle de rappels.
+        if (parent.status === 'ACTIVE' && av.endDate) {
+          const { newCycle, reminders } = replanAfterEndDateChange(
+            { endDate: av.endDate, noticePeriodDays: parent.noticePeriodDays, reminderCycle: parent.reminderCycle },
+            now,
+          );
+          await tx.reminder.updateMany({ where: { contractId: parent.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+          await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, reminderCycle: newCycle, updatedAt: now } });
+          for (const d of reminders) {
+            await tx.reminder.create({ data: {
+              id: uuidv7(), tenantId: parent.tenantId, customerId: parent.customerId, contractId: parent.id,
+              kind: d.kind, offsetDays: d.offsetDays, cycle: d.cycle, dueAt: d.dueAt, status: d.status, createdAt: now,
+            }});
+          }
+        } else {
+          // ACTIVE sans endDate (montant-seul), ou SIGNED (pas encore
+          // ACTIVE) : on reporte les champs, mais on ne replanifie PAS
+          // les rappels ici — soit ils sont posés à l'activation (sur
+          // la bonne date déjà reportée), soit l'échéance n'a pas
+          // changé et le cycle en cours reste valide.
+          await tx.contract.update({ where: { id: parent.id }, data: { endDate: av.endDate, amountCents: av.amountCents, updatedAt: now } });
+        }
+      }
+      // Sinon (parent introuvable ou TERMINATED/CANCELLED/EXPIRED/
+      // RENEWED/…) : le parent est dans un état TERMINAL — l'avenant
+      // ne s'applique plus à rien de significatif. On ne touche à rien
+      // plutôt que de réécrire endDate/amountCents sur un contrat clos.
+    }
+
+    // Capturer le PDF signé et la piste d'audit (§11.6). Job ASYNCHRONE,
+    // enfilé APRÈS commit par process() — jamais en ligne : DocuSeal réessaie
+    // sur timeout, et télécharger ici bloquerait la réponse.
+    return {
+      signatureRequestId: sigReq.signatureRequestId,
+      tenantId: sigReq.tenantId,
+      customerId: sigReq.customerId,
+    };
   }
 
   /**

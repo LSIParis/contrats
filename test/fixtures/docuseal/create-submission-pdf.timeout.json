@@ -1,0 +1,7 @@
+{
+  "_comment": "Aucune réponse dans le délai : fetch rejette avec une DOMException TimeoutError (AbortSignal.timeout).",
+  "error": {
+    "name": "TimeoutError",
+    "message": "The operation was aborted due to timeout"
+  }
+}

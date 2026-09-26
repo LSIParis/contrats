@@ -1,7 +1,12 @@
 import { describe, test, expect } from 'vitest';
 import { DocusealAdapter } from '../../src/signature/docuseal.adapter.js';
 import { GotenbergRenderer } from '../../src/documents/gotenberg.renderer.js';
-import type { CreateSubmissionCommand } from '@lsi/domain';
+import {
+  hiddenTagHtml,
+  initialsFooterHtml,
+  signatureBlockTags,
+  type CreateSubmissionCommand,
+} from '@lsi/domain';
 
 /**
  * Test d'INTÉGRATION : mon adaptateur réel contre la VRAIE DocuSeal Enterprise.
@@ -173,6 +178,57 @@ describe.runIf(available)('app → DocuSeal EE (instance réelle)', () => {
       expect(found!.providerSubmissionId).toBe(submission.providerSubmissionId);
     } finally {
       if (submission) await cleanup(submission.providerSubmissionId);
+    }
+  });
+});
+
+describe.runIf(available)('balises textuelles du gabarit (instance réelle)', () => {
+  /**
+   * À FAIRE PASSER avant d'activer DOCUSEAL_INITIALS_FOOTER=true en
+   * production (06-docuseal.md §Gabarit) : vérifie que DocuSeal reconnaît
+   * des balises écrites en BLANC et, surtout, la balise de paraphe
+   * reconstituée par Chromium autour du numéro de page du pied de page.
+   */
+  test('signature + datenow en texte blanc, paraphe par page en pied de page', async () => {
+    const renderer = new GotenbergRenderer();
+    const block = (role: string) => {
+      const t = signatureBlockTags(role);
+      return `<p>${role} :</p><div style="height:64px;">${hiddenTagHtml(t.signature)}</div><p>Date : ${hiddenTagHtml(t.date)}</p>`;
+    };
+    const { pdf } = await renderer.render({
+      html:
+        '<h1>TEST balises</h1><p>Page 1</p><div style="page-break-after:always;"></div><p>Page 2</p>' +
+        block('Client') +
+        block('LSI Maintenance'),
+      documentTitle: 'LSI-TEST-TAGS',
+      footerHtml: initialsFooterHtml(['Client', 'LSI Maintenance']),
+    });
+
+    const res = await fetch(`${DS_URL}/submissions/pdf`, {
+      method: 'POST',
+      headers: { 'X-Auth-Token': DS_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'LSI-TEST-TAGS',
+        send_email: false,
+        documents: [{ name: 'LSI-TEST-TAGS.pdf', file: pdf.toString('base64') }],
+        submitters: [
+          { role: 'Client', email: 'tags-client@example.invalid' },
+          { role: 'LSI Maintenance', email: 'tags-lsi@example.invalid' },
+        ],
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const body = (await res.json()) as any;
+    try {
+      expect(res.status).toBe(200);
+      const names: string[] = (body.fields ?? []).map((f: any) => `${f.type}:${f.name}`);
+      expect(names).toContain('signature:Signature Client');
+      expect(names).toContain('datenow:Date Client');
+      expect(names).toContain('initials:Paraphe Client p1');
+      expect(names).toContain('initials:Paraphe Client p2');
+      expect(names).toContain('initials:Paraphe LSI Maintenance p2');
+    } finally {
+      if (body?.id) await cleanup(String(body.id));
     }
   });
 });

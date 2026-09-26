@@ -1,0 +1,12 @@
+{
+  "_comment": "GET /submitters?external_id=… — aucun signataire.",
+  "status": 200,
+  "body": {
+    "data": [],
+    "pagination": {
+      "count": 0,
+      "next": null,
+      "prev": null
+    }
+  }
+}
