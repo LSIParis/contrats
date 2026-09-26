@@ -54,6 +54,7 @@ import { DOCUMENT_STORAGE } from './documents/document-storage.port.js';
 import { S3Storage } from './documents/s3-storage.js';
 import { InMemoryStorage } from './documents/in-memory-storage.js';
 import { ProofCaptureService } from './signature/proof-capture.service.js';
+import { DocusealReadiness } from './signature/docuseal-readiness.service.js';
 import { JOB_QUEUE } from './jobs/job-queue.port.js';
 import { BullMqJobQueue } from './jobs/bullmq-job-queue.js';
 import { NoOpJobQueue } from './jobs/noop-job-queue.js';
@@ -180,6 +181,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     SendForSignatureService,
     SignatureActionsService,
     ProofCaptureService,
+    DocusealReadiness,
     ReconciliationService,
     LifecycleService,
     ReminderDispatchService,

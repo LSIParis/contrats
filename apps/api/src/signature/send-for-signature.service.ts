@@ -16,6 +16,10 @@ import {
   type ESignatureProvider,
   type DocumentRenderer,
   type SubmitterCommand,
+  hiddenTagHtml,
+  initialsFooterHtml,
+  signatureBlockTags,
+  signerRoleLabel,
 } from '@lsi/domain';
 import { ESIGNATURE_PROVIDER } from './provider.token.js';
 import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
@@ -137,13 +141,19 @@ export class SendForSignatureService {
     // Le corps du contrat ne porte AUCUN champ de signature. Sans balise, la
     // submission DocuSeal n'aurait rien à faire signer (découvert en testant
     // contre l'EE réelle). On annexe donc un bloc de signature avec une
-    // balise {{Signature;role=…}} par signataire — le rôle DOIT correspondre
-    // au roleLabel du submitter (§11.3).
+    // balise de signature + date de signature par signataire (text-tags.ts)
+    // — le rôle DOIT correspondre au roleLabel du submitter (§11.3).
     const withSignatureBlock = version.bodyHtml + this.buildSignatureBlock(signers);
 
+    // Paraphe de chaque page, en pied de page (brief §7). ACTIVÉ PAR
+    // DOCUSEAL_INITIALS_FOOTER=true, une fois validé contre l'instance réelle
+    // par le test d'intégration : la balise y est reconstituée par Chromium
+    // autour du numéro de page (06-docuseal.md §Gabarit).
+    const roles = [...new Set(signers.map((s) => signerRoleLabel(s.party)))];
     const rendered = await this.renderer.render({
       html: withSignatureBlock,
       documentTitle: `${contract.reference} — ${contract.title}`,
+      ...(process.env.DOCUSEAL_INITIALS_FOOTER === 'true' ? { footerHtml: initialsFooterHtml(roles) } : {}),
     });
 
     // Le scope est dans le CHEMIN de stockage (§10.7) : politiques IAM et
@@ -169,7 +179,7 @@ export class SendForSignatureService {
       .sort((a, b) => a.signingOrder - b.signingOrder)
       .map((s) => ({
         party: s.party,
-        roleLabel: this.roleLabel(s.party), // même valeur que la balise du doc
+        roleLabel: signerRoleLabel(s.party), // même valeur que la balise du doc
         externalId: s.id, // ← clé de rapprochement des webhooks (§11.5)
         fullName: s.fullName,
         email: s.email,
@@ -191,6 +201,9 @@ export class SendForSignatureService {
     try {
       submission = await this.provider.createSubmission({
         pdf: rendered.pdf,
+        // L'adaptateur revérifie : le PDF envoyé est celui dont l'empreinte
+        // vient d'être stockée sur la version (§11.2).
+        pdfSha256: rendered.sha256,
         documentName: `${contract.reference}.pdf`,
         order: 'preserved', // RM-13 : LSI d'abord, client ensuite
         expireAt: sigReq.expireAt!,
@@ -311,35 +324,27 @@ export class SendForSignatureService {
   }
 
   /**
-   * Le libellé de rôle DocuSeal par partie. Source unique.
+   * Bloc de signature annexé au document, balises DocuSeal par signataire.
    *
-   * Utilisé à la fois pour la balise {{...;role=…}} du document et pour le
-   * `roleLabel` du submitter. S'ils divergeaient, le signataire n'aurait
-   * aucun champ à signer — le genre de bug silencieux qu'on ne voit qu'en
-   * envoyant un vrai contrat.
-   */
-  private roleLabel(party: 'LSI' | 'CLIENT'): string {
-    return party === 'LSI' ? 'LSI Maintenance' : 'Client';
-  }
-
-  /**
-   * Bloc de signature annexé au document, une balise DocuSeal par signataire.
-   *
-   * `{{Signature;role=<rôle>;type=signature}}` : DocuSeal parse ces balises du
-   * texte du PDF et les transforme en champs de signature attribués au bon
-   * rôle. On ajoute la date de signature à côté — utile en preuve.
+   * Signature + date de signature (`datenow`, non modifiable) : DocuSeal
+   * parse ces balises du texte du PDF et les transforme en champs attribués
+   * au bon rôle. Le libellé de rôle vient de `signerRoleLabel` — la MÊME
+   * source que le `roleLabel` du submitter. Balises en texte blanc : le PDF
+   * figé reste lisible (06-docuseal.md §Gabarit).
    */
   private buildSignatureBlock(signers: readonly { party: 'LSI' | 'CLIENT'; fullName: string }[]): string {
     const rows = [...signers]
       .sort((a, b) => (a.party === 'LSI' ? -1 : 1) - (b.party === 'LSI' ? -1 : 1))
       .map((s) => {
-        const role = this.roleLabel(s.party);
+        const role = signerRoleLabel(s.party);
+        const tags = signatureBlockTags(role);
         const who = s.party === 'LSI' ? 'Pour LSI Maintenance' : 'Pour le client';
         return `<td style="width:50%;vertical-align:top;padding:8px;">
   <div style="font-weight:bold;">${who}</div>
   <div>${escapeHtml(s.fullName)}</div>
-  <div style="margin-top:12px;">Signature : {{Signature;role=${role};type=signature}}</div>
-  <div style="margin-top:8px;">Date : {{Date;role=${role};type=date}}</div>
+  <div style="margin-top:12px;">Signature :</div>
+  <div style="height:64px;">${hiddenTagHtml(tags.signature)}</div>
+  <div style="margin-top:8px;">Date de signature : ${hiddenTagHtml(tags.date)}</div>
 </td>`;
       })
       .join('\n');

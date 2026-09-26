@@ -24,6 +24,14 @@ export class GotenbergRenderer implements DocumentRenderer {
   async render(req: RenderRequest): Promise<RenderedDocument> {
     const form = new FormData();
     form.append('files', new Blob([this.wrap(req)], { type: 'text/html' }), 'index.html');
+    if (req.footerHtml) {
+      // Gotenberg : un fichier `footer.html` est répété en pied de chaque page
+      // (headerTemplate/footerTemplate de Chromium). Document AUTONOME : ses
+      // styles doivent être en ligne ; `<span class="pageNumber">` y est
+      // remplacé par le numéro de page. Porte les paraphes DocuSeal.
+      const footer = `<!doctype html><html><head><meta charset="utf-8"></head><body>${req.footerHtml}</body></html>`;
+      form.append('files', new Blob([footer], { type: 'text/html' }), 'footer.html');
+    }
 
     // PDF/A-2b : format d'archivage normalisé, polices embarquées, aucun
     // contenu externe. Un contrat qui ne s'affiche plus dans 8 ans n'est

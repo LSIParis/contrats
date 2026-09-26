@@ -163,8 +163,12 @@ export class FakeRenderer implements DocumentRenderer {
   /** Dernier HTML reçu — permet de vérifier l'injection du bloc de signature. */
   lastHtml = '';
 
+  /** Dernier pied de page reçu (balises de paraphe), s'il y en avait un. */
+  lastFooter: string | undefined = undefined;
+
   async render(req: RenderRequest): Promise<RenderedDocument> {
     this.lastHtml = req.html;
+    this.lastFooter = req.footerHtml;
     // Un PDF minimal mais réel : commence par %PDF-, donc reconnaissable.
     const pdf = Buffer.from(`%PDF-1.7\n% ${req.documentTitle}\n${req.html}\n%%EOF`, 'utf8');
     return { pdf, sha256: createHash('sha256').update(pdf).digest('hex') };
