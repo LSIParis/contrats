@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -88,8 +89,7 @@ beforeAll(async () => {
     .overrideProvider(JOB_QUEUE)
     .useValue(queue)
     .compile();
-  app = mod.createNestApplication({ rawBody: true });
-  await app.init();
+  app = await createTestApp(mod);
   fx = await seedTwoCustomers();
 });
 

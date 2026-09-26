@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { ProviderReadiness } from '@lsi/domain';
@@ -87,8 +88,7 @@ describe('/health/ready', () => {
       .overrideProvider(ESIGNATURE_PROVIDER)
       .useValue(provider)
       .compile();
-    const app = mod.createNestApplication();
-    await app.init();
+    const app = await createTestApp(mod);
     try {
       const res = await request(app.getHttpServer()).get('/health/ready').expect(200);
       expect(res.body.status).toBe('ok');
