@@ -4,6 +4,7 @@ import { portalPost } from './portal-api.js';
 import { Button } from '../ui/button.js';
 import { Field } from '../ui/field.js';
 import { Input } from '../ui/input.js';
+import { AuthScreen } from '../ui/layout.js';
 
 export function PortalLoginPage() {
   const [email, setEmail] = useState('');
@@ -12,15 +13,14 @@ export function PortalLoginPage() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6">
-      <h1 className="text-2xl font-semibold text-lsi">Espace client — LSI Maintenance</h1>
+    <AuthScreen title="Espace client — LSI Maintenance" subtitle="Recevez un lien de connexion par email.">
       {m.isSuccess ? (
-        <p className="max-w-sm text-center text-sm text-gray-600">
+        <p role="status" className="text-center text-sm text-ink-muted">
           Si un compte existe, un lien de connexion vient d'être envoyé à cette adresse.
         </p>
       ) : (
         <form
-          className="flex w-full max-w-sm flex-col gap-4"
+          className="flex w-full flex-col gap-3.5"
           onSubmit={(e) => {
             e.preventDefault();
             if (email.trim()) m.mutate();
@@ -41,6 +41,6 @@ export function PortalLoginPage() {
           </Button>
         </form>
       )}
-    </div>
+    </AuthScreen>
   );
 }

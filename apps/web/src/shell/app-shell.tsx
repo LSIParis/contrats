@@ -1,30 +1,58 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useMe } from '../lib/queries.js';
+import { roleLabel } from '../lib/labels.js';
 import { NotificationBell } from '../features/notifications/notification-bell.js';
+import { AccountChip, NavItem, NavSection, Shell, Sidebar, Topbar } from '../ui/layout.js';
+
+/** Titre de la barre supérieure selon la section (comme `TITLES` dans lticket, App.tsx). */
+const SECTION_TITLES: Array<[prefix: string, title: string]> = [
+  ['/dashboard', 'Tableau de bord'],
+  ['/customers', 'Clients'],
+  ['/contracts', 'Contrats'],
+  ['/reminders', 'Rappels'],
+  ['/users', 'Utilisateurs'],
+  ['/audit', 'Journal d’audit'],
+  ['/templates', 'Modèles de contrat'],
+];
+
+function sectionTitle(pathname: string): string {
+  return SECTION_TITLES.find(([p]) => pathname === p || pathname.startsWith(`${p}/`))?.[1] ?? 'LSI Contrats';
+}
 
 export function AppShell() {
   const me = useMe();
+  const { pathname } = useLocation();
+  const roles = me.data?.roles ?? [];
+  const isAdmin = roles.includes('MSP_ADMIN');
+  const canTemplates = isAdmin || roles.includes('LEGAL_REVIEWER');
+
   return (
-    <div className="flex min-h-screen">
-      <nav className="w-56 bg-lsi-dark p-4 text-white">
-        <div className="mb-6 font-semibold">LSI Contrats</div>
-        <ul className="space-y-2">
-          <li><Link to="/dashboard">Tableau de bord</Link></li>
-          <li><Link to="/customers">Clients</Link></li>
-          <li><Link to="/contracts">Contrats</Link></li>
-          <li><Link to="/reminders">Rappels</Link></li>
-          {me.data?.roles?.includes('MSP_ADMIN') && <li><Link to="/users">Utilisateurs</Link></li>}
-          {me.data?.roles?.includes('MSP_ADMIN') && <li><Link to="/audit">Audit</Link></li>}
-          {(me.data?.roles?.includes('MSP_ADMIN') || me.data?.roles?.includes('LEGAL_REVIEWER')) && <li><Link to="/templates">Modèles</Link></li>}
-        </ul>
-      </nav>
-      <div className="flex-1">
-        <header className="flex items-center justify-end gap-4 border-b p-3 text-sm text-gray-600">
+    <Shell
+      sidebar={
+        <Sidebar appName="Contrats">
+          <NavItem to="/dashboard" icon="dash">Tableau de bord</NavItem>
+          <NavItem to="/customers" icon="building">Clients</NavItem>
+          <NavItem to="/contracts" icon="contract">Contrats</NavItem>
+          <NavItem to="/reminders" icon="bell">Rappels</NavItem>
+          {(isAdmin || canTemplates) && (
+            <NavSection label="Administration">
+              {canTemplates && <NavItem to="/templates" icon="book">Modèles</NavItem>}
+              {isAdmin && <NavItem to="/users" icon="users">Utilisateurs</NavItem>}
+              {isAdmin && <NavItem to="/audit" icon="clipboard">Audit</NavItem>}
+            </NavSection>
+          )}
+        </Sidebar>
+      }
+      topbar={
+        <Topbar title={sectionTitle(pathname)}>
           <NotificationBell />
-          <span>{me.data?.fullName} · {me.data?.roles?.join(', ')}</span>
-        </header>
-        <main className="p-6"><Outlet /></main>
-      </div>
-    </div>
+          {me.data?.fullName && (
+            <AccountChip name={me.data.fullName} detail={roles.map(roleLabel).join(', ') || undefined} />
+          )}
+        </Topbar>
+      }
+    >
+      <Outlet />
+    </Shell>
   );
 }
