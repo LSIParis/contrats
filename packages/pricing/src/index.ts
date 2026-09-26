@@ -27,3 +27,5 @@ export * from './trace.js';
 export * from './schedule.js';
 export * from './price-at.js';
 export * from './quantity.js';
+export * from './simulate.js';
+export * from './serialize.js';
