@@ -1,0 +1,5 @@
+{
+  "_comment": "Scénario : le serveur ne répond pas (premier appel d'un nouveau schéma : 10–30 s de préparation annoncés). Le double de fetch attend l'annulation par AbortController ; l'adaptateur doit lever AiTimeoutError sans brouillon.",
+  "scenario": "timeout",
+  "hangMs": null
+}

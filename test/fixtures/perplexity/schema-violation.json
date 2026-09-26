@@ -1,0 +1,128 @@
+{
+  "_comment": "Réponse 200 dont le JSON ne respecte pas le schéma (riskLevel hors énumération, justification absente) : aucune clause ne doit être retenue.",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "id": "resp_0f5e2c1a-7b39-4c61-9d7e-3a2b1c0d9e8f",
+    "object": "response",
+    "created_at": 1790431200,
+    "completed_at": 1790431247,
+    "model": "openai/gpt-5.6-terra",
+    "status": "completed",
+    "error": null,
+    "output": [
+      {
+        "type": "search_results",
+        "queries": [
+          "article 28 RGPD sous-traitant clauses obligatoires",
+          "reconduction tacite contrat entre professionnels"
+        ],
+        "results": [
+          {
+            "id": 1,
+            "url": "https://www.cnil.fr/fr/sous-traitance-exemple-de-clauses",
+            "title": "Sous-traitance : exemple de clauses | CNIL",
+            "snippet": "Les clauses contractuelles ci-dessous sont un exemple de rédaction pour répondre aux exigences de l'article 28 du RGPD.",
+            "date": "2023-06-12",
+            "last_updated": "2026-03-02",
+            "source": "web"
+          },
+          {
+            "id": 2,
+            "url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000032041559",
+            "title": "Article 1231-5 - Code civil - Légifrance",
+            "snippet": "Lorsque le contrat stipule que celui qui manquera de l'exécuter paiera une certaine somme à titre de dommages et intérêts…",
+            "date": null,
+            "last_updated": "2026-01-01",
+            "source": "web"
+          },
+          {
+            "id": 3,
+            "url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000032226842",
+            "title": "Article L215-1 - Code de la consommation - Légifrance",
+            "snippet": "Pour les contrats de prestations de services conclus pour une durée déterminée avec une clause de reconduction tacite…",
+            "date": null,
+            "last_updated": "2025-11-20",
+            "source": "web"
+          }
+        ]
+      },
+      {
+        "type": "fetch_url_results",
+        "contents": [
+          {
+            "url": "https://cyber.gouv.fr/publications/guide-dhygiene-informatique",
+            "title": "Guide d'hygiène informatique | ANSSI",
+            "snippet": "Ce guide présente 42 mesures d'hygiène informatique essentielles pour assurer la sécurité d'un système d'information."
+          }
+        ]
+      },
+      {
+        "id": "msg_5c1d9a3e-2f47-4b8a-8e61-0a9b7c6d5e4f",
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{\"clauses\":[{\"title\":\"Objet\",\"text\":\"Texte.\",\"category\":\"OBJET\",\"riskLevel\":\"CRITICAL\"}],\"suggestedAnnexes\":[]}",
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.cnil.fr/fr/sous-traitance-exemple-de-clauses",
+                "title": "Sous-traitance : exemple de clauses | CNIL",
+                "start_index": 0,
+                "end_index": 10
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.economie.gouv.fr/dgccrf/Publications/Vie-pratique/Fiches-pratiques/Delais-de-paiement",
+                "title": "Délais de paiement | DGCCRF",
+                "start_index": 11,
+                "end_index": 20
+              }
+            ],
+            "logprobs": []
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 9120,
+      "output_tokens": 1874,
+      "total_tokens": 10994,
+      "cost": {
+        "currency": "USD",
+        "input_cost": 0.01824,
+        "output_cost": 0.03748,
+        "total_cost": 0.06072,
+        "cache_creation_cost": null,
+        "cache_read_cost": 0,
+        "tool_calls_cost": 0.005
+      },
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "tool_calls_details": {
+        "search_web": {
+          "invocation": 2
+        },
+        "fetch_url": {
+          "invocation": 1
+        }
+      }
+    },
+    "store": false,
+    "tools": [
+      {
+        "type": "web_search"
+      },
+      {
+        "type": "fetch_url"
+      }
+    ]
+  }
+}

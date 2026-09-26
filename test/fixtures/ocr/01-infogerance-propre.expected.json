@@ -1,0 +1,14 @@
+{
+  "prestataireRaisonSociale": "ALPHA SERVICES INFORMATIQUES",
+  "prestataireSiren": "123456782",
+  "clientRaisonSociale": "BÊTA LOGISTIQUE",
+  "clientSiren": "987654324",
+  "dateSignature": "2023-12-15",
+  "dateEffet": "2024-01-01",
+  "dureeMois": 36,
+  "reconduction": "TACITE",
+  "preavis": { "quantite": 3, "unite": "MOIS" },
+  "montantMensuelHtCentimes": 125000,
+  "montantAnnuelHtCentimes": null,
+  "indiceRevision": "SYNTEC"
+}

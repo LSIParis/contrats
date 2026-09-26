@@ -1,0 +1,15 @@
+{
+  "_comment": "Débit dépassé (seau percé, par palier d’usage). Retry-After en secondes.",
+  "status": 429,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": "12"
+  },
+  "body": {
+    "error": {
+      "message": "Rate limit exceeded. Please retry after 12 seconds.",
+      "type": "rate_limit_exceeded",
+      "code": "429"
+    }
+  }
+}

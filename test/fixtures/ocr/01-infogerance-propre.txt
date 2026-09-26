@@ -1,0 +1,37 @@
+CONTRAT D'INFOGÉRANCE
+
+ENTRE LES SOUSSIGNÉS :
+
+La société ALPHA SERVICES INFORMATIQUES, SAS au capital de 50 000 €, dont le siège social est situé 8 rue des Exemples, 75011 Paris, immatriculée au RCS de Paris sous le numéro 123 456 782, représentée par son Président dûment habilité,
+ci-après dénommée « le Prestataire »,
+d'une part,
+
+ET :
+
+La société BÊTA LOGISTIQUE, SARL au capital de 10 000 €, dont le siège social est situé 14 avenue du Modèle, 69003 Lyon, immatriculée au RCS de Lyon sous le numéro 987 654 324, représentée par son Gérant,
+ci-après dénommée « le Client »,
+d'autre part.
+
+IL A ÉTÉ CONVENU CE QUI SUIT :
+
+Article 1 – Objet
+Le présent contrat a pour objet l'infogérance du système d'information du Client : supervision des serveurs, maintenance des postes de travail, sauvegarde externalisée et support aux utilisateurs.
+
+Article 2 – Durée
+Le présent contrat est conclu pour une durée initiale de trente-six (36) mois. Il prend effet le 1er janvier 2024.
+À l'issue de cette période initiale, il est renouvelable par tacite reconduction par périodes successives de douze (12) mois, sauf dénonciation par l'une des parties par lettre recommandée avec accusé de réception moyennant un préavis de trois (3) mois avant l'échéance.
+
+Article 3 – Prix
+En contrepartie des prestations, le Client verse au Prestataire une redevance mensuelle de 1 250,00 € HT, payable à terme à échoir.
+Les frais de mise en service s'élèvent à 900,00 € HT, facturés à la signature.
+Toute somme non payée à l'échéance entraîne une indemnité forfaitaire pour frais de recouvrement de 40 €.
+
+Article 4 – Révision des prix
+Les prix sont révisés annuellement au 1er janvier selon la formule P1 = P0 × (0,15 + 0,85 × S1/S0), où S est l'indice SYNTEC publié.
+
+Article 5 – Responsabilité
+La responsabilité du Prestataire est limitée aux dommages directs.
+
+Fait à Paris, le 15 décembre 2023, en deux exemplaires originaux.
+
+Pour le Prestataire                    Pour le Client

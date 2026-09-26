@@ -14,3 +14,5 @@ export * from './reminder/planning.js';
 export * from './signature/e-signature-provider.port.js';
 export * from './documents/document-renderer.port.js';
 export * from './notifications/email-sender.port.js';
+export * from './pseudonymization/pseudonymize.js';
+export * from './import-extraction/extract-metadata.js';
