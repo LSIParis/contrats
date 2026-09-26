@@ -17,3 +17,6 @@ export * from './formula/tokenizer.js';
 export * from './formula/parser.js';
 export * from './formula/evaluator.js';
 export * from './formula/validate.js';
+export * from './types.js';
+export * from './indexes.js';
+export * from './revision.js';
