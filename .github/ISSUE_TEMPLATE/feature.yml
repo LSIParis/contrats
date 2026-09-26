@@ -1,0 +1,39 @@
+name: Évolution
+description: Proposer une nouvelle fonctionnalité ou une amélioration
+title: "[évolution] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Besoin métier
+      description: Quel problème cherche-t-on à résoudre, pour qui (admin, commercial, juriste, signataire, client…) ?
+    validations:
+      required: true
+  - type: textarea
+    id: proposition
+    attributes:
+      label: Proposition
+      description: Comportement souhaité, écrans ou routes d'API concernés.
+    validations:
+      required: true
+  - type: textarea
+    id: criteres
+    attributes:
+      label: Critères d'acceptation
+      placeholder: |
+        - Étant donné …, quand …, alors …
+  - type: checkboxes
+    id: impacts
+    attributes:
+      label: Impacts à évaluer
+      options:
+        - label: Modèle de données / migration
+        - label: Valeur probante des contrats (empreintes, signature, preuves)
+        - label: Journal d'audit
+        - label: Données personnelles (RGPD) ou envoi vers un service tiers (IA, DocuSeal)
+        - label: API publique consommée par les autres applications de la suite
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées

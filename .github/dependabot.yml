@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # Dépendances Node (pnpm utilise l'écosystème npm de Dependabot)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Image de base du Dockerfile
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "chore(docker)"
+
+  # Actions GitHub épinglées par SHA : Dependabot met à jour le SHA et le commentaire de version
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"

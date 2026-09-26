@@ -1,0 +1,380 @@
+# Stack Portainer — application « Contrats » (production et préproduction)
+#
+# Distinct du docker-compose.yml de développement : ici UNIQUEMENT des
+# `image:` (aucun `build:` : rien n'est construit sur le VPS), versions
+# épinglées par ${CONTRATS_TAG}, secrets fournis par les variables
+# d'environnement de la stack Portainer — JAMAIS commités.
+# Toutes les variables sont documentées dans deploy/portainer/stack.env.example.
+#
+# Procédure pas à pas : docs/contrats/09-exploitation.md.
+#
+# Réseaux :
+#   internal  (internal: true) : tous les services ; aucun accès Internet,
+#             aucun port publié. Postgres, Redis, MinIO, Gotenberg et OCR n'ont
+#             QUE ce réseau.
+#   edge      : `app` seul — le seul port publié, lié à ${APP_BIND_IP}
+#             (127.0.0.1 si le reverse proxy est sur ce VPS, 10.99.0.2 si le
+#             proxy est sur 51.91.98.38 et passe par le tunnel WireGuard).
+#   egress    : sorties Internet sans port publié (worker → DocuSeal,
+#             Perplexity ; backup → Wasabi, Uptime Kuma).
+#
+# Ordre de démarrage : postgres (healthy) → migrate (terminé avec succès)
+# → app + worker. minio → minio-init (bucket versionné) → app + worker.
+#
+# Pas de `name:` ni de `container_name` : Portainer nomme le projet d'après la
+# stack (`contrats`, `contrats-preprod`), ce qui isole volumes et réseaux de
+# deux stacks sur le même hôte.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+# Image unique app / worker / migrate : les trois tournent la MÊME version.
+# ${CONTRATS_TAG:?} : pas de repli sur `latest`, la stack refuse de démarrer
+# si le tag n'est pas renseigné (production = X.Y.Z, préproduction = main).
+#
+# ${tag} : deploy.yml (annexe A) appelle le webhook de stack Portainer BE avec
+# `?tag=<version>`. Portainer transmet les paramètres de requête du webhook
+# comme variables d'environnement de la stack : `tag` prime alors sur
+# CONTRATS_TAG pour ce redéploiement. Absent (Portainer CE, redéploiement
+# manuel), c'est CONTRATS_TAG qui fait foi. Voir 09-exploitation.md.
+x-app-image: &app-image ghcr.io/${GHCR_OWNER:?GHCR_OWNER requis (propriétaire GHCR en minuscules)}/contrats:${tag:-${CONTRATS_TAG:?CONTRATS_TAG requis (ex. 1.4.2 ; jamais latest)}}
+
+x-app-env: &app-env
+  NODE_ENV: production
+  PORT: '3001'
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # URL publique et proxy
+  APP_URL: ${APP_URL:?APP_URL requis}
+  APP_ORIGIN: ${APP_ORIGIN:-${APP_URL}}
+  PORTAL_URL: ${PORTAL_URL:-${APP_URL}}
+  # Nombre de sauts ou IP/CIDR du reverse proxy de confiance (X-Forwarded-*).
+  TRUST_PROXY: ${TRUST_PROXY:-1}
+  # Base : rôles NON-propriétaires (RLS active). Le superutilisateur n'est
+  # donné qu'au job migrate ; l'utiliser ici désactiverait le cloisonnement.
+  DATABASE_URL_APP: postgresql://lsi_app:${LSI_APP_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-lsi_contrats}
+  DATABASE_URL_WEBHOOK: postgresql://lsi_webhook:${LSI_WEBHOOK_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-lsi_contrats}
+  DATABASE_URL_SCHEDULER: postgresql://lsi_scheduler:${LSI_SCHEDULER_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-lsi_contrats}
+  # Redis : sessions + files BullMQ
+  REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+  # Stockage documentaire S3 (MinIO interne)
+  S3_ENDPOINT: http://minio:9000
+  S3_BUCKET: ${S3_BUCKET:-lsi-contrats}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+  S3_REGION: ${S3_REGION:-eu-west-3}
+  # Services internes
+  GOTENBERG_URL: http://gotenberg:3000
+  OCR_URL: http://ocr:8080
+  # DocuSeal Pro (VPS dédié)
+  DOCUSEAL_URL: ${DOCUSEAL_URL:?DOCUSEAL_URL requis (ex. https://signe.lsi-maintenance.fr/api)}
+  DOCUSEAL_API_KEY: ${DOCUSEAL_API_KEY:?}
+  DOCUSEAL_WEBHOOK_SECRET: ${DOCUSEAL_WEBHOOK_SECRET:?}
+  # DOCUSEAL_SIGN_URL volontairement absent : l'app la dérive de DOCUSEAL_URL
+  # (une valeur vide passée ici serait prise telle quelle).
+  DOCUSEAL_SIGNATURE_HEADER: ${DOCUSEAL_SIGNATURE_HEADER:-x-docuseal-signature}
+  DOCUSEAL_WEBHOOK_HEADER_SECRET: ${DOCUSEAL_WEBHOOK_HEADER_SECRET:-}
+  # IA (facultatif : sans clé, les fonctions IA répondent 503)
+  PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  # Authentification
+  DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-lsi}
+  OIDC_ISSUER: ${OIDC_ISSUER:?}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
+  CONTRACT_SERVICE_API_KEY: ${CONTRACT_SERVICE_API_KEY:-}
+  # E-mails
+  BREVO_API_KEY: ${BREVO_API_KEY:-}
+  EMAIL_FROM: ${EMAIL_FROM:-contrats@lsi-maintenance.fr}
+  EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-LSI Maintenance}
+  # Files de tâches : les deux ENFILENT ; seul le worker CONSOMME.
+  JOBS_ENABLED: 'true'
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  # ---------------------------------------------------------------------
+  # PostgreSQL 17 — RLS. Aucun port publié.
+  # ⚠ Une base existante en 16 ne démarre PAS sous 17 : migration par
+  #   pg_dump/pg_restore (09-exploitation.md §PostgreSQL 16 → 17).
+  # ---------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:-lsi_contrats}
+      LANG: fr_FR.utf8
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    shm_size: 256m
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ${POSTGRES_DB:-lsi_contrats}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # Redis — sessions + BullMQ. Mot de passe obligatoire, AOF.
+  # ---------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?}', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    environment:
+      # redis-cli lit le mot de passe ici : il n'apparaît pas dans la commande
+      # du healthcheck.
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    mem_limit: ${REDIS_MEM_LIMIT:-256m}
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # MinIO — stockage documentaire S3 (originaux et PDF signés, versioning).
+  # ${MINIO_IMAGE} : MinIO ne publie plus d'images communautaires (Docker
+  # Hub et quay.io refusent le pull, dl.min.io répond 410). Utiliser le miroir
+  # GHCR privé de l'image déjà en cache sur le VPS (09-exploitation.md
+  # §MinIO). L'image doit contenir `mc` (healthcheck).
+  # ---------------------------------------------------------------------
+  minio:
+    image: ${MINIO_IMAGE:?MINIO_IMAGE requis (miroir GHCR, voir 09-exploitation.md)}
+    restart: unless-stopped
+    command: ['server', '/data']
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?}
+      MINIO_BROWSER: 'off'
+    volumes:
+      - documents:/data
+    networks: [internal]
+    mem_limit: ${MINIO_MEM_LIMIT:-512m}
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # Crée le bucket et active le versioning : un PDF signé ou un original
+  # importé n'est jamais écrasé. Idempotent. Réutilise l'image `backup`
+  # (sh + mc) plutôt qu'une image minio/mc qui n'est plus publiée.
+  minio-init:
+    image: ghcr.io/${GHCR_OWNER:?}/contrats-backup:${BACKUP_TAG:-${tag:-${CONTRATS_TAG:?}}}
+    restart: 'no'
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        mc alias set local http://minio:9000 "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" >/dev/null
+        mc mb --ignore-existing "local/$$S3_BUCKET"
+        mc version enable "local/$$S3_BUCKET"
+        echo "bucket $$S3_BUCKET prêt (versioning actif)"
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+      S3_BUCKET: ${S3_BUCKET:-lsi-contrats}
+    networks: [internal]
+    mem_limit: 128m
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # Gotenberg — HTML → PDF. Aucun accès réseau sortant (réseau interne seul).
+  # ---------------------------------------------------------------------
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - gotenberg
+      # Liste blanche : Chromium ne lit que son fichier temporaire. Tout le
+      # reste (http, file ailleurs) est refusé — un <script src> ou une
+      # <img src=http> injecté ne peut ni exfiltrer ni charger (§13.3).
+      - --chromium-allow-list=^file:///tmp/.*
+      - --chromium-disable-javascript=true
+      # Défense en profondeur : refuse toute URL résolvant vers une IP privée.
+      - --chromium-deny-private-ips
+      - --log-level=warn
+    networks: [internal]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${GOTENBERG_MEM_LIMIT:-1g}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # OCR — ocrmypdf + Tesseract fra (deploy/ocr). Interne, jamais publié.
+  # ---------------------------------------------------------------------
+  ocr:
+    image: ghcr.io/${GHCR_OWNER:?}/contrats-ocr:${OCR_TAG:-${tag:-${CONTRATS_TAG:?}}}
+    restart: unless-stopped
+    <<: *hardening
+    read_only: true
+    tmpfs:
+      - /tmp:size=${OCR_TMPFS_SIZE:-1g}
+    environment:
+      OCR_MAX_BYTES: ${OCR_MAX_BYTES:-52428800}
+      OCR_TIMEOUT_SECONDS: ${OCR_TIMEOUT_SECONDS:-300}
+      OCR_MAX_CONCURRENCY: ${OCR_MAX_CONCURRENCY:-2}
+    networks: [internal]
+    mem_limit: ${OCR_MEM_LIMIT:-2g}
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # Migrations + rotation des mots de passe de rôles — job one-shot.
+  # Un `migrate deploy` par réplique serait une course : il tourne UNE fois
+  # et se termine ; app et worker attendent sa réussite. Seul service à
+  # recevoir le superutilisateur.
+  # ---------------------------------------------------------------------
+  migrate:
+    image: *app-image
+    restart: 'no'
+    <<: *hardening
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ['sh', '/app/deploy/migrate.sh']
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_SUPERUSER_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-lsi_contrats}
+      LSI_APP_PASSWORD: ${LSI_APP_PASSWORD:?}
+      LSI_WEBHOOK_PASSWORD: ${LSI_WEBHOOK_PASSWORD:?}
+      LSI_SCHEDULER_PASSWORD: ${LSI_SCHEDULER_PASSWORD:?}
+    networks: [internal]
+    healthcheck:
+      disable: true
+    mem_limit: 512m
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # API + SPA — seul service exposé au reverse proxy.
+  # ---------------------------------------------------------------------
+  app:
+    image: *app-image
+    restart: unless-stopped
+    <<: *hardening
+    init: true
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      gotenberg:
+        condition: service_started
+      ocr:
+        condition: service_started
+    environment:
+      <<: *app-env
+      # L'app enfile (webhooks, imports) mais ne consomme pas.
+      WORKER_ENABLED: 'false'
+    ports:
+      # Lié à UNE adresse précise, jamais 0.0.0.0 : 127.0.0.1 (proxy local)
+      # ou 10.99.0.2 (tunnel WireGuard vers le proxy de 51.91.98.38).
+      - '${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-3001}:3001'
+    networks: [internal, edge]
+    mem_limit: ${APP_MEM_LIMIT:-1g}
+    # Healthcheck de l'image : GET /healthz (HEALTHCHECK du Dockerfile).
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # Worker — même image, sans serveur HTTP : files BullMQ, échéancier
+  # quotidien, réconciliation DocuSeal, OCR, webhooks sortants.
+  # ---------------------------------------------------------------------
+  worker:
+    image: *app-image
+    restart: unless-stopped
+    <<: *hardening
+    init: true
+    stop_grace_period: 60s
+    command: ['pnpm', '--filter', '@lsi/api', 'exec', 'node', '--import', '@swc-node/register/esm-register', 'src/worker.ts']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      gotenberg:
+        condition: service_started
+      ocr:
+        condition: service_started
+    environment:
+      <<: *app-env
+      WORKER_ENABLED: 'true'
+    networks: [internal, egress]
+    # Pas de port HTTP : le HEALTHCHECK /healthz de l'image ne s'applique pas.
+    healthcheck:
+      disable: true
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    logging: *logging
+
+  # ---------------------------------------------------------------------
+  # Sauvegardes — pg_dump quotidien + miroir MinIO vers Wasabi (hors VPS),
+  # restauration de contrôle mensuelle, heartbeats Uptime Kuma.
+  # Image : deploy/backup. Aucun port.
+  # ---------------------------------------------------------------------
+  backup:
+    image: ghcr.io/${GHCR_OWNER:?}/contrats-backup:${BACKUP_TAG:-${tag:-${CONTRATS_TAG:?}}}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-lsi_contrats}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+      S3_BUCKET: ${S3_BUCKET:-lsi-contrats}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+      WASABI_ENDPOINT: ${WASABI_ENDPOINT:-https://s3.eu-west-2.wasabisys.com}
+      WASABI_BUCKET: ${WASABI_BUCKET:?}
+      WASABI_ACCESS_KEY: ${WASABI_ACCESS_KEY:?}
+      WASABI_SECRET_KEY: ${WASABI_SECRET_KEY:?}
+      UPTIME_PUSH_URL: ${UPTIME_PUSH_URL:-}
+      UPTIME_RESTORE_PUSH_URL: ${UPTIME_RESTORE_PUSH_URL:-}
+    networks: [internal, egress]
+    mem_limit: ${BACKUP_MEM_LIMIT:-512m}
+    logging: *logging
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+  egress: {}
+
+volumes:
+  # Base PostgreSQL 17.
+  pgdata:
+  redisdata:
+  # Documents (MinIO) : originaux importés, PDF générés et signés, preuves.
+  documents:

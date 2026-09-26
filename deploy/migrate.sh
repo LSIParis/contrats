@@ -10,6 +10,24 @@
 set -eu
 cd /app
 
+# Fail-fast : un secret absent ferait tourner l'ALTER ROLE avec un mot de passe
+# vide. Le job échoue alors, et app/worker (service_completed_successfully)
+# ne démarrent pas : mieux vaut une stack arrêtée qu'une base ouverte.
+: "${DATABASE_URL:?DATABASE_URL manquant}"
+for var in LSI_APP_PASSWORD LSI_WEBHOOK_PASSWORD LSI_SCHEDULER_PASSWORD; do
+  eval "val=\${$var:-}"
+  if [ -z "$val" ]; then
+    echo "✗ $var est vide ou absent de l'environnement de la stack." >&2
+    exit 1
+  fi
+  case "$val" in
+    *"'"*|*"\\"*)
+      echo "✗ $var contient une apostrophe ou une barre oblique inverse : refusé (interpolé en SQL)." >&2
+      exit 1
+      ;;
+  esac
+done
+
 echo "→ Application des migrations Prisma…"
 pnpm --filter @lsi/persistence exec prisma migrate deploy
 

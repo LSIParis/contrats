@@ -48,3 +48,11 @@ Thumbs.db
 
 # Worktrees et état local de Claude Code
 .claude/
+
+# Python (service OCR)
+__pycache__/
+*.pyc
+
+# Variables de stack Portainer remplies (secrets)
+stack.env
+*.stack.env
