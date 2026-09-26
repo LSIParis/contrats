@@ -92,12 +92,12 @@ export function AccountChip({ name, detail }: { name: string; detail?: string })
   const initials =
     name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || '?';
   return (
-    <span className="inline-flex items-center gap-2.5 rounded-full border border-line py-1 pl-3 pr-1.5 font-medium text-ink" title={detail}>
-      <span className="text-13">{name}</span>
-      {detail && <span className="sr-only">({detail})</span>}
+    <span className="inline-flex items-center gap-2.5 rounded-full border border-line py-1 pl-1.5 pr-3 font-medium text-ink" title={detail}>
       <span aria-hidden="true" className="grid h-[30px] w-[30px] place-items-center rounded-full bg-mint-800 text-xs font-bold text-white">
         {initials}
       </span>
+      <span className="text-13">{name}</span>
+      {detail && <span className="sr-only">({detail})</span>}
     </span>
   );
 }
@@ -153,7 +153,7 @@ export function AuthScreen({ title, subtitle, children }: { title: string; subti
         <div className="self-center"><BrandChip size="lg" /></div>
         <div className="text-center">
           <h1 className="text-[20px]">{title}</h1>
-          {subtitle && <p className="text-ink-muted">{subtitle}</p>}
+          {subtitle && <p className="mt-4 text-ink-muted">{subtitle}</p>}
         </div>
         {children}
         <p className="mt-1 text-center text-13 text-ink-faint">LSI Maintenance · RCS Aix-en-Provence 821 439 379</p>
