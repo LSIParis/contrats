@@ -1,92 +1,138 @@
+# Intégration continue — application « Contrats »
+# Déclenchée sur chaque PR ; sur main, elle est exécutée via release.yml (workflow_call).
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "22"
 
 jobs:
-  test:
+  quality:
+    name: Lint, typecheck, schéma Prisma
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @lsi/persistence exec prisma generate
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-        env:
-          TESTCONTAINERS_RYUK_DISABLED: 'true'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-  build-and-push:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      # La version de pnpm est lue depuis le champ "packageManager" du package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Installation des dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Validation du schéma Prisma
+        run: pnpm db:validate
+
+  test:
+    name: Tests (Vitest + PostgreSQL)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 20
+    needs: quality
+    services:
+      postgres:
+        # Même version majeure de PostgreSQL qu'en production (à aligner sur la stack Portainer).
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: contrats
+          POSTGRES_PASSWORD: contrats
+          POSTGRES_DB: contrats_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U contrats -d contrats_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://contrats:contrats@localhost:5432/contrats_test?schema=public
+      SHADOW_DATABASE_URL: postgresql://contrats:contrats@localhost:5432/contrats_shadow?schema=public
+      NODE_ENV: test
+      TZ: UTC
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Installation des dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Création de la base shadow
+        run: PGPASSWORD=contrats psql -h localhost -U contrats -d contrats_test -c "CREATE DATABASE contrats_shadow;"
+
+      - name: Migrations sur base vierge
+        run: pnpm db:migrate:deploy
+
+      - name: Détection de dérive schéma / migrations
+        run: pnpm db:check-drift
+
+      - name: Tests unitaires et d'intégration (dont isolation multi-tenante)
+        run: pnpm test:ci
+
+      - name: Rapport de couverture
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          images: ghcr.io/lsiparis/contrats
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
-      - uses: docker/build-push-action@v6
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  image:
+    name: Construction et scan de l'image (sans publication)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: quality
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Construction de l'image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
+          load: true
+          tags: contrats:ci
+          build-args: |
+            APP_VERSION=ci
+            GIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  build-push-backup:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      # Action épinglée par SHA : les tags de trivy-action ont été compromis en mars 2026.
+      - name: Scan de vulnérabilités (bloquant sur CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ghcr.io/lsiparis/contrats-backup
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
-      - uses: docker/build-push-action@v6
-        with:
-          context: ./deploy/backup
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          image-ref: contrats:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
