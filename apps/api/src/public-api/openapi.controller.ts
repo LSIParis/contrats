@@ -13,7 +13,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 @Public()
 @Controller('api/v1')
 export class OpenApiController {
-  private readonly spec = buildOpenApi(process.env.PUBLIC_BASE_URL ?? 'https://contrats.lsi-maintenance.fr');
+  private readonly spec = buildOpenApi(process.env.APP_URL ?? 'https://contrats.lsi-maintenance.fr');
 
   @Get('openapi.json')
   openapi() {
