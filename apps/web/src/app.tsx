@@ -18,6 +18,8 @@ import { AuditPage } from './features/audit/audit-page.js';
 import { TemplatesPage } from './features/templates/templates-page.js';
 import { TemplateDetailPage } from './features/templates/template-detail-page.js';
 import { PortalApp } from './portal/portal-app.js';
+import { StructureEditorPage } from './features/structure/structure-editor-page.js';
+import { LibraryPage } from './features/library/library-page.js';
 
 function InternalRoutes() {
   return (
@@ -34,6 +36,7 @@ function InternalRoutes() {
         <Route path="/contracts/:id/import" element={<ImportValidationPage />} />
         <Route path="/contracts/:id/edit" element={<ContractEditPage />} />
         <Route path="/contracts/:id/versions" element={<VersionsPage />} />
+        <Route path="/contracts/:id/structure" element={<StructureEditorPage />} />
         <Route path="/contracts/:id" element={<ContractDetailPage />} />
         <Route path="/reminders" element={<div>Rappels</div>} />
         <Route path="/users" element={<UsersPage />} />
@@ -41,6 +44,7 @@ function InternalRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/:id" element={<TemplateDetailPage />} />
+        <Route path="/library" element={<LibraryPage />} />
       </Route>
     </Routes>
   );

@@ -3,6 +3,7 @@ import { useMe } from '../lib/queries.js';
 import { roleLabel } from '../lib/labels.js';
 import { NotificationBell } from '../features/notifications/notification-bell.js';
 import { AccountChip, NavItem, NavSection, Shell, Sidebar, Topbar } from '../ui/layout.js';
+import { allows } from '../lib/permissions.js';
 
 /** Titre de la barre supérieure selon la section (comme `TITLES` dans lticket, App.tsx). */
 const SECTION_TITLES: Array<[prefix: string, title: string]> = [
@@ -13,6 +14,7 @@ const SECTION_TITLES: Array<[prefix: string, title: string]> = [
   ['/users', 'Utilisateurs'],
   ['/audit', 'Journal d’audit'],
   ['/templates', 'Modèles de contrat'],
+  ['/library', 'Bibliothèque de clauses'],
   ['/settings', 'Paramètres'],
 ];
 
@@ -35,6 +37,9 @@ export function AppShell() {
           <NavItem to="/customers" icon="building">Clients</NavItem>
           <NavItem to="/contracts" icon="contract">Contrats</NavItem>
           <NavItem to="/reminders" icon="bell">Rappels</NavItem>
+          {(allows(me.data, 'contracts.write') || allows(me.data, 'clauses.manage')) && (
+            <NavItem to="/library" icon="book">Bibliothèque de clauses</NavItem>
+          )}
           {(isAdmin || canTemplates) && (
             <NavSection label="Administration">
               {canTemplates && <NavItem to="/templates" icon="book">Modèles</NavItem>}

@@ -9,6 +9,14 @@ const PERMISSIONS = {
   'tenant.configure': ['MSP_ADMIN'],
   'contracts.import': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
   'imports.validate': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
+  'contracts.write': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'contracts.aiDraft': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER'],
+  'contracts.negotiate': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'contracts.sendForSignature': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'contracts.lifecycle': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'contracts.signInternal': ['MSP_ADMIN', 'INTERNAL_SIGNATORY'],
+  'clauses.manage': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
+  'clauses.validateAi': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UiAction = keyof typeof PERMISSIONS;
@@ -16,4 +24,18 @@ export type UiAction = keyof typeof PERMISSIONS;
 export function can(roles: readonly string[] | undefined, action: UiAction): boolean {
   const allowed: readonly string[] = PERMISSIONS[action];
   return (roles ?? []).some((r) => allowed.includes(r));
+}
+
+/**
+ * Droit effectif de l'utilisateur courant. `/v1/auth/me` renvoie la liste
+ * `permissions` calculée par l'API (source unique) : on la préfère ; à défaut
+ * (ancienne API, tests), on retombe sur le miroir des rôles ci-dessus.
+ */
+export function allows(
+  me: { roles?: readonly string[]; permissions?: readonly string[] } | null | undefined,
+  action: UiAction,
+): boolean {
+  if (!me) return false;
+  if (Array.isArray(me.permissions)) return me.permissions.includes(action);
+  return can(me.roles, action);
 }
