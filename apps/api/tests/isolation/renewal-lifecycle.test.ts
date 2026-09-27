@@ -50,6 +50,7 @@ beforeAll(async () => {
   const s = app.get(SessionService);
   await s.put({ sessionId: 'ren-am', userId: fx.amUserId, tenantId: fx.tenantId, roles: ['ACCOUNT_MANAGER'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) });
   await s.put({ sessionId: 'ren-am-b', userId: fx.amBUserId, tenantId: fx.tenantId, roles: ['ACCOUNT_MANAGER'], scope: internalScope(fx.tenantId, [fx.customerB.id], fx.amBUserId) });
+  await s.put({ sessionId: 'ren-admin', userId: fx.adminUserId, tenantId: fx.tenantId, roles: ['MSP_ADMIN'], scope: adminScope(fx.tenantId, fx.adminUserId) });
   await s.put({ sessionId: 'ren-reader', userId: fx.amUserId, tenantId: fx.tenantId, roles: ['READER'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) });
 });
 const http = () => request(app.getHttpServer());
@@ -65,6 +66,23 @@ describe('reconduction TACITE (job quotidien)', () => {
     expect(periods.at(-1)).toMatchObject({ kind: 'TACIT_RENEWAL' });
     expect(iso(periods.at(-1)!.startDate)).toBe(iso(day(-1)));
     expect(events.map((e) => e.event)).toEqual(expect.arrayContaining(['OPEN_RENEWAL', 'RENEW_PERIOD']));
+  });
+
+  test('webhooks sortants : une reconduction publie contract.renewal_due puis contract.renewed, jamais contract.activated', async () => {
+    // L'outbox n'enregistre un événement que s'il a un abonné.
+    const prev = process.env.WEBHOOKS_ALLOW_PRIVATE;
+    process.env.WEBHOOKS_ALLOW_PRIVATE = 'true';
+    try {
+      await http().post('/v1/admin/webhooks').set('x-lsi-session', 'ren-admin')
+        .send({ url: 'http://127.0.0.1:9/hook', eventTypes: ['contract.activated', 'contract.renewal_due', 'contract.renewed'] }).expect(201);
+    } finally {
+      process.env.WEBHOOKS_ALLOW_PRIVATE = prev;
+    }
+    const id = await seed({ endDate: day(-2), renewalMode: 'TACIT', renewalPeriodMonths: 12 });
+    await app.get(LifecycleService).run(new Date());
+    const types = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) =>
+      (await tx.webhookEvent.findMany({ where: { resourceId: id }, orderBy: { occurredAt: 'asc' } })).map((e) => e.type));
+    expect([...types].sort()).toEqual(['contract.renewal_due', 'contract.renewed']);
   });
 
   test('plusieurs périodes manquées (job interrompu) → rattrapées une à une', async () => {

@@ -83,7 +83,7 @@ export async function persistTransition(
   // on lit l'état de départ AVANT l'écriture, puis on publie dans l'outbox
   // DANS cette même transaction (contract-producers.ts). Aucune lecture
   // supplémentaire pour les autres transitions.
-  const before = contractEventFor(next.status)
+  const before = contractEventFor(next.status, event.type)
     ? await tx.contract.findUnique({
         where: { id: contractId },
         select: { status: true, customer: { select: { externalRef: true } } },
@@ -105,7 +105,7 @@ export async function persistTransition(
     },
   });
   if (before) {
-    await publishContractTransition(tx, before.status, updated, before.customer?.externalRef ?? null, now);
+    await publishContractTransition(tx, before.status, updated, before.customer?.externalRef ?? null, now, event.type);
   }
   return updated;
 }

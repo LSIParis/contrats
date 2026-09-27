@@ -18,7 +18,19 @@ export const CONTRACT_STATUS_EVENTS: Partial<Record<ContractStatus, WebhookEvent
   TERMINATED: 'contract.terminated',
 };
 
-export function contractEventFor(status: string): WebhookEventType | undefined {
+/** Statuts dont le retour à ACTIVE est une REPRISE, pas une activation. */
+const RESUMED_FROM = new Set(['RENEWAL_DUE', 'TERMINATION_PENDING']);
+
+/**
+ * Type publié pour une transition. Une nouvelle période (`RENEW_PERIOD`,
+ * reconduction tacite ou renouvellement décidé) est un RENOUVELLEMENT même
+ * si le statut d'arrivée est ACTIVE ; un retour à ACTIVE depuis RENEWAL_DUE
+ * (non-renouvellement décidé) ou TERMINATION_PENDING (résiliation retirée)
+ * n'est pas une activation : rien n'est publié.
+ */
+export function contractEventFor(status: string, eventType?: string, previousStatus?: string | null): WebhookEventType | undefined {
+  if (eventType === 'RENEW_PERIOD') return 'contract.renewed';
+  if (status === 'ACTIVE' && previousStatus && RESUMED_FROM.has(previousStatus)) return undefined;
   return CONTRACT_STATUS_EVENTS[status as ContractStatus];
 }
 
@@ -33,8 +45,9 @@ export async function publishContractTransition(
   after: ContractRowForEvent & { tenantId: string },
   customerExternalRef: string | null,
   now: Date,
+  eventType?: string,
 ): Promise<void> {
-  const type = contractEventFor(after.status);
+  const type = contractEventFor(after.status, eventType, previousStatus);
   if (!type || previousStatus === after.status) return;
   await OutboundEvents.publish(tx, {
     tenantId: after.tenantId,
