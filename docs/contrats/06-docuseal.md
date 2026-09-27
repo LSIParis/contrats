@@ -368,3 +368,36 @@ Ce qu'il faudrait changer :
 | PDF figé | À l'envoi : `contract_versions.pdf_sha256`, `signature_requests.sent_pdf_sha256`, et un `stored_documents` `CONTRACT_PDF` (écriture unique). La transition `SEND_FOR_SIGNATURE` passe par la machine et le journal. |
 | Preuves | À la complétion : PDF fusionné et journal d'audit rapatriés, hachés, stockés ; `signed_pdf_sha256`, `audit_trail_sha256`, `hash_relation` (`SIGNED_OVERLAY` : DocuSeal réécrit le PDF) ; documents `SIGNED_PDF` (**dérivé** du `CONTRACT_PDF` envoyé) et `SIGNATURE_AUDIT_TRAIL`. Capture idempotente. |
 | Réconciliation | Job `signatures-sync` toutes les 30 min : `app_find_signatures_needing_sync` (SENT / PARTIALLY_COMPLETED sans nouvelle depuis 60 min) → `reconcileFromProvider`, rejoué dans le pipeline idempotent des webhooks. Le job horaire historique réenfile les captures de preuve manquantes. |
+
+## 13. Signature des propositions commerciales (lot 9)
+
+- **Même adaptateur** (`ESIGNATURE_PROVIDER`, voie nominale
+  `POST /submissions/pdf`, balises textuelles, readiness et drapeau
+  `contrats.docuseal.enabled`) : `ProposalSignatureService`
+  (`apps/api/src/proposals/proposal-signature.service.ts`).
+- **Document signé** : « bon pour accord » = version acceptée + tableau de prix
+  **figé** (PricingSnapshot) + CGV + zone de signature (balise signature +
+  date par rôle : `Client`, `Client 2`…, `LSI Maintenance`). Rendu, **haché et
+  stocké avant l'envoi** (`proposal_signature_requests.sent_pdf_sha256`,
+  `stored_documents` `PROPOSAL_PDF`) ; l'adaptateur revérifie l'empreinte.
+- **Remise** : signature **intégrée** dans la page publique (`embed_src` du
+  signataire du lien), e-mail DocuSeal en repli. Ordre : paramètre
+  `signature.defaultOrder` (client puis LSI) ; contre-signature LSI si le modèle
+  la prévoit (`providerCountersign`) ; expiration = échéance de la proposition.
+- **Webhooks** : le point d'entrée reste `POST /v1/webhooks/docuseal` (HMAC sur
+  le corps brut, secret d'en-tête facultatif). Une soumission inconnue des
+  contrats est déléguée à `ProposalSignatureService.process` : scope résolu
+  depuis `proposal_signature_requests` par le rôle `lsi_webhook` (six
+  colonnes, migration 31), idempotence par UNIQUE `provider_event_id`
+  (`createMany` + `skipDuplicates` : aucune exception dans la transaction),
+  effets monotones, demande close = événement journalisé sans effet.
+- **Complétion** (`submission.completed`, ou dernier `form.completed`) : job
+  `proposal-capture` → PDF signé et journal d'audit **rapatriés et archivés**
+  (`PROPOSAL_SIGNED_PDF`, `PROPOSAL_AUDIT_TRAIL`, empreintes, relation
+  envoyé ↔ signé), **puis** la proposition passe `SIGNÉE` et la conversion en
+  contrat est enfilée. Refus (`form.declined`) ou expiration
+  (`submission.expired`) : retour `EN_DISCUSSION`, commercial notifié.
+- **Réconciliation** : `app_find_proposal_signatures_needing_sync` (même
+  pipeline `reconcileFromProvider`) et `app_find_proposal_signatures_needing_proof`
+  (preuves non rapatriées), balayage toutes les 5 minutes.
+- Fixtures : `test/fixtures/proposals/` (dérivées de `test/fixtures/docuseal/`).
