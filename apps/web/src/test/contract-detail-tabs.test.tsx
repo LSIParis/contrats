@@ -33,6 +33,8 @@ function setup(body: unknown, initial = '/contracts/k1') {
       return json({ items: [{ id: 'd1', contractId: 'k1', customerId: 'c1', kind: 'PERIOD_END', dueDate: '2099-12-31T00:00:00.000Z', details: null, contract: { reference: 'IMP-2026-0001', title: 'x', status: 'ACTIVE' } }] });
     }
     if (url.includes('/comments')) return json({ items: [] });
+    if (url.endsWith('/pricing/schedules')) return json({ items: [], nextRevisionDate: null });
+    if (url.endsWith('/pricing/overrides')) return json({ items: [] });
     if (url.endsWith('/v1/contracts/k1')) return json(body);
     return new Response('', { status: 404 });
   }));
@@ -67,13 +69,14 @@ test('contrat importé à valider : pastille « Importé », statut, lien « Val
   expect(screen.getByRole('link', { name: 'Valider l’import' })).toHaveAttribute('href', '/contracts/k1/import');
 });
 
-test('Annexes et Tarification : emplacement explicite, sans données fictives', async () => {
+test('Annexes : emplacement explicite ; Tarification : barème du contrat (lot 3)', async () => {
   const user = userEvent.setup();
   setup(detail());
   await user.click(await screen.findByRole('tab', { name: 'Annexes' }));
   expect(screen.getByText('Disponible au lot 2.')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: 'Tarification' }));
-  expect(screen.getByText('Disponible au lot 3.')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Barème — versions' })).toBeInTheDocument();
+  expect(await screen.findByText('Aucun barème pour ce contrat.')).toBeInTheDocument();
 });
 
 test('navigation clavier entre onglets (flèches)', async () => {

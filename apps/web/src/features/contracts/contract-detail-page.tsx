@@ -25,6 +25,7 @@ import { TerminateContract } from './terminate-contract.js';
 import { RenewContract } from './renew-contract.js';
 import { AmendContract } from './amend-contract.js';
 import { ContractDeadlines } from '../deadlines/deadlines.js';
+import { ContractPricing } from '../pricing/contract-pricing.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
@@ -355,11 +356,7 @@ export function ContractDetailPage() {
               Les annexes (conditions particulières, périmètre, SLA) seront gérées ici.
             </Placeholder>
           ),
-          tarification: (
-            <Placeholder title="Tarification" lot="lot 3">
-              Le barème, les révisions et le simulateur tarifaire arriveront avec le moteur de tarification.
-            </Placeholder>
-          ),
+          tarification: <ContractPricing contractId={contract.id} />,
           signature,
           avenants,
           echeances,
