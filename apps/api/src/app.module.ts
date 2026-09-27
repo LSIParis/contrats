@@ -34,6 +34,16 @@ import { StructureService } from './structure/structure.service.js';
 import { ClauseLibraryService } from './structure/clause-library.service.js';
 import { NegotiationController } from './negotiation/negotiation.controller.js';
 import { AcceptanceService } from './negotiation/acceptance.service.js';
+import { PricingController } from './pricing/pricing.controller.js';
+import { PricingCatalogController } from './pricing/catalog.controller.js';
+import { PricingService } from './pricing/pricing.service.js';
+import { PricingSchedulesService } from './pricing/schedules.service.js';
+import { PriceOverridesService } from './pricing/overrides.service.js';
+import { PriceIndexesService } from './pricing/indexes.service.js';
+import { PricingRulesService } from './pricing/rules.service.js';
+import { PricingEvents } from './pricing/pricing-events.js';
+import { ManualQuantityProvider, QUANTITY_PROVIDER } from './pricing/quantity-provider.js';
+import { CsvIndexConnector, INDEX_CONNECTORS } from './pricing/index-connector.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { ContentController } from './contracts/content.controller.js';
@@ -127,6 +137,8 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     DeadlinesController,
     StructureController,
     NegotiationController,
+    PricingController,
+    PricingCatalogController,
     TemplatesController,
     AiDraftingController,
   ],
@@ -137,6 +149,18 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     StructureService,
     ClauseLibraryService,
     AcceptanceService,
+    // Tarification (lot 3, 04-tarification.md §17). Le QuantityProvider est un
+    // PORT : quantités manuelles par défaut ; un connecteur réel (RMM de
+    // Client Help) le remplacera ici, sans toucher au service.
+    PricingService,
+    PricingSchedulesService,
+    PriceOverridesService,
+    PriceIndexesService,
+    PricingRulesService,
+    PricingEvents,
+    { provide: QUANTITY_PROVIDER, useClass: ManualQuantityProvider },
+    // Connecteurs d'import d'indices : aucun n'ouvre le réseau.
+    { provide: INDEX_CONNECTORS, useFactory: () => [new CsvIndexConnector()] },
     // Service OCR interne (réseau de la stack) ; remplacé par un faux en test.
     { provide: OCR_CLIENT, useFactory: () => new HttpOcrClient() },
     ContractsService,

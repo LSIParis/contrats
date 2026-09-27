@@ -38,9 +38,10 @@
 | `ContractVersion` | `contract_versions` | **immuable** (UPDATE/DELETE révoqués, sauf l'écriture unique du PDF et de son empreinte) |
 | `Annex` | `annexes` | lot 2, rattachée à une version |
 | `Amendment` | `contracts` de type `AMENDMENT` | choix historique RM-17 : un avenant a son propre cycle de signature |
-| `PricingSchedule`, `PricingLine` | `pricing_schedules`, `pricing_lines` | lot 3 |
-| `PriceIndex`, `PriceIndexValue` | `price_indexes`, `price_index_values` | lot 3 |
-| `PriceOverride` | `price_overrides` | lot 3 |
+| `PricingSchedule`, `PricingLine` | `pricing_schedules`, `pricing_lines` | lot 3 : version DRAFT → ACTIVE → SUPERSEDED, sans chevauchement (EXCLUDE), figée une fois engagée (trigger) ; `line_key` stable entre versions |
+| `PriceIndex`, `PriceIndexValue` | `price_indexes`, `price_index_values` | lot 3 : valeurs **append-only**, correction chaînée (`supersedes_id`) |
+| `PriceOverride` | `price_overrides` | lot 3 : bornée, motivée, double validation au-delà du seuil |
+| — | `pricing_rules` | lot 3 : catalogue de règles du tenant (grilles, paliers, remises) |
 | `SignatureRequest` | `signature_requests`, `signature_events` | idempotence des webhooks par contrainte unique |
 | `LifecycleEvent` | `lifecycle_events` | **écrit par trigger**, append-only (§4) |
 | `Deadline` | `deadlines` | échéancier matérialisé, alertes via `reminders` |
@@ -74,6 +75,10 @@
 | Pas de doublon d'échéance ni d'alerte | UNIQUE `(contract, kind, due_date)` et `(contract, kind, offset, cycle)` |
 | Validation d'import complète | CHECK « tout ou rien » sur (qui, quand, quoi) |
 | Un valideur n'approuve pas sa propre soumission | CHECK `decided_by <> submitted_by` |
+| Deux versions engagées d'un barème ne se chevauchent pas | EXCLUDE gist `(contract_id =, daterange &&)` |
+| Barème engagé et ses lignes immuables | triggers `pricing_schedules_guard`, `pricing_lines_guard` |
+| Valeur d'indice jamais réécrite | UPDATE/DELETE révoqués ; correction chaînée (UNIQUE `supersedes_id`) |
+| Dérogation : auteur ≠ second validateur ; prix et motif figés | CHECK `approved_by_user_id <> author_user_id` ; GRANT UPDATE limité aux décisions |
 
 ## 5. Migrations de la passe v2
 
@@ -83,6 +88,7 @@
 | 18 | Nouvelles valeurs d'énumération du cycle de vie (séparées : règle PostgreSQL 55P04) |
 | 19 | Cycle de vie : acceptation, reconduction, préavis en mois, résiliation programmée, périodes (backfill **testé** `app_backfill_initial_periods`) |
 | 20 | Import (`contract_imports`) et échéancier (`deadlines`, rappels rattachés) |
+| 21 | Tarification : `price_indexes(+_values)`, `pricing_rules`, `pricing_schedules`, `pricing_lines`, `price_overrides` ; extension `btree_gist` (04-tarification.md §17) |
 | 22 | Lot 2 : bibliothèque de clauses versionnée, composition des modèles, clauses et annexes des versions de contrat, revues de clauses, variables manquantes |
 
 ## 6. Contrats types, clauses, variables, annexes (lot 2)

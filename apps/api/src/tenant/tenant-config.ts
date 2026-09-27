@@ -37,6 +37,10 @@ export const SETTINGS = {
   'pricing.rounding': { schema: z.enum(['HALF_AWAY_FROM_ZERO', 'HALF_EVEN']), default: 'HALF_AWAY_FROM_ZERO' },
   /** Écart (%) au-delà duquel une dérogation tarifaire exige une seconde validation. */
   'pricing.overrideApprovalThresholdPercent': { schema: z.number().min(0).max(1000), default: 10 },
+  /** Décimales du prix unitaire calculé (révision, formule, règles) — V2-H17. */
+  'pricing.unitPriceScale': { schema: z.number().int().min(0).max(6), default: 6 },
+  /** Règle de recherche des valeurs d'indice par défaut — V2-H18. */
+  'pricing.indexLookup': { schema: z.enum(['LATEST_PUBLISHED', 'EXACT_PERIOD']), default: 'LATEST_PUBLISHED' },
   /** Ordre de signature par défaut (brief §7 : client puis LSI). */
   'signature.defaultOrder': { schema: z.enum(['CLIENT_FIRST', 'LSI_FIRST']), default: 'CLIENT_FIRST' },
   /** Délai d'expiration d'une soumission DocuSeal, en jours. */

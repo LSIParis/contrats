@@ -183,6 +183,19 @@ isolation → souveraineté → réversibilité).
 | V2-H14 | Le reverse proxy existant (openresty, probablement Nginx Proxy Manager) reste en place ; l'enregistrement DNS pointe vers `51.91.98.38`, ce qui suppose un proxy distinct qui relaie vers `51.178.30.81`. La vérification est documentée, rien n'est supposé. | constaté, non vérifiable depuis la passe | voir `09-exploitation.md` §DNS |
 | V2-H15 | Redis est conservé comme service auxiliaire (sessions, BullMQ) et MinIO comme stockage objet, en plus des services listés par le brief. | existant en production | — |
 | V2-H16 | Jeu de données de démonstration : `pnpm seed`, contrats types explicitement marqués « DÉMONSTRATION ». | brief | — |
+| V2-H17 | Prix unitaire calculé arrondi à **6 décimales** par défaut, puis total de ligne au centime (paramètre `pricing.unitPriceScale`). | fidélité à la formule | `unitPriceScale = 2` (écart de quelques centimes, 04 §6.4) |
+| V2-H18 | Recherche d'indice `LATEST_PUBLISHED` par défaut (`pricing.indexLookup`), `EXACT_PERIOD` par tenant ou par ligne. | rejouabilité ; pratique Syntec | changer le paramètre |
+| V2-H19 | Seuil de double validation des dérogations : 10 % d'écart, comparaison stricte, sur le prix calculé à la date. | brief sans valeur | `pricing.overrideApprovalThresholdPercent` |
+| V2-H20 | Une remise porte sur des lignes de même taux de TVA et même récurrence ; pas de ventilation automatique. | décision comptable | ventilation au prorata |
+| V2-H21 | Récurrences par défaut : `UNIT`/`TIERED` mensuelles, `HOURLY`/`HOUR_PACK` ponctuelles. | usage MSP | champ `recurrence` |
+| V2-H22 | Dates du moteur calendaires ; conversion `Europe/Paris` à la frontière API. | aucun fuseau dans une règle de prix | — |
+| V2-H23 | Valeur d'indice simulée sans date de publication : publiée le 1er jour de sa période. | simuler une révision à venir | préciser `publishedAt` |
+| V2-H24 | Révision annuelle : une date de révision passée, sur une version de barème sans fin, annonce l'échéance `PRICE_REVISION` à la date anniversaire. | usage des clauses Syntec | périodicité par ligne |
+| V2-H25 | Import d'indice sans date de publication : réputée publiée le jour de l'import. | seule date certaine | fournir la 3ᵉ colonne CSV |
+| V2-H26 | Devis catalogue sans taux précisé : TVA 20 %. | taux normal | `vatRatePercent` |
+| V2-H27 | Le catalogue de règles est l'état courant (non versionné) : le figer = ligne MANUAL ou grille par millésime. | simplicité | versionner le catalogue |
+| V2-H28 | Une correction de valeur d'indice vaut rétroactivement (erratum). | une correction corrige une erreur | rejouer « tel que connu à la date » |
+| V2-H29 | Une dérogation en attente de seconde validation n'est jamais appliquée, même si l'écart retombe sous le seuil. | sens le plus prudent | la transmettre au moteur |
 
 ## 7. Ce qui n'est pas dans le périmètre
 

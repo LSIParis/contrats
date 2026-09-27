@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { findContractsForDeadlines, systemScope, uuidv7, withScope, type Scope } from '@lsi/persistence';
 import { computeDeadlines, type ComputedDeadline, type DeadlineKind } from '@lsi/domain';
 import { TenantConfigService } from '../tenant/tenant-config.service.js';
+import { PricingService } from '../pricing/pricing.service.js';
 
 /**
  * Échéancier (02-cycle-de-vie.md §6).
@@ -42,7 +43,10 @@ export interface RecomputeResult {
 export class DeadlinesService {
   private readonly log = new Logger(DeadlinesService.name);
 
-  constructor(private readonly config: TenantConfigService) {}
+  constructor(
+    private readonly config: TenantConfigService,
+    private readonly pricing: PricingService,
+  ) {}
 
   /** Recalcul d'UN contrat, dans une transaction scopée existante. */
   async recompute(tx: any, contractId: string, thresholds: readonly number[], now: Date): Promise<RecomputeResult> {
@@ -107,11 +111,13 @@ export class DeadlinesService {
   }
 
   /**
-   * Prochaine date de révision tarifaire. Point d'extension du lot 3
-   * (`PricingService.nextRevisionDate`) ; sans barème, aucune.
+   * Prochaine date de révision tarifaire, fournie par la tarification (lot 3,
+   * `PricingService.nextRevisionDate`) : lignes à révision native des versions
+   * engagées du barème. Sans barème révisable, aucune. Lue dans la MÊME
+   * transaction scopée que le reste du recalcul.
    */
-  protected async nextRevision(_tx: any, _contractId: string, _now: Date): Promise<Date | null> {
-    return null;
+  protected async nextRevision(tx: any, contractId: string, now: Date): Promise<Date | null> {
+    return this.pricing.nextRevisionDate(tx, contractId, now);
   }
 
   /**
