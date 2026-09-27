@@ -10,10 +10,12 @@ import {
   Post,
   Query,
   Res,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { sendFile } from '../common/http-io.js';
-import type { Scope } from '@lsi/persistence';
+import { appendAudit, type Scope } from '@lsi/persistence';
+import { TenantConfigService } from '../tenant/tenant-config.service.js';
 import { ContractsService } from './contracts.service.js';
 import { SendForSignatureService } from '../signature/send-for-signature.service.js';
 import { CreateContractDto } from './dto/create-contract.dto.js';
@@ -52,6 +54,7 @@ export class ContractsController {
   constructor(
     private readonly contracts: ContractsService,
     private readonly send: SendForSignatureService,
+    private readonly config: TenantConfigService,
   ) {}
 
   @Post()
@@ -61,7 +64,27 @@ export class ContractsController {
     @Body() dto: CreateContractDto,
   ) {
     assertCan(session, 'contracts.write');
-    return this.contracts.create(scope, dto, new Date());
+    // Lot 9 (brief §12, règle 1) : derrière `contrats.proposals.required`, la
+    // création directe est réservée à l'administrateur, motif obligatoire.
+    // Import, avenant et renouvellement ont leurs propres routes : non concernés.
+    const required = await this.config.isEnabled(scope, 'contrats.proposals.required');
+    if (required && (!session.roles.includes('MSP_ADMIN') || !dto.directCreationReason?.trim())) {
+      throw new UnprocessableEntityException({
+        code: 'PROPOSAL_REQUIRED',
+        detail:
+          'Tout nouveau contrat naît d’une proposition signée. Création directe réservée à un administrateur, avec un motif (directCreationReason).',
+      });
+    }
+    const now = new Date();
+    const created = await this.contracts.create(scope, dto, now);
+    if (required) {
+      await appendAudit({
+        tenantId: scope.tenantId, customerId: dto.customerId, actorUserId: session.userId, actorKind: 'INTERNAL',
+        actorIp: null, actorUserAgent: null, action: 'contract.direct_creation', resourceType: 'contract',
+        resourceId: created.id, after: { reason: dto.directCreationReason }, requestId: null, occurredAt: now,
+      });
+    }
+    return created;
   }
 
   @Get()

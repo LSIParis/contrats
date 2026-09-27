@@ -77,7 +77,18 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
       'POST /v1/portal/auth/logout',
       'POST /v1/portal/auth/request-link',
       'POST /v1/webhooks/docuseal',
-    ]);
+      // Lot 9 — page publique d'une proposition : jeton haché résolu en base,
+      // lecture confinée à la proposition (RLS), débit limité, noindex.
+      'GET /v1/public/proposals/:token',
+      'GET /v1/public/proposals/:token/pdf',
+      'POST /v1/public/proposals/:token/accept',
+      'POST /v1/public/proposals/:token/comments',
+      'POST /v1/public/proposals/:token/decline',
+      'POST /v1/public/proposals/:token/events',
+      'POST /v1/public/proposals/:token/otp',
+      'POST /v1/public/proposals/:token/otp/verify',
+      'PUT /v1/public/proposals/:token/selection',
+    ].sort());
     // Toute route /api/v1 hors description publique est gardée par la clé d'API.
     expect(apiGuarded.length).toBeGreaterThan(0);
     expect(apiGuarded.every((r) => r.includes(' /api/v1/'))).toBe(true);

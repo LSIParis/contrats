@@ -119,7 +119,9 @@ export default [
   // Le seed de démonstration : même raisonnement que les fixtures.
   // ---------------------------------------------------------------------
   {
-    files: ['packages/persistence/prisma/seed.ts'],
+    // Lot 9 : seed des modèles de proposition (annexe C) et ses tests —
+    // données de référence écrites avec le rôle propriétaire, hors réseau.
+    files: ['packages/persistence/prisma/seed.ts', 'packages/persistence/prisma/seed/**/*.ts', 'packages/persistence/test/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
       'no-restricted-syntax': 'off',

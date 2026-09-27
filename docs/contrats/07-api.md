@@ -296,3 +296,72 @@ Content-Type: application/problem+json; charset=utf-8
 | 409 | codes du moteur de tarification | barème absent, article inconnu… |
 | 429 | `RATE_LIMITED` | débit dépassé (`Retry-After`) |
 | 5xx | `INTERNAL`, `UNAVAILABLE` | jamais de détail technique |
+
+## 7. Propositions commerciales (lot 9)
+
+> API **interne** (session, UI) et **page publique** (jeton). L'exposition
+> dans l'API publique `/api/v1` (`GET /proposals`, `/proposals/{id}`,
+> `/proposals/{id}/pricing`, `/clients/{clientRef}/proposals`, scopes
+> `proposals:read`, `proposals:pricing:read`), l'OpenAPI et le client régénérés
+> relèvent du **lot 9.8**. Toutes les entrées sont validées par Zod
+> (`apps/api/src/proposals/proposals.schemas.ts`, `.strict()`).
+
+### 7.1 API interne `/v1/proposals` (droits : `permissions.ts`, `proposals.*`)
+
+| Méthode | Chemin | Action |
+|---|---|---|
+| GET | `/v1/proposals?status=&customerId=&mine=&limit=` | liste (portefeuille) |
+| POST | `/v1/proposals` | création (`customerId`, `templateSlug?`, `title?`, `acceptanceMode?`, `mergeContext?`, `contactIds?`) |
+| GET | `/v1/proposals/stream` | notifications temps réel (SSE) du commercial |
+| GET / PATCH | `/v1/proposals/:id` | détail (version, sections, tableau de prix, devis du moteur, préparation, transitions possibles) / métadonnées |
+| PUT | `/v1/proposals/:id/sections` | sections et blocs (brouillon) |
+| PUT | `/v1/proposals/:id/pricing` | tableau de prix (brouillon ; prix modifié → `TO_VALIDATE`) |
+| POST | `/v1/proposals/:id/pricing/validate` | valider un prix de la proposition (admin) |
+| PUT | `/v1/proposals/:id/selection` | configuration proposée (brouillon, prête) |
+| POST / DELETE | `/v1/proposals/:id/recipients[/:recipientId]` | destinataires |
+| GET | `/v1/proposals/:id/readiness` | contrôles de préparation détaillés |
+| POST | `/v1/proposals/:id/import-docx` | import Word (multipart `file`) |
+| POST | `…/submit-review`, `…/approve-review`, `…/reject-review`, `…/mark-ready`, `…/send`, `…/resend`, `…/revise`, `…/withdraw`, `…/reactivate`, `…/close-discussion` | transitions (sous-ressources d'action) |
+| POST | `/v1/proposals/:id/sections/:key/validate` | valider une section « à valider » (admin) |
+| POST | `/v1/proposals/:id/start-signature`, `/v1/proposals/:id/convert` | relances manuelles (signature, conversion) |
+| GET | `/v1/proposals/:id/tracking`, `…/comments`, `…/pdf`, `…/preview` | suivi, échanges, PDF de la version, aperçu HTML |
+| POST | `/v1/proposals/:id/comments` | réponse du commercial |
+
+Administration `/v1/proposal-admin` : `GET templates[/:slug]`,
+`PATCH templates/:slug`, `PATCH templates/:slug/lines/:key`,
+`GET pending-validations`, `POST pending-validations/validate`,
+`GET|POST library`, `PATCH library/:key`, `GET|POST terms`,
+`PUT contract-templates/:id/slug`.
+
+Erreurs : 404 hors portefeuille (jamais 403 sur une ressource), 404
+`PROPOSALS_DISABLED` module désactivé, 409 `PROPOSAL_INVALID_TRANSITION`
+(avec `allowedTransitions`) / `PROPOSAL_RULE_VIOLATION` (avec `rule` :
+`P-TO-VALIDATE`, `P-MERGE-TAGS`, `P-REVIEW-REQUIRED`, `P-SUPERSEDED`,
+`P-EXPIRED`…), 422 `PROPOSAL_REQUIRED` (création directe de contrat).
+
+### 7.2 Page publique `/v1/public/proposals/:token` (`@Public`)
+
+`GET` (consultation), `POST /events` (suivi groupé), `PUT /selection`
+(configuration), `POST /comments`, `POST /decline`, `POST /otp`,
+`POST /otp/verify`, `POST /accept`, `GET /pdf`. En-tête `x-proposal-otp` pour
+une session de code vérifié. Réponses `noindex`, `no-store`, `no-referrer` ;
+404 lien inconnu, 410 `LINK_REVOKED` / `LINK_EXPIRED`, 429 `RATE_LIMITED`.
+Détail : `11-propositions.md` §6.
+
+### 7.3 Webhooks sortants `proposal.*`
+
+| Type | Émis quand |
+|---|---|
+| `proposal.sent` | la proposition passe `SENT` (envoi, renvoi après réactivation) |
+| `proposal.viewed` | première consultation (`VIEWED`) |
+| `proposal.accepted` | acceptation (`ACCEPTED`) |
+| `proposal.signed` | signature (DocuSeal complétée et preuves archivées, ou acceptation par clic) |
+| `proposal.declined` | refus du client (motif **codé** seulement) |
+| `proposal.expired` | échéance passée (`EXPIRED`) |
+| `proposal.converted` | contrat généré (`CONVERTED`, `contractId`) |
+
+Producteur unique : `persistProposalTransition`
+(`apps/api/src/proposals/proposal-transition.ts`), dans la transaction de la
+transition (outbox). Charge utile minimisée (`ProposalRefSchema`,
+`webhooks-out/events.ts`) : identifiants, numéro, statuts, version, échéance,
+motif de refus codé, contrat — ni montant, ni titre, ni contact.

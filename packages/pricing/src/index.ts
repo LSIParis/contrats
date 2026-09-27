@@ -29,3 +29,4 @@ export * from './price-at.js';
 export * from './quantity.js';
 export * from './simulate.js';
 export * from './serialize.js';
+export * from './proposal.js';

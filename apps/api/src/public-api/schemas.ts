@@ -58,7 +58,7 @@ export const Contract = z.object({
   title: z.string(),
   type: z.enum(['MAIN', 'AMENDMENT']),
   status: z.enum(CONTRACT_STATUSES),
-  origin: z.enum(['NATIVE', 'IMPORTED', 'AI']),
+  origin: z.enum(['NATIVE', 'IMPORTED', 'AI', 'PROPOSAL']),
   category: z.string(),
   customer: CustomerRef,
   parentContractId: Uuid.nullable(),

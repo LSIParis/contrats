@@ -18,6 +18,7 @@ const SECTION_TITLES: Array<[prefix: string, title: string]> = [
   ['/library', 'Bibliothèque de clauses'],
   ['/settings', 'Paramètres'],
   ['/pricing', 'Tarification'],
+  ['/proposal-admin', 'Propositions'],
 ];
 
 function sectionTitle(pathname: string): string {
@@ -49,6 +50,7 @@ export function AppShell() {
               {isAdmin && <NavItem to="/users" icon="users">Utilisateurs</NavItem>}
               {isAdmin && <NavItem to="/audit" icon="clipboard">Audit</NavItem>}
               {isAdmin && <NavItem to="/settings" icon="settings">Paramètres</NavItem>}
+              {isAdmin && <NavItem to="/proposal-admin/pending" icon="fileCheck">Prix à valider</NavItem>}
             </NavSection>
           )}
         </Sidebar>

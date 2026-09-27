@@ -27,9 +27,10 @@ export class BrevoSender implements EmailSender {
       headers: { 'api-key': this.apiKey, 'Content-Type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({
         sender: {
-          name: process.env.EMAIL_FROM_NAME ?? 'LSI Maintenance',
+          name: msg.fromName ?? process.env.EMAIL_FROM_NAME ?? 'LSI Maintenance',
           email: process.env.EMAIL_FROM ?? 'contrats@lsi-maintenance.fr',
         },
+        ...(msg.replyTo ? { replyTo: { email: msg.replyTo } } : {}),
         to: [{ email: msg.to }],
         subject: msg.subject,
         textContent: msg.text,

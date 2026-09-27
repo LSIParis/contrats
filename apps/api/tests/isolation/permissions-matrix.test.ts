@@ -70,6 +70,14 @@ const PROBES: Partial<Record<Action, Probe>> = {
   'pricing.override.approve': { method: 'post', path: () => `/v1/contracts/${ghost}/pricing/overrides/${ghost}/approve` },
   'pricing.indexes.manage': { method: 'post', path: () => '/v1/price-indexes/FANTOME/values', body: { period: '2026-01', value: '1', publishedAt: '2026-02-01' } },
   'pricing.rules.manage': { method: 'put', path: () => '/v1/pricing-rules/fantome', body: { label: 'x' } },
+  // --- Propositions (lot 9) : proposition inexistante → 404 pour un rôle autorisé.
+  'proposals.read': { method: 'get', path: () => `/v1/proposals/${ghost}` },
+  'proposals.write': { method: 'post', path: () => `/v1/proposals/${ghost}/mark-ready` },
+  'proposals.send': { method: 'post', path: () => `/v1/proposals/${ghost}/send` },
+  'proposals.review': { method: 'post', path: () => `/v1/proposals/${ghost}/approve-review` },
+  'proposals.convert': { method: 'post', path: () => `/v1/proposals/${ghost}/convert` },
+  'proposals.library.manage': { method: 'post', path: () => '/v1/proposal-admin/terms', body: { title: 'CGV test', body: 'Conditions générales de test, article premier.' } },
+  'proposals.prices.validate': { method: 'get', path: () => '/v1/proposal-admin/pending-validations' },
 };
 
 describe('matrice rôle × action (API)', () => {
@@ -94,7 +102,7 @@ describe('matrice rôle × action (API)', () => {
  */
 describe('invariants de sécurité de la matrice', () => {
   const writeActions = (Object.keys(PERMISSIONS) as Action[]).filter(
-    (a) => !['contracts.read', 'comments.internal', 'portal.read'].includes(a),
+    (a) => !['contracts.read', 'comments.internal', 'portal.read', 'proposals.read'].includes(a),
   );
 
   test('READER et TECHNICIAN n’écrivent rien (hors commentaire interne historique)', () => {
@@ -138,5 +146,23 @@ describe('invariants de sécurité de la matrice', () => {
       expect(can([role], 'apiClients.manage')).toBe(false);
       expect(can([role], 'webhooks.manage')).toBe(false);
     }
+  });
+});
+
+describe('propositions (lot 9) : séparation des rôles', () => {
+  test('le commercial rédige et envoie mais ne valide ni remise ni prix', () => {
+    expect(can(['ACCOUNT_MANAGER'], 'proposals.write')).toBe(true);
+    expect(can(['ACCOUNT_MANAGER'], 'proposals.send')).toBe(true);
+    expect(can(['ACCOUNT_MANAGER'], 'proposals.review')).toBe(false);
+    expect(can(['ACCOUNT_MANAGER'], 'proposals.prices.validate')).toBe(false);
+    expect(can(['ACCOUNT_MANAGER'], 'proposals.library.manage')).toBe(false);
+  });
+  test('seul l’admin gère modèles, bibliothèque, CGV et prix à valider ; le lecteur consulte', () => {
+    for (const role of ALL_ROLES.filter((r) => r !== 'MSP_ADMIN')) {
+      expect(can([role], 'proposals.library.manage')).toBe(false);
+      expect(can([role], 'proposals.prices.validate')).toBe(false);
+    }
+    expect(can(['READER'], 'proposals.read')).toBe(true);
+    expect(can(['LEGAL_REVIEWER'], 'proposals.review')).toBe(true);
   });
 });

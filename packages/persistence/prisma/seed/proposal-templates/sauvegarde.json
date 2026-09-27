@@ -1,0 +1,327 @@
+{
+  "slug": "sauvegarde-en-ligne",
+  "seedVersion": 1,
+  "name": "Sauvegarde en ligne",
+  "description": "Sauvegarde externalisée chiffrée et immuable des postes, serveurs, machines virtuelles, NAS et Microsoft 365, avec Comet Backup et un stockage Impossible Cloud hébergé en France.",
+  "target": "TPE-PME qui veulent une copie de leurs données hors de leurs locaux, protégée contre les rançongiciels, restaurable rapidement et hébergée en France.",
+  "contractTemplateSlug": "sauvegarde-en-ligne",
+  "acceptanceMode": "DOCUSEAL_SIGNATURE",
+  "providerCountersign": true,
+  "validityDays": 30,
+  "followUps": { "noOpenAfterDays": 3, "noDecisionAfterDays": 7, "beforeExpiryDays": 2 },
+  "vatRatePercent": 20,
+  "currency": "EUR",
+  "tags": ["sauvegarde", "comet-backup", "impossible-cloud", "microsoft-365", "rançongiciel"],
+  "sections": [
+    {
+      "key": "couverture",
+      "title": "Couverture",
+      "kind": "COVER",
+      "body": "# Proposition de sauvegarde en ligne\n\n**{{client.raisonSociale}}**\n\nProposition n° {{proposition.numero}} — préparée par {{commercial.nom}}\n\nValable jusqu'au {{proposition.dateExpiration}}"
+    },
+    {
+      "key": "votre-contexte",
+      "title": "Votre contexte",
+      "kind": "CLIENT_INPUT",
+      "aiAssist": true,
+      "guidance": "Décrire ce qui doit être protégé : postes ({{parc.nbPostes}}), serveurs ({{parc.nbServeurs}}), hyperviseurs, NAS, utilisateurs Microsoft 365 ({{parc.nbUtilisateursM365}}), bases de données. Indiquer la solution de sauvegarde actuelle, où sont les copies, la date du dernier test de restauration, le volume de données estimé, et la perte de données acceptable (RPO) et la durée d'interruption acceptable (RTO) exprimées par le client. Laisser [à compléter] si une information manque."
+    },
+    {
+      "key": "pourquoi",
+      "title": "Pourquoi une sauvegarde en ligne",
+      "kind": "TEXT",
+      "body": "## Pourquoi une sauvegarde en ligne\n\nUn rançongiciel, un incendie, un vol ou une simple erreur de manipulation peuvent faire disparaître en quelques minutes des années de travail. Une sauvegarde conservée dans vos locaux, ou joignable depuis votre réseau, disparaît souvent en même temps que les données qu'elle protège.\n\nNotre offre conserve une copie de vos données **hors de vos locaux**, **chiffrée avant de quitter vos équipements** et **verrouillée contre toute suppression** pendant une durée définie : même un attaquant qui prendrait le contrôle de votre réseau ne pourrait ni la lire, ni l'effacer.\n\nMicrosoft 365 n'échappe pas à la règle : Microsoft assure la disponibilité du service, mais la protection de vos contenus contre la suppression, la corruption ou le chiffrement malveillant reste de votre responsabilité."
+    },
+    {
+      "key": "ce-que-nous-protegeons",
+      "title": "Ce que nous protégeons",
+      "kind": "TEXT",
+      "body": "## Ce que nous protégeons\n\n| Élément | Ce qui est sauvegardé |\n|---|---|\n| Postes Windows, macOS et Linux | Fichiers et dossiers choisis, profils utilisateurs |\n| Serveurs Windows et Linux | Fichiers, **image disque complète** (restauration intégrale, y compris sur un autre matériel), état système Windows (Active Directory), bases Microsoft SQL Server, MySQL et MongoDB, serveur Exchange sur site |\n| Hyperviseurs | Machines virtuelles **Proxmox VE**, **Hyper-V** et **VMware**, sans agent dans chaque machine |\n| NAS Synology | Partages et données du NAS |\n| Microsoft 365 | Messagerie, calendriers et contacts Exchange Online, OneDrive, SharePoint et Teams, avec restauration fine d'un élément ou d'une boîte complète |\n\nLa sauvegarde est pilotée depuis notre console Comet Backup, hébergée et exploitée par LSI-Maintenance."
+    },
+    {
+      "key": "securite",
+      "title": "Sécurité et souveraineté",
+      "kind": "TEXT",
+      "body": "## Sécurité et souveraineté\n\n- **Chiffrement de bout en bout** : les données sont chiffrées en AES-256 sur votre équipement, avant tout envoi. Le fournisseur de stockage ne peut pas lire vos données.\n- **Immuabilité anti-rançongiciel** : chaque sauvegarde est verrouillée par la fonction Object Lock en mode conformité, pendant la durée indiquée ci-dessous. Pendant cette durée, personne ne peut la modifier ni la supprimer, pas même un administrateur ou un attaquant disposant des identifiants.\n- **Hébergement en France** : le stockage est assuré par Impossible Cloud, fournisseur européen de stockage objet, dans sa région de Paris. L'entreprise est certifiée ISO/IEC 27001 et ses centres de données sont certifiés ISO 27001 et SOC 2.\n- **Durabilité** : les données sont réparties par codage d'effacement sur plusieurs serveurs, pour une durabilité annoncée de 99,999999999 % par an.\n- **Efficacité** : sauvegardes incrémentales permanentes, compression et déduplication. Seules les modifications sont envoyées, ce qui limite le volume stocké et la bande passante utilisée.\n- **Restauration sans frais de sortie** : récupérer vos données, même en totalité, n'entraîne aucun coût de transfert supplémentaire."
+    },
+    {
+      "key": "conservation",
+      "title": "Planification et conservation",
+      "kind": "TEXT",
+      "validationStatus": "TO_VALIDATE",
+      "body": "## Planification et conservation\n\n| Paramètre | Valeur par défaut |\n|---|---|\n| Fréquence | Quotidienne, en dehors des heures de travail ; toutes les 4 heures possible pour les serveurs critiques |\n| Conservation | 30 sauvegardes quotidiennes, 8 hebdomadaires et 12 mensuelles |\n| Verrouillage immuable | 30 jours |\n| Microsoft 365 | Quotidienne, conservation 12 mois |\n\nCes paramètres sont ajustés avec vous à la mise en service, selon vos objectifs de perte de données et de reprise. Une conservation plus longue augmente le volume stocké."
+    },
+    {
+      "key": "suivi",
+      "title": "Suivi et restauration",
+      "kind": "TEXT",
+      "validationStatus": "TO_VALIDATE",
+      "body": "## Suivi et restauration\n\n- **Contrôle quotidien** de chaque tâche de sauvegarde par notre équipe, avec traitement des échecs et des retards sans attendre votre signalement.\n- **Tableau de bord** de l'état de vos sauvegardes dans votre espace client Client Help.\n- **Rapport mensuel** : sauvegardes réussies, volume protégé, incidents et actions correctives.\n- **Restaurations** à la demande : fichier, dossier, boîte aux lettres, machine virtuelle ou serveur complet. Les restaurations liées à un incident couvert sont incluses ; les autres sont facturées au temps passé.\n- **Prise en charge** d'une demande de restauration urgente sous 4 heures ouvrées.\n- En option, **test de restauration trimestriel** avec procès-verbal remis à votre direction."
+    },
+    {
+      "key": "investissement",
+      "title": "Votre investissement",
+      "kind": "PRICING",
+      "body": "## Votre investissement\n\nIndiquez les éléments à protéger et le volume de stockage estimé : les totaux se mettent à jour immédiatement. Tous les prix sont hors taxes. Le stockage est facturé au volume réellement occupé, arrondi au téraoctet supérieur."
+    },
+    {
+      "key": "exclusions",
+      "title": "Ce qui n'est pas inclus",
+      "kind": "TEXT",
+      "body": "## Ce qui n'est pas inclus\n\n- La remise en état du matériel, du système ou des applications après sinistre, au-delà de la restauration des données, sur devis.\n- Le plan de reprise d'activité complet (serveur de secours, bascule), qui peut faire l'objet d'une proposition dédiée.\n- La sauvegarde des éléments non déclarés dans le tableau de prix."
+    },
+    { "key": "conditions", "title": "Conditions", "kind": "LIBRARY", "libraryKey": "conditions-infogerance-supervision" },
+    { "key": "qui-sommes-nous", "title": "Qui sommes-nous", "kind": "LIBRARY", "libraryKey": "qui-sommes-nous" },
+    { "key": "prochaines-etapes", "title": "Prochaines étapes", "kind": "LIBRARY", "libraryKey": "prochaines-etapes" },
+    { "key": "cgv", "title": "Conditions générales de vente", "kind": "TERMS" },
+    { "key": "signature", "title": "Acceptation et signature", "kind": "SIGNATURE" }
+  ],
+  "pricing": {
+    "choices": [
+      {
+        "key": "engagement",
+        "label": "Durée d'engagement",
+        "editableByClient": true,
+        "options": [
+          { "value": "12", "label": "12 mois", "commitmentMonths": 12 },
+          { "value": "24", "label": "24 mois", "default": true, "commitmentMonths": 24 },
+          { "value": "36", "label": "36 mois", "description": "Tarif préférentiel", "commitmentMonths": 36 }
+        ]
+      }
+    ],
+    "lines": [
+      {
+        "key": "poste",
+        "label": "Poste de travail Windows, macOS ou Linux — fichiers et dossiers",
+        "kind": "REQUIRED",
+        "unit": "poste / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbPostes}}", "min": 0, "max": 500, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "12": 800, "24": 750, "36": 700 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-poste",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "serveur",
+        "label": "Serveur Windows ou Linux — fichiers, image disque, état système, bases de données",
+        "kind": "REQUIRED",
+        "unit": "serveur / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbServeurs}}", "min": 0, "max": 50, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "12": 2900, "24": 2700, "36": 2500 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-serveur",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "hyperviseur",
+        "label": "Hyperviseur Proxmox VE, Hyper-V ou VMware — machines virtuelles (par hôte)",
+        "kind": "REQUIRED",
+        "unit": "hôte / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 0, "min": 0, "max": 8, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "12": 4900, "24": 4500, "36": 4200 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-hyperviseur",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "nas",
+        "label": "NAS Synology",
+        "kind": "REQUIRED",
+        "unit": "NAS / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 0, "min": 0, "max": 20, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "12": 1500, "24": 1400, "36": 1300 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-nas",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "m365-utilisateur",
+        "label": "Utilisateur Microsoft 365 — Exchange Online, OneDrive, SharePoint, Teams",
+        "kind": "REQUIRED",
+        "unit": "utilisateur / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbUtilisateursM365}}", "min": 0, "max": 500, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "12": 350, "24": 325, "36": 300 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-m365",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "stockage",
+        "label": "Stockage immuable Impossible Cloud, région Paris",
+        "description": "Chiffré, verrouillé par Object Lock, sans frais de restauration ; volume occupé arrondi au To supérieur",
+        "kind": "REQUIRED",
+        "unit": "To / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 1, "min": 1, "max": 200, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "12": 2900, "24": 2900, "36": 2600 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative alignée sur l'option de sauvegarde externalisée du modèle Supervision ; coût fournisseur 7,99 € HT / To / mois (Impossible Cloud, paiement à l'usage, septembre 2026)",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "copie-secondaire",
+        "label": "Seconde copie dans une autre région européenne (Francfort)",
+        "description": "Copie indépendante dans un second coffre, pour résister à la perte d'une région entière",
+        "kind": "OPTIONAL",
+        "unit": "To / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "maxFrom": "stockage", "editableByClient": true },
+        "pricing": { "unitPriceCents": 2000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "test-restauration",
+        "label": "Test de restauration trimestriel avec procès-verbal",
+        "kind": "OPTIONAL",
+        "unit": "forfait / trimestre",
+        "recurrence": "QUARTERLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 15000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Aligné sur l'option du modèle Supervision, valeur indicative septembre 2026, à valider",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "mes-poste",
+        "label": "Mise en service — poste",
+        "kind": "SETUP",
+        "unit": "poste",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "poste", "editableByClient": false },
+        "pricing": { "unitPriceCents": 2000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider"
+      },
+      {
+        "key": "mes-serveur",
+        "label": "Mise en service — serveur",
+        "kind": "SETUP",
+        "unit": "serveur",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "serveur", "editableByClient": false },
+        "pricing": { "unitPriceCents": 15000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Aligné sur la mise en service serveur de l'offre d'infogérance d'août 2026, à valider pour la sauvegarde seule"
+      },
+      {
+        "key": "mes-hyperviseur",
+        "label": "Mise en service — hyperviseur",
+        "kind": "SETUP",
+        "unit": "hôte",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "hyperviseur", "editableByClient": false },
+        "pricing": { "unitPriceCents": 25000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider"
+      },
+      {
+        "key": "mes-nas",
+        "label": "Mise en service — NAS",
+        "kind": "SETUP",
+        "unit": "NAS",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "nas", "editableByClient": false },
+        "pricing": { "unitPriceCents": 5000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Aligné sur la mise en service équipement de l'offre d'infogérance d'août 2026, à valider pour la sauvegarde seule"
+      },
+      {
+        "key": "mes-m365",
+        "label": "Mise en service — utilisateur Microsoft 365",
+        "kind": "SETUP",
+        "unit": "utilisateur",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "m365-utilisateur", "editableByClient": false },
+        "pricing": { "unitPriceCents": 500 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider"
+      },
+      {
+        "key": "restauration-hors-incident",
+        "label": "Restauration à la demande hors incident couvert, à distance",
+        "kind": "INFO",
+        "unit": "heure",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 9500 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      },
+      {
+        "key": "hors-forfait-site",
+        "label": "Intervention sur site (hors déplacement)",
+        "kind": "INFO",
+        "unit": "heure",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 11000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      }
+    ],
+    "rules": [
+      {
+        "type": "AT_LEAST_ONE",
+        "key": "au-moins-un-element",
+        "lines": ["poste", "serveur", "hyperviseur", "nas", "m365-utilisateur"],
+        "message": "Indiquez au moins un élément à sauvegarder."
+      },
+      {
+        "type": "MINIMUM_MONTHLY",
+        "key": "minimum-mensuel",
+        "amountCents": 4900,
+        "label": "Complément minimum de facturation",
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider"
+      }
+    ]
+  },
+  "controlCases": [
+    {
+      "name": "PME type — 10 postes, 2 serveurs, 1 hôte, 1 NAS, 15 utilisateurs Microsoft 365, 2 To — 24 mois",
+      "choices": { "engagement": "24" },
+      "quantities": { "poste": 10, "serveur": 2, "hyperviseur": 1, "nas": 1, "m365-utilisateur": 15, "stockage": 2 },
+      "selectedOptions": [],
+      "expected": { "monthlyCents": 29475, "oneTimeCents": 87500, "commitmentTotalCents": 707400 }
+    },
+    {
+      "name": "Infrastructure virtualisée — 3 serveurs, 1 hôte, 4 To, seconde copie 4 To, test trimestriel — 36 mois",
+      "choices": { "engagement": "36" },
+      "quantities": { "poste": 0, "serveur": 3, "hyperviseur": 1, "nas": 0, "m365-utilisateur": 0, "stockage": 4, "copie-secondaire": 4 },
+      "selectedOptions": ["copie-secondaire", "test-restauration"],
+      "expected": { "monthlyCents": 30100, "oneTimeCents": 70000, "commitmentTotalCents": 1263600 }
+    },
+    {
+      "name": "Très petit périmètre sous le minimum — 2 postes, 1 To, 12 mois",
+      "choices": { "engagement": "12" },
+      "quantities": { "poste": 2, "serveur": 0, "hyperviseur": 0, "nas": 0, "m365-utilisateur": 0, "stockage": 1 },
+      "selectedOptions": [],
+      "expected": { "monthlyCents": 4900, "oneTimeCents": 4000, "commitmentTotalCents": 58800 }
+    }
+  ]
+}

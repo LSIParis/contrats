@@ -7,6 +7,7 @@ import {
   IsUUID,
   Min,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 
 /**
@@ -65,4 +66,16 @@ export class CreateContractDto {
   @IsOptional()
   @IsEnum(['MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_OFF'])
   billingFrequency?: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'ONE_OFF';
+
+  /**
+   * Lot 9 (brief §12, règle 1) : quand `contrats.proposals.required` est actif,
+   * tout nouveau contrat naît d'une proposition signée. La création DIRECTE
+   * reste possible pour un administrateur, avec ce motif OBLIGATOIRE, tracé
+   * dans le journal d'audit.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2000)
+  directCreationReason?: string;
 }

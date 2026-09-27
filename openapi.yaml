@@ -64,6 +64,7 @@ components:
             - NATIVE
             - IMPORTED
             - AI
+            - PROPOSAL
         category:
           type: string
         customer:
@@ -210,6 +211,7 @@ components:
                   - NATIVE
                   - IMPORTED
                   - AI
+                  - PROPOSAL
               category:
                 type: string
               customer:
@@ -552,7 +554,7 @@ components:
           maxLength: 500
         eventTypes:
           minItems: 1
-          maxItems: 6
+          maxItems: 13
           type: array
           items:
             type: string
@@ -563,6 +565,13 @@ components:
               - contract.renewed
               - contract.terminated
               - pricing.revised
+              - proposal.sent
+              - proposal.viewed
+              - proposal.accepted
+              - proposal.signed
+              - proposal.declined
+              - proposal.expired
+              - proposal.converted
       required:
         - url
         - eventTypes

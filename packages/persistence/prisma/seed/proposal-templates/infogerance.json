@@ -1,0 +1,306 @@
+{
+  "slug": "infogerance",
+  "seedVersion": 1,
+  "name": "Infogérance TPE-PME",
+  "description": "Gestion quotidienne du parc, supervision, mises à jour, antivirus et support utilisateurs illimité, avec option Microsoft 365.",
+  "target": "TPE-PME de 5 à 100 postes qui confient la gestion de leur parc et le support de leurs utilisateurs.",
+  "contractTemplateSlug": "infogerance",
+  "acceptanceMode": "DOCUSEAL_SIGNATURE",
+  "providerCountersign": true,
+  "validityDays": 30,
+  "followUps": { "noOpenAfterDays": 3, "noDecisionAfterDays": 7, "beforeExpiryDays": 2 },
+  "vatRatePercent": 20,
+  "currency": "EUR",
+  "tags": ["infogérance", "support", "microsoft-365"],
+  "sections": [
+    {
+      "key": "couverture",
+      "title": "Couverture",
+      "kind": "COVER",
+      "body": "# Proposition d'infogérance\n\n**{{client.raisonSociale}}**\n\nProposition n° {{proposition.numero}} — préparée par {{commercial.nom}}\n\nValable jusqu'au {{proposition.dateExpiration}}"
+    },
+    {
+      "key": "votre-contexte",
+      "title": "Votre contexte",
+      "kind": "CLIENT_INPUT",
+      "aiAssist": true,
+      "guidance": "Décrire en 5 à 10 lignes : taille du parc ({{parc.nbPostes}} postes, {{parc.nbServeurs}} serveurs), outils utilisés (Microsoft 365, métier), organisation actuelle du support, irritants exprimés par le client, enjeux de continuité. Reprendre les mots du client. Ne rien inventer : laisser [à compléter] si une information manque."
+    },
+    {
+      "key": "notre-proposition",
+      "title": "Notre proposition",
+      "kind": "TEXT",
+      "body": "## Notre proposition\n\nNous prenons en charge la gestion quotidienne de votre informatique pour que vos équipes puissent se concentrer sur leur métier.\n\nNotre objectif : maintenir vos postes, serveurs et équipements dans un état opérationnel, sécurisé et suivi au quotidien, et réduire les interruptions de service grâce à la détection proactive des anomalies."
+    },
+    {
+      "key": "perimetre",
+      "title": "Périmètre du service",
+      "kind": "TEXT",
+      "body": "## Périmètre du service\n\n### Supervision quotidienne\n- État général des postes, des serveurs et des agents de supervision.\n- Alertes proactives : espace disque, services arrêtés, matériel en défaut.\n\n### Mises à jour\n- Gestion des mises à jour du système d'exploitation et des applications courantes.\n- Suivi des postes non à jour et correction.\n\n### Protection antivirus\n- Vérification de la présence et de l'état de la protection sur chaque poste.\n- Identification des postes non protégés ou présentant une anomalie.\n\n### Support utilisateurs illimité\n- Assistance à l'utilisation du poste de travail, des périphériques et des applications usuelles.\n- Demandes par téléphone, e-mail ou portail, traitées à distance.\n\n### Inventaire et reporting\n- Inventaire technique tenu à jour.\n- Rapport d'activité périodique : incidents, demandes, état du parc."
+    },
+    {
+      "key": "niveaux-de-service",
+      "title": "Niveaux de service",
+      "kind": "TEXT",
+      "validationStatus": "TO_VALIDATE",
+      "body": "## Niveaux de service\n\n| Priorité | Exemple | Prise en charge |\n|---|---|---|\n| Bloquante | Serveur arrêté, plus aucun utilisateur ne peut travailler | 4 heures ouvrées |\n| Standard | Un utilisateur gêné, poste lent, imprimante | 8 heures ouvrées |\n| Demande | Création de compte, installation planifiée | 2 jours ouvrés |\n\nHeures ouvrées : du lundi au vendredi, de 9 h à 18 h, hors jours fériés."
+    },
+    {
+      "key": "mise-en-service",
+      "title": "Mise en service",
+      "kind": "TEXT",
+      "body": "## Mise en service\n\nLa mise en service comprend l'audit initial, l'intégration des équipements, le déploiement des agents, le paramétrage des règles d'alerte, la collecte de l'inventaire et l'initialisation du reporting. Elle est réalisée dans les semaines qui suivent la signature, selon un planning convenu avec vous."
+    },
+    {
+      "key": "investissement",
+      "title": "Votre investissement",
+      "kind": "PRICING",
+      "body": "## Votre investissement\n\nAjustez les quantités et les options : les totaux se mettent à jour immédiatement. Tous les prix sont hors taxes."
+    },
+    {
+      "key": "exclusions",
+      "title": "Ce qui n'est pas inclus",
+      "kind": "TEXT",
+      "body": "## Ce qui n'est pas inclus\n\n- Les projets, les migrations et les interventions lourdes, sur devis.\n- La fourniture de matériel.\n- La fourniture, la revente et le renouvellement de licences, notamment Microsoft : elles font l'objet d'un contrat séparé ou sont souscrites directement par vous."
+    },
+    { "key": "conditions", "title": "Conditions", "kind": "LIBRARY", "libraryKey": "conditions-infogerance-supervision" },
+    { "key": "qui-sommes-nous", "title": "Qui sommes-nous", "kind": "LIBRARY", "libraryKey": "qui-sommes-nous" },
+    { "key": "nos-engagements", "title": "Nos engagements", "kind": "LIBRARY", "libraryKey": "nos-engagements" },
+    { "key": "prochaines-etapes", "title": "Prochaines étapes", "kind": "LIBRARY", "libraryKey": "prochaines-etapes" },
+    { "key": "cgv", "title": "Conditions générales de vente", "kind": "TERMS" },
+    { "key": "signature", "title": "Acceptation et signature", "kind": "SIGNATURE" }
+  ],
+  "pricing": {
+    "choices": [
+      {
+        "key": "engagement",
+        "label": "Durée d'engagement",
+        "editableByClient": true,
+        "options": [
+          { "value": "24", "label": "24 mois", "default": true, "commitmentMonths": 24 },
+          { "value": "36", "label": "36 mois", "description": "Tarif préférentiel", "commitmentMonths": 36 }
+        ]
+      }
+    ],
+    "lines": [
+      {
+        "key": "poste-travail",
+        "label": "Poste de travail Windows / macOS / Linux",
+        "description": "Supervision, mises à jour, suivi antivirus, support utilisateurs illimité, reporting",
+        "kind": "REQUIRED",
+        "unit": "poste / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbPostes}}", "min": 1, "max": 500, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 2500, "36": 2250 } },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026",
+        "setupLineKey": "mes-poste",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "serveur",
+        "label": "Serveur physique ou virtuel",
+        "description": "Supervision renforcée, suivi des services critiques, mises à jour, suivi antivirus, reporting",
+        "kind": "REQUIRED",
+        "unit": "serveur / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbServeurs}}", "min": 0, "max": 50, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 9500, "36": 8500 } },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026",
+        "setupLineKey": "mes-serveur",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "equipement-reseau",
+        "label": "Équipement réseau administrable (pare-feu, switch, borne)",
+        "description": "Disponibilité, supervision des alertes et inventaire technique",
+        "kind": "REQUIRED",
+        "unit": "équipement / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbEquipementsReseau}}", "min": 0, "max": 100, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 1500, "36": 1350 } },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026",
+        "setupLineKey": "mes-reseau",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "m365-tenant",
+        "label": "Gestion du tenant Microsoft 365",
+        "description": "Domaines et DNS, comptes administrateurs, Exchange, règles de sécurité, documentation",
+        "kind": "OPTIONAL",
+        "unit": "forfait / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 8900 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026",
+        "setupLineKey": "m365-prise-en-charge",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "m365-utilisateur",
+        "label": "Administration et assistance des utilisateurs Microsoft 365",
+        "kind": "OPTIONAL",
+        "unit": "utilisateur / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": "{{parc.nbUtilisateursM365}}", "min": 1, "max": 500, "editableByClient": true },
+        "pricing": { "unitPriceCents": 1100 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "m365-poste-premium",
+        "label": "Gestion Intune / Defender des postes Business Premium",
+        "kind": "OPTIONAL",
+        "unit": "poste / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "maxFrom": "poste-travail", "editableByClient": true },
+        "pricing": { "unitPriceCents": 800 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "mes-poste",
+        "label": "Mise en service — poste de travail",
+        "kind": "SETUP",
+        "unit": "poste",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "poste-travail", "editableByClient": false },
+        "pricing": { "unitPriceCents": 3500 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "mes-serveur",
+        "label": "Mise en service — serveur",
+        "kind": "SETUP",
+        "unit": "serveur",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "serveur", "editableByClient": false },
+        "pricing": { "unitPriceCents": 15000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "mes-reseau",
+        "label": "Mise en service — équipement réseau",
+        "kind": "SETUP",
+        "unit": "équipement",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "equipement-reseau", "editableByClient": false },
+        "pricing": { "unitPriceCents": 5000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "m365-prise-en-charge",
+        "label": "Prise en charge initiale Microsoft 365",
+        "description": "Audit du tenant, sécurisation des comptes administrateurs, documentation",
+        "kind": "SETUP",
+        "unit": "forfait",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 1, "min": 0, "max": 1, "linkedTo": "m365-tenant", "editableByClient": false },
+        "pricing": { "unitPriceCents": 79000 },
+        "priceFrom": true,
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      },
+      {
+        "key": "hors-forfait-distance",
+        "label": "Intervention hors forfait ou projet, à distance",
+        "kind": "INFO",
+        "unit": "heure",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 9500 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      },
+      {
+        "key": "hors-forfait-site",
+        "label": "Intervention sur site (hors déplacement)",
+        "kind": "INFO",
+        "unit": "heure",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 11000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      }
+    ],
+    "rules": [
+      {
+        "type": "MINIMUM_MONTHLY",
+        "key": "minimum-mensuel",
+        "amountCents": 24900,
+        "label": "Complément minimum de facturation",
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      },
+      {
+        "type": "REQUIRES",
+        "key": "premium-requiert-tenant",
+        "line": "m365-poste-premium",
+        "requires": ["m365-tenant"],
+        "message": "La gestion Intune / Defender nécessite l'option Gestion du tenant Microsoft 365."
+      },
+      {
+        "type": "REQUIRES",
+        "key": "utilisateurs-requiert-tenant",
+        "line": "m365-utilisateur",
+        "requires": ["m365-tenant"],
+        "message": "L'administration des utilisateurs Microsoft 365 nécessite l'option Gestion du tenant."
+      },
+      {
+        "type": "AUTO_INCLUDE",
+        "key": "prise-en-charge-avec-tenant",
+        "line": "m365-prise-en-charge",
+        "when": "m365-tenant"
+      }
+    ]
+  },
+  "controlCases": [
+    {
+      "name": "Exemple de l'offre d'août 2026 (montants corrigés) — 24 mois",
+      "choices": { "engagement": "24" },
+      "quantities": { "poste-travail": 50, "serveur": 2, "equipement-reseau": 5 },
+      "selectedOptions": [],
+      "expected": { "monthlyCents": 151500, "oneTimeCents": 230000, "commitmentTotalCents": 3636000 }
+    },
+    {
+      "name": "Exemple de l'offre d'août 2026 (montants corrigés) — 36 mois",
+      "choices": { "engagement": "36" },
+      "quantities": { "poste-travail": 50, "serveur": 2, "equipement-reseau": 5 },
+      "selectedOptions": [],
+      "expected": { "monthlyCents": 136250, "oneTimeCents": 230000, "commitmentTotalCents": 4905000 }
+    },
+    {
+      "name": "10 postes, 1 équipement réseau, pack Microsoft 365 (20 utilisateurs, 12 postes Premium) — 24 mois",
+      "choices": { "engagement": "24" },
+      "quantities": { "poste-travail": 10, "serveur": 0, "equipement-reseau": 1, "m365-utilisateur": 20, "m365-poste-premium": 10 },
+      "selectedOptions": ["m365-tenant", "m365-utilisateur", "m365-poste-premium"],
+      "expected": { "monthlyCents": 65400, "oneTimeCents": 119000, "commitmentTotalCents": 1569600 }
+    },
+    {
+      "name": "Petit parc sous le minimum de facturation — 5 postes, 24 mois",
+      "choices": { "engagement": "24" },
+      "quantities": { "poste-travail": 5, "serveur": 0, "equipement-reseau": 0 },
+      "selectedOptions": [],
+      "expected": { "monthlyCents": 24900, "oneTimeCents": 17500, "commitmentTotalCents": 597600 }
+    }
+  ]
+}

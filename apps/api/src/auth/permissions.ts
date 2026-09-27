@@ -60,6 +60,18 @@ export const PERMISSIONS = {
   'comments.internal': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'TECHNICIAN'],
   'comments.share': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER'],
 
+  // --- Propositions commerciales (lot 9, brief §12.9) -------------------------
+  // commercial : crée, envoie, relance ses propositions ; valideur : remises et
+  // clauses dérogatoires ; admin : modèles, bibliothèque, seuils, CGV, prix à
+  // valider ; lecteur : consulte. Le client n'y accède QUE par son lien.
+  'proposals.read': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER'],
+  'proposals.write': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'proposals.send': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'proposals.review': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
+  'proposals.library.manage': ['MSP_ADMIN'],
+  'proposals.prices.validate': ['MSP_ADMIN'],
+  'proposals.convert': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+
   // --- Portail client -----------------------------------------------------
   'portal.read': ['CLIENT_SIGNER', 'CLIENT_VIEWER'],
   'portal.accept': ['CLIENT_SIGNER'],

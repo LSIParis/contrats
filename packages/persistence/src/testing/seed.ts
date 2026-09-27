@@ -14,6 +14,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
+import { runProposalTemplatesSeed } from '../../prisma/seed/proposal-templates/cli';
 
 export interface CustomerFixture {
   id: string;
@@ -180,4 +181,48 @@ export async function seedTwoCustomers(databaseUrl?: string): Promise<TwoCustome
     customerA: a,
     customerB: b,
   };
+}
+
+/**
+ * Lot 9 — charge les modèles de proposition de l'annexe C (seed réel, dépôt
+ * Prisma) pour un tenant de test. Rôle propriétaire, comme le seed en production.
+ */
+export async function seedProposalTemplates(tenantSlug: string, args: string[] = [], databaseUrl?: string) {
+  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  try {
+    return await runProposalTemplatesSeed(owner, [`--tenant=${tenantSlug}`, ...args]);
+  } finally {
+    await owner.$disconnect();
+  }
+}
+
+/**
+ * Lot 9 — contrat type PUBLIÉ (version immuable) portant un `slug`, cible de
+ * la conversion d'une proposition (annexe C, règle 8).
+ */
+export async function seedPublishedContractTemplate(
+  tenantId: string,
+  slug: string,
+  databaseUrl?: string,
+): Promise<{ templateId: string; versionId: string }> {
+  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const templateId = uuidv7();
+  const versionId = uuidv7();
+  try {
+    await owner.contractTemplate.create({
+      data: { id: templateId, tenantId, name: `Contrat type ${slug}`, status: 'PUBLISHED', slug, createdAt: new Date(), updatedAt: new Date() },
+    });
+    await owner.contractTemplateVersion.create({
+      data: {
+        id: versionId, tenantId, templateId, versionNumber: 1,
+        bodyHtml: '<p>Le prestataire assure les prestations décrites en annexe pour {{client.raisonSociale}}.</p>',
+        variablesSchema: {}, isImmutable: true, publishedAt: new Date(), createdAt: new Date(),
+        defaultAnnexes: [{ kind: 'PRICING_GRID', title: 'Grille tarifaire' }],
+      },
+    });
+    await owner.contractTemplate.update({ where: { id: templateId }, data: { currentVersionId: versionId } });
+    return { templateId, versionId };
+  } finally {
+    await owner.$disconnect();
+  }
 }

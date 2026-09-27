@@ -24,6 +24,8 @@ import { PortalApp } from './portal/portal-app.js';
 import { StructureEditorPage } from './features/structure/structure-editor-page.js';
 import { LibraryPage } from './features/library/library-page.js';
 import { RemindersPage } from './features/reminders/reminders-page.js';
+import { ProposalPublicPage } from './features/proposals/public/proposal-public-page.js';
+import { PendingValidationsPage } from './features/proposals/pending-validations-page.js';
 
 function InternalRoutes() {
   return (
@@ -52,6 +54,7 @@ function InternalRoutes() {
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/:id" element={<TemplateDetailPage />} />
         <Route path="/library" element={<LibraryPage />} />
+        <Route path="/proposal-admin/pending" element={<PendingValidationsPage />} />
       </Route>
     </Routes>
   );
@@ -62,6 +65,8 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/portal/*" element={<PortalApp />} />
+        {/* Lot 9 : page publique d'une proposition — lien personnel, HORS session. */}
+        <Route path="/p/:token" element={<ProposalPublicPage />} />
         <Route
           path="/*"
           element={

@@ -45,6 +45,12 @@ export async function withScope<T>(
     await tx.$executeRaw`SELECT set_config('app.all_customers', ${scope.allCustomers ? 'on' : 'off'}, true)`;
     await tx.$executeRaw`SELECT set_config('app.user_id', ${scope.userId}, true)`;
     await tx.$executeRaw`SELECT set_config('app.actor_kind', ${scope.actorKind}, true)`;
+    // Lot 9 : confinement de la page publique à une proposition. Posé seulement
+    // pour ce scope (portée transaction, comme les autres GUC) ; validé UUID.
+    if (scope.proposalId !== undefined) {
+      toPgUuidArray([scope.proposalId]);
+      await tx.$executeRaw`SELECT set_config('app.proposal_id', ${scope.proposalId}, true)`;
+    }
     return fn(tx);
   });
 }

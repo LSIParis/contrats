@@ -11,6 +11,13 @@ export interface EmailMessage {
   /** Corps texte (obligatoire) + HTML (optionnel). */
   readonly text: string;
   readonly html?: string;
+  /**
+   * Nom d'expéditeur affiché (lot 9 : « au nom du commercial »). L'adresse
+   * d'expédition reste celle du domaine (SPF / DKIM / DMARC respectés).
+   */
+  readonly fromName?: string;
+  /** Adresse de réponse (le commercial), distincte de l'expéditeur technique. */
+  readonly replyTo?: string;
 }
 
 export interface EmailSender {

@@ -25,6 +25,9 @@ const PERMISSIONS = {
   'pricing.indexes.manage': ['MSP_ADMIN'],
   'apiClients.manage': ['MSP_ADMIN'],
   'webhooks.manage': ['MSP_ADMIN'],
+  // Lot 9 — propositions commerciales.
+  'proposals.read': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER'],
+  'proposals.prices.validate': ['MSP_ADMIN'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UiAction = keyof typeof PERMISSIONS;

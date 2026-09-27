@@ -254,7 +254,13 @@ importers:
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
+      '@lsi/pricing':
+        specifier: workspace:*
+        version: link:../pricing
       '@testcontainers/postgresql':
         specifier: ^10.13.2
         version: 10.28.0

@@ -85,3 +85,34 @@ export async function resolveWebhookScope(
     contractId: r.contract_id,
   };
 }
+
+export interface ResolvedProposalWebhookScope {
+  readonly signatureRequestId: string;
+  readonly tenantId: string;
+  readonly customerId: string;
+  readonly proposalId: string;
+}
+
+/**
+ * Lot 9 — même résolution pour une soumission DocuSeal de PROPOSITION : le
+ * rôle `lsi_webhook` lit six colonnes d'identité de proposal_signature_requests
+ * (migration 31), rien d'autre. Appelée quand la soumission n'est pas celle
+ * d'un contrat ; le traitement se fait ensuite sous lsi_app, dans le scope.
+ */
+export async function resolveProposalWebhookScope(
+  provider: 'DOCUSEAL',
+  providerSubmissionId: string,
+): Promise<ResolvedProposalWebhookScope | null> {
+  const rows = await webhookClient().$queryRaw<
+    { id: string; tenant_id: string; customer_id: string; proposal_id: string }[]
+  >`
+    SELECT id, tenant_id, customer_id, proposal_id
+    FROM proposal_signature_requests
+    WHERE provider = ${provider}::"SignatureProvider"
+      AND provider_submission_id = ${providerSubmissionId}
+    LIMIT 1
+  `;
+  const r = rows[0];
+  if (!r) return null;
+  return { signatureRequestId: r.id, tenantId: r.tenant_id, customerId: r.customer_id, proposalId: r.proposal_id };
+}

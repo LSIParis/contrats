@@ -52,6 +52,7 @@
 | — | `contract_acceptances` | acceptation d'une version, distincte de la signature |
 | — | `contract_periods` | historique des périodes (initiale, reconductions) |
 | — | `contract_imports` | pipeline OCR → extraction → validation |
+| `Proposal`, `ProposalVersion`, `ProposalSection` / `ProposalBlock`, `ProposalTemplate`, `ContentLibraryItem`, `PricingTable` / `PricingOption`, `ProposalSelection`, `PricingSnapshot`, `ProposalRecipient`, `ProposalAccessLink`, `ProposalViewEvent`, `ProposalComment`, `ProposalFollowUp` | `proposals`, `proposal_versions`, `proposal_sections`, `proposal_blocks`, `proposal_templates(+_sections, +_pricing_lines)`, `content_library_items`, `proposal_terms`, `proposal_selections`, `pricing_snapshots`, `proposal_recipients`, `proposal_access_links`, `proposal_view_events` + `proposal_view_stats`, `proposal_comments`, `proposal_follow_ups` + `proposal_deliveries`, `proposal_acceptances`, `proposal_signature_requests` / `_signers` / `_events`, `proposal_lifecycle_events` | lot 9 : voir §7 et `11-propositions.md` §4 |
 
 ## 3. Montants et dates
 
@@ -93,6 +94,9 @@
 | 21 | Tarification : `price_indexes(+_values)`, `pricing_rules`, `pricing_schedules`, `pricing_lines`, `price_overrides` ; extension `btree_gist` (04-tarification.md §17) |
 | 22 | Lot 2 : bibliothèque de clauses versionnée, composition des modèles, clauses et annexes des versions de contrat, revues de clauses, variables manquantes |
 | 23 | Lot 5 : webhooks sortants — `webhook_subscriptions`, `webhook_events` (outbox), `webhook_deliveries` ; `app_publish_webhook_event` (publication dans la transaction de l'appelant, bornée au tenant/scope courant), `app_find_due_webhook_deliveries` (découverte, identifiants seuls) |
+| 30 | Lot 9 : valeurs d'énumérations seules (55P04) — `ContractOrigin.PROPOSAL`, `PricingRecurrence.QUARTERLY`, documents de proposition |
+| 31 | Lot 9 : propositions commerciales — tables de classe tenant (bibliothèque, CGV, modèles, compteur) et client (propositions et filles), `contracts.proposal_id` UNIQUE, `customers.commercial_status`, `contract_templates.slug`, RLS + lecture confinée du lien public, trigger de transition, gardes d'immuabilité, découverte et purge `SECURITY DEFINER` |
+| 32 | Lot 9 : date d'effet souhaitée, erreur de conversion, découverte des preuves de signature à rapatrier |
 
 ## 6. Contrats types, clauses, variables, annexes (lot 2)
 
@@ -139,3 +143,28 @@ contract_clause_reviews (append-only) : revue humaine, obligatoire pour les clau
   `reopen-negotiation`, acceptation portail (`/v1/portal/contracts/:id/accept`,
   identité de session, IP) ou enregistrée par LSI (pièce justificative
   obligatoire) → `contract_acceptances`.
+
+## 7. Propositions commerciales (lot 9, migrations 30 à 32)
+
+Carte complète : `11-propositions.md` §4. Points de modèle :
+
+- **Classe tenant** : `content_library_items` (clé stable, compteur `version`,
+  `user_modified_at` qui protège de l'écrasement par le seed),
+  `proposal_terms` (CGV **immuables**, empreinte), `proposal_templates` et
+  leurs sections / lignes de prix (forme de l'annexe C, cible du seed),
+  `proposal_sequences` (numérotation `PROP-AAAA-NNNN` atomique).
+- **Classe client** : `proposals` et toutes ses tables filles portent
+  `tenant_id` + `customer_id`, FK composites `(id, tenant_id, customer_id)`.
+  Un **prospect** est un `Customer` au statut `commercial_status = PROSPECT`
+  (V2-H44).
+- **Invariants en base** : version de proposition figée dès l'envoi (trigger
+  `proposal_versions_guard`, sections / blocs compris) ; journal
+  `proposal_lifecycle_events` écrit **uniquement** par le trigger
+  `proposals_status_transition` (+ audit chaîné) ; sélections, snapshots,
+  acceptations, envois et suivi détaillé **append-only** ; acceptation par clic
+  impossible sans e-mail vérifié (CHECK) ; une seule soumission DocuSeal
+  active par proposition (index partiel) ; un contrat par proposition
+  (`contracts_proposal_key`).
+- **RLS** : aucune ligne de proposition lisible par un acteur `CLIENT`
+  (portail) ; la page publique lit par des politiques `*_link_read`
+  confinées à UNE proposition (GUC `app.proposal_id`), sans aucune écriture.

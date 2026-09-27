@@ -100,13 +100,15 @@ export interface PricingTotals {
   readonly vatByRate: readonly VatBreakdown[];
   /** HT des lignes à récurrence mensuelle. */
   readonly monthlyLinesCents: bigint;
+  /** HT des lignes à récurrence trimestrielle (lot 9). */
+  readonly quarterlyLinesCents: bigint;
   /** HT des lignes à récurrence annuelle. */
   readonly yearlyLinesCents: bigint;
   /** HT des lignes ponctuelles (mise en service, régie, packs…). */
   readonly oneOffCents: bigint;
-  /** Récurrent mensuel HT normalisé : mensuel + annuel / 12 (arrondi au centime). */
+  /** Récurrent mensuel HT normalisé : mensuel + trimestriel / 3 + annuel / 12 (arrondi au centime, une fois). */
   readonly monthlyRecurringCents: bigint;
-  /** Récurrent annuel HT : mensuel × 12 + annuel. */
+  /** Récurrent annuel HT : mensuel × 12 + trimestriel × 4 + annuel. */
   readonly annualRecurringCents: bigint;
 }
 
@@ -132,7 +134,7 @@ const LINE_KINDS: ReadonlySet<string> = new Set<LineKind>([
   'DISCOUNT',
 ]);
 const MODES: ReadonlySet<string> = new Set<PricingMode>(['RULE', 'FORMULA', 'MANUAL']);
-const RECURRENCES: ReadonlySet<string> = new Set<Recurrence>(['MONTHLY', 'YEARLY', 'ONE_OFF']);
+const RECURRENCES: ReadonlySet<string> = new Set<Recurrence>(['MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_OFF']);
 
 /** Récurrence imposée par le type : la contredire est une erreur. */
 const FORCED_RECURRENCE: Partial<Record<LineKind, Recurrence>> = {
@@ -531,12 +533,14 @@ function priceDiscountLine(
 export function computeTotals(lines: readonly PricedLine[], settings: PricingSettings): PricingTotals {
   let htCents = 0n;
   let monthlyLinesCents = 0n;
+  let quarterlyLinesCents = 0n;
   let yearlyLinesCents = 0n;
   let oneOffCents = 0n;
   const byRate = new Map<string, { rate: Decimal; base: bigint }>();
   for (const l of lines) {
     htCents += l.totalHtCents;
     if (l.recurrence === 'MONTHLY') monthlyLinesCents += l.totalHtCents;
+    else if (l.recurrence === 'QUARTERLY') quarterlyLinesCents += l.totalHtCents;
     else if (l.recurrence === 'YEARLY') yearlyLinesCents += l.totalHtCents;
     else oneOffCents += l.totalHtCents;
     const rate = D(l.vatRatePercent);
@@ -558,10 +562,14 @@ export function computeTotals(lines: readonly PricedLine[], settings: PricingSet
     ttcCents: htCents + vatCents,
     vatByRate,
     monthlyLinesCents,
+    quarterlyLinesCents,
     yearlyLinesCents,
     oneOffCents,
-    monthlyRecurringCents: monthlyLinesCents + toCents(centsToEuros(yearlyLinesCents).div(12), settings.rounding),
-    annualRecurringCents: monthlyLinesCents * 12n + yearlyLinesCents,
+    // Sans ligne trimestrielle, identique au calcul historique (mensuel + annuel / 12).
+    monthlyRecurringCents:
+      monthlyLinesCents +
+      toCents(centsToEuros(quarterlyLinesCents).div(3).plus(centsToEuros(yearlyLinesCents).div(12)), settings.rounding),
+    annualRecurringCents: monthlyLinesCents * 12n + quarterlyLinesCents * 4n + yearlyLinesCents,
   };
 }
 

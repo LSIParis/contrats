@@ -61,8 +61,12 @@ export type LineKind =
  */
 export type PricingMode = 'RULE' | 'FORMULA' | 'MANUAL';
 
-/** Périodicité de facturation. Sert à la ventilation récurrent / ponctuel. */
-export type Recurrence = 'MONTHLY' | 'YEARLY' | 'ONE_OFF';
+/**
+ * Périodicité de facturation. Sert à la ventilation récurrent / ponctuel.
+ * QUARTERLY (lot 9) : prestations trimestrielles des propositions (test de
+ * restauration trimestriel…), normalisées au mois (÷ 3) et à l'année (× 4).
+ */
+export type Recurrence = 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'ONE_OFF';
 
 export type TierMode = 'GRADUATED' | 'VOLUME';
 

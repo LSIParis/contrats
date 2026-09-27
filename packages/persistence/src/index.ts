@@ -16,14 +16,29 @@ export {
   clientScope,
   systemScope,
   tenantSystemScope,
+  proposalLinkScope,
   type Scope,
   type ActorKind,
 } from './scope.js';
 export { uuidv7 } from './uuid.js';
 export {
   resolveWebhookScope,
+  resolveProposalWebhookScope,
   type ResolvedWebhookScope,
+  type ResolvedProposalWebhookScope,
 } from './webhook-scope-lookup.js';
+export {
+  resolveProposalLink,
+  findProposalsToExpire,
+  findProposalFollowUpsDue,
+  findProposalsToConvert,
+  findProposalSignaturesNeedingSync,
+  findProposalSignaturesNeedingProof,
+  findProposalTrackingTenants,
+  purgeProposalViewEvents,
+  nextProposalSequence,
+  type ResolvedProposalLink,
+} from './proposal-lookup.js';
 export { findSignaturesNeedingProof, findSignaturesNeedingSync } from './reconciliation-lookup.js';
 export { resolveApiKeyPrefix, type ResolvedApiKey } from './api-key-lookup.js';
 export {

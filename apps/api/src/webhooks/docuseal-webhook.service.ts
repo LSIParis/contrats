@@ -5,6 +5,7 @@ import { persistTransition, toContractSnapshot } from '../contracts/snapshot.js'
 import { DocusealAdapter } from '../signature/docuseal.adapter.js';
 import { JOB_QUEUE, type CaptureProofJob, type JobQueue } from '../jobs/job-queue.port.js';
 import { reconciliationEvents } from './reconciliation-events.js';
+import { ProposalSignatureService } from '../proposals/proposal-signature.service.js';
 
 export type WebhookOutcome =
   | 'processed'
@@ -45,6 +46,9 @@ export class DocusealWebhookService {
   constructor(
     private readonly provider: DocusealAdapter,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
+    // Lot 9 : les soumissions de PROPOSITIONS passent par le même point
+    // d'entrée (HMAC, parsing, réconciliation), puis par leur propre traitement.
+    private readonly proposals: ProposalSignatureService,
   ) {}
 
   async handle(
@@ -123,6 +127,9 @@ export class DocusealWebhookService {
     // `lsi_webhook`, borné à six colonnes d'identité d'une seule table.
     const sigReq = await resolveWebhookScope('DOCUSEAL', event.providerSubmissionId);
     if (!sigReq) {
+      // Pas un contrat : peut-être une proposition (même résolution, depuis notre base).
+      const proposal = await this.proposals.process(event);
+      if (proposal.status !== 'unknown_submission') return proposal;
       // 200 : DocuSeal réessaie 48 h sur les 4xx/5xx, et faire réessayer un
       // événement définitivement non traitable n'est que du bruit.
       this.log.warn(`webhook orphelin, submission=${event.providerSubmissionId}`);

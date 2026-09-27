@@ -135,6 +135,17 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     void reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   });
 
+  // Lot 9 — page publique d'une proposition (`/p/<jeton>`, servie par le SPA) :
+  // jamais indexée, jamais mise en cache, aucun Referer transmis (le jeton est
+  // dans le chemin). La CSP stricte ci-dessus s'applique aussi.
+  fastify.addHook('onSend', async (req, reply) => {
+    if (req.url.startsWith('/p/')) {
+      void reply.header('X-Robots-Tag', 'noindex, nofollow, noarchive');
+      void reply.header('Cache-Control', 'no-store');
+      void reply.header('Referrer-Policy', 'no-referrer');
+    }
+  });
+
   // Cookie de session (§13.1). Aucun secret : le cookie n'est pas signé, sa
   // valeur est un identifiant opaque résolu côté serveur (Redis).
   await app.register(fastifyCookie as never);

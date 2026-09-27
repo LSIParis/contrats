@@ -1,0 +1,333 @@
+{
+  "slug": "supervision",
+  "seedVersion": 1,
+  "name": "Supervision et sauvegarde",
+  "description": "Surveillance proactive de l'infrastructure et contrôle quotidien des sauvegardes, sans support utilisateurs.",
+  "target": "Clients disposant d'un informaticien interne ou d'un autre prestataire pour le support, qui veulent une surveillance proactive et la garantie que leurs sauvegardes fonctionnent.",
+  "contractTemplateSlug": "supervision",
+  "acceptanceMode": "DOCUSEAL_SIGNATURE",
+  "providerCountersign": true,
+  "validityDays": 30,
+  "followUps": { "noOpenAfterDays": 3, "noDecisionAfterDays": 7, "beforeExpiryDays": 2 },
+  "vatRatePercent": 20,
+  "currency": "EUR",
+  "tags": ["supervision", "sauvegarde", "infrastructure"],
+  "sections": [
+    {
+      "key": "couverture",
+      "title": "Couverture",
+      "kind": "COVER",
+      "body": "# Proposition de supervision et de sauvegarde\n\n**{{client.raisonSociale}}**\n\nProposition n° {{proposition.numero}} — préparée par {{commercial.nom}}\n\nValable jusqu'au {{proposition.dateExpiration}}"
+    },
+    {
+      "key": "votre-contexte",
+      "title": "Votre contexte",
+      "kind": "CLIENT_INPUT",
+      "aiAssist": true,
+      "guidance": "Décrire l'infrastructure en place : serveurs et hyperviseurs, NAS, pare-feu, réseau, solution de sauvegarde actuelle et son dernier test de restauration, qui assure le support aujourd'hui. Mentionner les incidents récents. Laisser [à compléter] si une information manque."
+    },
+    {
+      "key": "ce-que-nous-surveillons",
+      "title": "Ce que nous surveillons",
+      "kind": "TEXT",
+      "body": "## Ce que nous surveillons\n\n- **Serveurs physiques et virtuels** : disponibilité, processeur, mémoire, espace disque, services critiques, certificats.\n- **Hyperviseurs Proxmox VE** : état des nœuds, du stockage et des machines virtuelles.\n- **Pare-feu pfSense / Netgate** : disponibilité, état des interfaces et des tunnels.\n- **Réseau UniFi** : switchs et bornes, équipements déconnectés.\n- **NAS Synology et QNAP** : volumes, état des disques et indicateurs SMART.\n- **Postes de travail** (en option) : état de santé et alertes, sans support utilisateurs.\n\nLes équipements d'infrastructure sont supervisés par un collecteur installé sur votre site, sans agent sur les équipements eux-mêmes."
+    },
+    {
+      "key": "sauvegardes",
+      "title": "Vos sauvegardes sous contrôle",
+      "kind": "TEXT",
+      "body": "## Vos sauvegardes sous contrôle\n\nUne sauvegarde qui n'a pas été vérifiée n'est pas une sauvegarde.\n\n- Contrôle quotidien du résultat de chaque tâche de sauvegarde.\n- Détection des machines virtuelles qui ne sont couvertes par aucune sauvegarde.\n- Alerte en cas d'échec, de retard ou d'absence de sauvegarde.\n- En option, test de restauration trimestriel avec procès-verbal remis à votre direction."
+    },
+    {
+      "key": "alertes",
+      "title": "Alertes et réaction",
+      "kind": "TEXT",
+      "validationStatus": "TO_VALIDATE",
+      "body": "## Alertes et réaction\n\nChaque alerte est qualifiée par notre équipe avant d'être transmise. Les alertes critiques sont signalées à votre contact désigné ou à votre prestataire dans l'heure ouvrée qui suit leur détection.\n\nSi vous le souhaitez, nous pouvons aussi corriger directement : l'option Intervention corrective réserve un volume d'heures mensuel."
+    },
+    {
+      "key": "reporting",
+      "title": "Reporting",
+      "kind": "TEXT",
+      "body": "## Reporting\n\nChaque mois, vous recevez un rapport synthétique : disponibilité des équipements, incidents détectés et traités, état des sauvegardes, équipements hors support ou en fin de vie à prévoir au budget."
+    },
+    {
+      "key": "investissement",
+      "title": "Votre investissement",
+      "kind": "PRICING",
+      "body": "## Votre investissement\n\nIndiquez le nombre d'équipements à superviser et les options souhaitées : les totaux se mettent à jour immédiatement. Tous les prix sont hors taxes."
+    },
+    {
+      "key": "aller-plus-loin",
+      "title": "Aller plus loin avec l'infogérance",
+      "kind": "TEXT",
+      "optional": true,
+      "body": "## Aller plus loin avec l'infogérance\n\nVous souhaitez aussi confier le support de vos utilisateurs et la gestion de vos postes ? Notre offre d'infogérance reprend l'ensemble de la supervision et y ajoute un support utilisateurs illimité. Demandez-la en commentaire : nous vous adresserons une proposition pré-remplie avec votre parc."
+    },
+    { "key": "conditions", "title": "Conditions", "kind": "LIBRARY", "libraryKey": "conditions-infogerance-supervision" },
+    { "key": "qui-sommes-nous", "title": "Qui sommes-nous", "kind": "LIBRARY", "libraryKey": "qui-sommes-nous" },
+    { "key": "prochaines-etapes", "title": "Prochaines étapes", "kind": "LIBRARY", "libraryKey": "prochaines-etapes" },
+    { "key": "cgv", "title": "Conditions générales de vente", "kind": "TERMS" },
+    { "key": "signature", "title": "Acceptation et signature", "kind": "SIGNATURE" }
+  ],
+  "pricing": {
+    "choices": [
+      {
+        "key": "engagement",
+        "label": "Durée d'engagement",
+        "editableByClient": true,
+        "options": [
+          { "value": "24", "label": "24 mois", "default": true, "commitmentMonths": 24 },
+          { "value": "36", "label": "36 mois", "description": "Tarif préférentiel", "commitmentMonths": 36 }
+        ]
+      }
+    ],
+    "lines": [
+      {
+        "key": "serveur-supervise",
+        "label": "Serveur supervisé (physique ou machine virtuelle)",
+        "kind": "REQUIRED",
+        "unit": "serveur / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbServeurs}}", "min": 0, "max": 100, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 4500, "36": 4000 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-serveur",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "hyperviseur",
+        "label": "Hyperviseur Proxmox VE (par nœud)",
+        "kind": "REQUIRED",
+        "unit": "nœud / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 0, "min": 0, "max": 20, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 3900, "36": 3500 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-hyperviseur",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "nas",
+        "label": "NAS Synology ou QNAP",
+        "kind": "REQUIRED",
+        "unit": "NAS / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 0, "min": 0, "max": 20, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 1900, "36": 1700 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-nas",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "equipement-reseau",
+        "label": "Pare-feu, switch ou borne",
+        "kind": "REQUIRED",
+        "unit": "équipement / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": "{{parc.nbEquipementsReseau}}", "min": 0, "max": 200, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 900, "36": 800 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-reseau",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "poste-supervise",
+        "label": "Poste de travail supervisé (sans support utilisateurs)",
+        "kind": "REQUIRED",
+        "unit": "poste / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 0, "min": 0, "max": 500, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 600, "36": 500 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "setupLineKey": "mes-poste",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "controle-sauvegardes",
+        "label": "Contrôle quotidien des sauvegardes",
+        "description": "Vérification des tâches, détection des machines non couvertes, alertes",
+        "kind": "OPTIONAL",
+        "unit": "forfait / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 4900, "36": 4500 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "sauvegarde-externalisee",
+        "label": "Sauvegarde externalisée hébergée en France",
+        "kind": "OPTIONAL",
+        "unit": "To / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "max": 50, "editableByClient": true },
+        "pricing": { "dependsOn": "engagement", "byChoice": { "24": 2900, "36": 2600 } },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "test-restauration",
+        "label": "Test de restauration trimestriel avec procès-verbal",
+        "kind": "OPTIONAL",
+        "unit": "forfait / trimestre",
+        "recurrence": "QUARTERLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 15000 },
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "intervention-corrective",
+        "label": "Intervention corrective incluse",
+        "description": "Volume d'heures réservé chaque mois pour corriger les anomalies détectées",
+        "kind": "OPTIONAL",
+        "unit": "heure / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 2, "min": 1, "max": 20, "editableByClient": true },
+        "pricing": { "unitPriceCents": 9500 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Taux horaire hors forfait LSI SAS, août 2026",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "mes-serveur",
+        "label": "Mise en service — serveur",
+        "kind": "SETUP",
+        "unit": "serveur",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "serveur-supervise", "editableByClient": false },
+        "pricing": { "unitPriceCents": 15000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "mes-hyperviseur",
+        "label": "Mise en service — hyperviseur",
+        "kind": "SETUP",
+        "unit": "nœud",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "hyperviseur", "editableByClient": false },
+        "pricing": { "unitPriceCents": 15000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026 (tarif serveur)"
+      },
+      {
+        "key": "mes-nas",
+        "label": "Mise en service — NAS",
+        "kind": "SETUP",
+        "unit": "NAS",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "nas", "editableByClient": false },
+        "pricing": { "unitPriceCents": 5000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026 (tarif équipement)"
+      },
+      {
+        "key": "mes-reseau",
+        "label": "Mise en service — équipement réseau",
+        "kind": "SETUP",
+        "unit": "équipement",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "equipement-reseau", "editableByClient": false },
+        "pricing": { "unitPriceCents": 5000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "mes-poste",
+        "label": "Mise en service — poste",
+        "kind": "SETUP",
+        "unit": "poste",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 0, "min": 0, "linkedTo": "poste-supervise", "editableByClient": false },
+        "pricing": { "unitPriceCents": 3500 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre monitoring et support illimité LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "hors-forfait-distance",
+        "label": "Intervention hors forfait, à distance",
+        "kind": "INFO",
+        "unit": "heure",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 9500 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      },
+      {
+        "key": "hors-forfait-site",
+        "label": "Intervention sur site (hors déplacement)",
+        "kind": "INFO",
+        "unit": "heure",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 11000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Grille maintenance Microsoft 365 LSI SAS, août 2026"
+      }
+    ],
+    "rules": [
+      {
+        "type": "AT_LEAST_ONE",
+        "key": "au-moins-un-equipement",
+        "lines": ["serveur-supervise", "hyperviseur", "nas", "equipement-reseau", "poste-supervise"],
+        "message": "Indiquez au moins un équipement à superviser."
+      },
+      {
+        "type": "REQUIRED_IF_ANY",
+        "key": "controle-sauvegardes-obligatoire",
+        "line": "controle-sauvegardes",
+        "ifAny": ["serveur-supervise", "hyperviseur", "nas"],
+        "message": "Le contrôle des sauvegardes est inclus dès qu'un serveur, un hyperviseur ou un NAS est supervisé."
+      },
+      {
+        "type": "MINIMUM_MONTHLY",
+        "key": "minimum-mensuel",
+        "amountCents": 9900,
+        "label": "Complément minimum de facturation",
+        "priceStatus": "TO_VALIDATE",
+        "priceSource": "Valeur indicative LSI-Maintenance, septembre 2026, à valider"
+      }
+    ]
+  },
+  "controlCases": [
+    {
+      "name": "PME type — 2 serveurs, 1 nœud Proxmox, 1 NAS, 3 équipements réseau, 2 To externalisés, test trimestriel — 24 mois",
+      "choices": { "engagement": "24" },
+      "quantities": { "serveur-supervise": 2, "hyperviseur": 1, "nas": 1, "equipement-reseau": 3, "poste-supervise": 0, "sauvegarde-externalisee": 2 },
+      "selectedOptions": ["sauvegarde-externalisee", "test-restauration"],
+      "expected": { "monthlyCents": 28200, "oneTimeCents": 65000, "commitmentTotalCents": 796800 }
+    },
+    {
+      "name": "Très petit périmètre sous le minimum — 1 NAS, 36 mois",
+      "choices": { "engagement": "36" },
+      "quantities": { "serveur-supervise": 0, "hyperviseur": 0, "nas": 1, "equipement-reseau": 0, "poste-supervise": 0 },
+      "selectedOptions": [],
+      "expected": { "monthlyCents": 9900, "oneTimeCents": 5000, "commitmentTotalCents": 356400 }
+    }
+  ]
+}

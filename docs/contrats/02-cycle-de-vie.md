@@ -170,3 +170,27 @@ chaque contrat actif les `Deadline` : `PERIOD_END`, `NOTICE_DEADLINE`,
 (propriétaire du contrat, admins) et vers les webhooks sortants
 (`contract.renewal_due`). Une alerte est unique par (échéance, seuil) :
 contrainte en base, pas un `if`.
+
+## 7. Propositions commerciales et origine `PROPOSAL` (lot 9)
+
+- La proposition a sa **propre** machine à états
+  (`packages/domain/src/proposal/state-machine.ts`, 13 états, testée
+  exhaustivement) : `11-propositions.md` §3. Même principe que le contrat :
+  machine pure, un seul chemin d'écriture (`persistProposalTransition`),
+  trigger `proposals_status_transition` → `proposal_lifecycle_events` + audit
+  chaîné, événements sortants `proposal.*`.
+- **Naissance d'un contrat** : une proposition SIGNÉE est convertie en contrat
+  `DRAFT`, `origin = PROPOSAL`, `proposal_id` renseigné (événement
+  `CREATE_FROM_PROPOSAL` dans `lifecycle_events`) ; le contrat suit ensuite
+  **ce** cycle de vie (revue, envoi, signature, activation). Avec l'option
+  `signedProposalIsContract` (désactivée par défaut, à valider par un juriste),
+  le contrat est créé directement `ACTIVE` (`signed_via_proposal`,
+  signatureMode dérivé `PROPOSAL_SIGNED`).
+- **`contrats.proposals.required`** : quand il est actif, `POST /v1/contracts`
+  refuse une création directe (422 `PROPOSAL_REQUIRED`) sauf par un
+  administrateur avec motif (`directCreationReason`, audité
+  `contract.direct_creation`). Import (`LEGACY_IMPORT`), avenant et
+  renouvellement ne sont pas concernés.
+- `signatureMode` (dérivé, §3.2 de `00-architecture.md`) :
+  `EXTERNAL_WET_SIGNATURE` si import, `PROPOSAL_SIGNED` si
+  `signed_via_proposal`, `ELECTRONIC_DOCUSEAL` sinon.

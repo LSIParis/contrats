@@ -7,7 +7,7 @@ export type Contract = {
   title: string;
   type: "MAIN" | "AMENDMENT";
   status: "DRAFT" | "IN_REVIEW" | "CHANGES_REQUESTED" | "APPROVED" | "SENT_TO_CLIENT" | "IN_NEGOTIATION" | "ACCEPTED" | "PENDING_SIGNATURE" | "PARTIALLY_SIGNED" | "SIGNATURE_EXPIRED" | "SIGNED" | "ACTIVE" | "RENEWAL_DUE" | "TERMINATION_PENDING" | "EXPIRED" | "TERMINATED" | "RENEWED" | "CANCELLED" | "DECLINED" | "IMPORTED_PENDING_VALIDATION";
-  origin: "NATIVE" | "IMPORTED" | "AI";
+  origin: "NATIVE" | "IMPORTED" | "AI" | "PROPOSAL";
   category: string;
   customer: {
     id: string;
@@ -34,7 +34,7 @@ export type ContractPage = {
     title: string;
     type: "MAIN" | "AMENDMENT";
     status: "DRAFT" | "IN_REVIEW" | "CHANGES_REQUESTED" | "APPROVED" | "SENT_TO_CLIENT" | "IN_NEGOTIATION" | "ACCEPTED" | "PENDING_SIGNATURE" | "PARTIALLY_SIGNED" | "SIGNATURE_EXPIRED" | "SIGNED" | "ACTIVE" | "RENEWAL_DUE" | "TERMINATION_PENDING" | "EXPIRED" | "TERMINATED" | "RENEWED" | "CANCELLED" | "DECLINED" | "IMPORTED_PENDING_VALIDATION";
-    origin: "NATIVE" | "IMPORTED" | "AI";
+    origin: "NATIVE" | "IMPORTED" | "AI" | "PROPOSAL";
     category: string;
     customer: {
       id: string;
@@ -130,7 +130,7 @@ export type Webhook = {
 export type CreateWebhookRequest = {
   url: string;
   description?: string;
-  eventTypes: Array<"contract.activated" | "contract.signed" | "contract.renewal_due" | "contract.renewed" | "contract.terminated" | "pricing.revised">;
+  eventTypes: Array<"contract.activated" | "contract.signed" | "contract.renewal_due" | "contract.renewed" | "contract.terminated" | "pricing.revised" | "proposal.sent" | "proposal.viewed" | "proposal.accepted" | "proposal.signed" | "proposal.declined" | "proposal.expired" | "proposal.converted">;
 };
 
 /** Erreur RFC 9457 (`application/problem+json`). */

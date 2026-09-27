@@ -114,6 +114,21 @@ import { DraftingProviderRegistry } from './ai-drafting/drafting-provider-regist
 import { CONTRACT_DRAFTER } from './ai-drafting/contract-drafter.port.js';
 import { ClaudeContractDrafter } from './ai-drafting/claude-contract-drafter.js';
 import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-drafter.js';
+// Lot 9 — propositions commerciales (docs/contrats/11-propositions.md).
+import { ProposalsController } from './proposals/proposals.controller.js';
+import { ProposalAdminController } from './proposals/proposal-admin.controller.js';
+import { ProposalPublicController } from './proposals/proposal-public.controller.js';
+import { ProposalsService } from './proposals/proposals.service.js';
+import { ProposalSendService } from './proposals/proposal-send.service.js';
+import { ProposalPublicService } from './proposals/proposal-public.service.js';
+import { ProposalAdminService } from './proposals/proposal-admin.service.js';
+import { ProposalDocumentsService } from './proposals/proposal-documents.service.js';
+import { ProposalSignatureService } from './proposals/proposal-signature.service.js';
+import { ProposalConversionService } from './proposals/proposal-conversion.service.js';
+import { ProposalNotifier } from './proposals/proposal-notifier.service.js';
+import { ProposalJobsService } from './proposals/proposal-jobs.service.js';
+import { PublicRateLimiter } from './proposals/public-rate-limit.js';
+import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from './proposals/proposal-jobs.port.js';
 
 @Module({
   imports: [
@@ -167,9 +182,28 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     AiDraftingController,
     ContractAiController,
     WebhooksAdminController,
+    ProposalsController,
+    ProposalAdminController,
+    ProposalPublicController,
   ],
   providers: [
     TenantConfigService,
+    // Lot 9 — propositions commerciales. File de jobs propre (capture des
+    // preuves, conversion) : BullMQ si JOBS_ENABLED, sinon no-op (tests).
+    ProposalsService,
+    ProposalSendService,
+    ProposalPublicService,
+    ProposalAdminService,
+    ProposalDocumentsService,
+    ProposalSignatureService,
+    ProposalConversionService,
+    ProposalNotifier,
+    ProposalJobsService,
+    PublicRateLimiter,
+    {
+      provide: PROPOSAL_JOB_QUEUE,
+      useClass: process.env.JOBS_ENABLED === 'true' ? BullMqProposalJobQueue : NoOpProposalJobQueue,
+    },
     // Webhooks sortants (lot 5) : administration + livraison (job minute).
     WebhooksAdminService,
     WebhookDeliveryService,

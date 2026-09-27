@@ -127,3 +127,48 @@ privé — c'est un choix d'exploitation à consigner.
 ## 5. Journal d'audit
 
 ## 6. Registre des traitements, conservation, purge, export
+
+## 7. Propositions commerciales : page publique, suivi de lecture (lot 9)
+
+### 7.1 Accès sans compte
+
+- Lien personnel par destinataire : jeton de **256 bits** ; seul son
+  **SHA-256** est stocké ; résolution par une fonction `SECURITY DEFINER`
+  bornée (identifiants seuls) ; lecture ensuite **confinée en base** à la
+  proposition du lien (acteur CLIENT sans portefeuille + GUC `app.proposal_id`,
+  politiques de lecture seule) — un jeton ne donne accès à aucune donnée d'une
+  autre proposition, d'un autre client ou d'un autre tenant (testé en base et
+  par l'API).
+- Expiration (échéance + délai de grâce), révocation à chaque renvoi, relance
+  ou nouvelle version ; **code à usage unique** par e-mail (haché, 10 min,
+  5 essais) pour les propositions sensibles et l'acceptation par clic ;
+  limitation de débit par lien et par IP ; `noindex`, `no-store`,
+  `no-referrer`, CSP stricte sans ressource tierce.
+
+### 7.2 Suivi de lecture — conformité
+
+Le suivi porte sur des **personnes physiques** (destinataires chez le client).
+
+| Point | Mesure |
+|---|---|
+| Finalité | suivi commercial de la proposition adressée (intérêt légitime de LSI-Maintenance, relation précontractuelle) |
+| Information | **bandeau** permanent sur la page (ce qui est enregistré, pourquoi, durée) |
+| Minimisation | ouverture, temps par section, téléchargement PDF, nouveau navigateur ; **IP tronquée** (/24, /48) ; agent utilisateur tronqué (200 car.) ; navigateur identifié par une empreinte pseudonyme liée au lien, jamais réutilisable ailleurs |
+| Aucun tiers | **aucun traceur tiers ni outil d'analyse externe** ; balise d'envoi vers l'application elle-même |
+| Conservation | détail purgé `proposals.trackingRetentionDays` (90 j) après décision ou expiration (job quotidien `proposals-purge`, `app_purge_proposal_view_events` bornée au tenant) ; **agrégats** (compteurs par section) conservés avec la proposition |
+| Droits | accès / effacement via l'administrateur (les événements sont rattachés au destinataire) |
+
+### 7.3 Preuve de l'acceptation
+
+L'acceptation (clic ou DocuSeal) conserve nom, fonction, e-mail (vérifié par
+code pour le clic), horodatage, **IP complète**, agent utilisateur, empreinte
+de la version et PricingSnapshot (empreinte SHA-256) : finalité **probatoire**,
+distincte du suivi, conservée avec le contrat (prescription).
+
+### 7.4 Registre des traitements — entrées ajoutées
+
+| Traitement | Personnes | Données | Base légale | Durée |
+|---|---|---|---|---|
+| Propositions commerciales | contacts des prospects et clients | identité, fonction, e-mail, échanges (questions / réponses), configuration choisie | mesures précontractuelles | durée de la relation + prescription ; proposition non signée : 3 ans après la dernière activité (à valider) |
+| Suivi de lecture des propositions | destinataires | événements de lecture, IP tronquée, empreinte de navigateur | intérêt légitime | détail : `proposals.trackingRetentionDays` après décision / expiration ; agrégats avec la proposition |
+| Acceptation et signature des propositions | signataires | identité, fonction, e-mail vérifié, IP, horodatage, preuves DocuSeal | exécution du contrat / preuve | durée du contrat + prescription (`retention.yearsAfterEnd`) |

@@ -696,3 +696,45 @@ sur une version sans fin, l'anniversaire suivant (V2-H24) → échéance
 | V2-H27 | Le catalogue de règles est l'état courant : modifier une grille modifie le prix des lignes RULE qui la citent, à toute date. Figer = ligne MANUAL ou une grille par millésime. | versionner le catalogue |
 | V2-H28 | Une correction de valeur d'indice vaut rétroactivement (erratum), y compris pour rejouer une date passée. | rejouer « tel que connu à la date » |
 | V2-H29 | Une dérogation EN ATTENTE n'est jamais appliquée, même si l'écart à la date retombe sous le seuil. | la transmettre au moteur |
+
+## 18. Récurrence trimestrielle et tableau de prix des propositions (lot 9)
+
+### 18.1 `QUARTERLY`
+
+`Recurrence` accepte `QUARTERLY` (prestations trimestrielles : test de
+restauration avec procès-verbal). Totaux : `quarterlyLinesCents` ;
+`monthlyRecurringCents` = mensuel + arrondi(trimestriel / 3 + annuel / 12) ;
+`annualRecurringCents` = mensuel × 12 + trimestriel × 4 + annuel. Sans ligne
+trimestrielle, les résultats sont **identiques** à ceux d'avant (tests
+existants inchangés). `pricing_lines.recurrence` accepte la valeur
+(migration 30). Hypothèse V2-H48.
+
+### 18.2 `quoteProposal` (`src/proposal.ts`)
+
+Le tableau de prix d'une proposition (forme de l'annexe C) est **configuré**
+(inclusions, quantités, bornes, règles de dépendance — aucun montant) puis
+**calculé par `priceAt`** : chaque ligne retenue devient une `PricingLine`
+`MANUAL` (prix unitaire du modèle, centimes → euros), une règle
+`DISCOUNT_PERCENT` une ligne `DISCOUNT` (pourcentage sur les lignes ciblées,
+arrondi du moteur), le minimum mensuel une ligne `FLAT_MONTHLY` de complément
+ajoutée puis recalculée (V2-H49). Ventilation par récurrence avec
+`computeTotals` ; total sur la durée = mensuel × mois + trimestriel ×
+(mois / 3) + annuel × (mois / 12), TVA = somme des TVA de période (V2-H50).
+
+Le **barème produit** (`engineSchedule`) est figé à l'acceptation
+(`pricing_snapshots`) puis écrit **tel quel** comme version 1 du barème du
+contrat (`11-propositions.md` §10) : prix affiché = prix figé = barème initial.
+
+### 18.3 Même résultat que la référence de l'annexe C
+
+`packages/persistence/test/seed/proposal-templates.engine.test.ts` confronte
+`quoteProposal` aux cas de contrôle chiffrés des quatre modèles livrés
+(`runControlCases` vide), ainsi qu'aux choix présélectionnés, erreurs et
+éléments « à valider » de la spécification `reference-pricing.ts`.
+
+Exemples (brief §12.11) : infogérance 50 postes, 2 serveurs, 5 équipements
+réseau → **1 515,00 € HT / mois** sur 24 mois (36 360,00 €), **1 362,50 €**
+sur 36 mois (49 050,00 €), **2 300,00 €** de mise en service ; RSSI TPE-PME +
+DPO → (1 200 + 350) × 0,90 = **1 395,00 €** ; ETI + DPO → **6 885,00 €** ;
+sauvegarde en ligne 2 postes + 1 To sur 12 mois → 45,00 € calculés,
+**49,00 €** après minimum.

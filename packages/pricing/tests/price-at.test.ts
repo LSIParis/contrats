@@ -75,6 +75,33 @@ describe('priceAt — types de lignes (mode MANUAL)', () => {
     });
   });
 
+  test('récurrence TRIMESTRIELLE (lot 9) : ventilée à part, normalisée au mois et à l’année', () => {
+    const r = priceAt(
+      input([
+        line({ id: 'infog', kind: 'FLAT_MONTHLY', unitPrice: '490' }),
+        line({ id: 'test-resto', kind: 'UNIT', recurrence: 'QUARTERLY', unitPrice: '150' }),
+        line({ id: 'sauvegarde', kind: 'FLAT_YEARLY', unitPrice: '1000' }),
+      ]),
+      '2026-01-15',
+    );
+    expect(lineOf(r, 'test-resto').recurrence).toBe('QUARTERLY');
+    expect(r.totals).toMatchObject({
+      htCents: 164000n,
+      monthlyLinesCents: 49000n,
+      quarterlyLinesCents: 15000n,
+      yearlyLinesCents: 100000n,
+      oneOffCents: 0n,
+      // 490 + 150/3 + 1000/12 = 490 + 50 + 83.333… → 623.33
+      monthlyRecurringCents: 62333n,
+      // 490 × 12 + 150 × 4 + 1000
+      annualRecurringCents: 748000n,
+    });
+    // Un forfait mensuel reste mensuel : la récurrence imposée ne se contredit pas.
+    expect(codeOf(() => priceAt(input([line({ id: 'x', kind: 'FLAT_MONTHLY', recurrence: 'QUARTERLY', unitPrice: '1' })]), '2026-01-15'))).toBe(
+      'INVALID_LINE',
+    );
+  });
+
   test('HOURLY : 1,5 h × 80 € ; HOUR_PACK : taux horaire effectif tracé', () => {
     const r = priceAt(
       input([
