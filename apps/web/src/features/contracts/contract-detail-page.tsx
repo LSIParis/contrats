@@ -29,6 +29,8 @@ import { ContractContentPanel } from '../structure/contract-content-panel.js';
 import { AnnexesPanel } from '../structure/annexes-panel.js';
 import { AiReviewBanner } from '../structure/ai-review.js';
 import { allows } from '../../lib/permissions.js';
+import { NegotiationActions } from '../negotiation/negotiation-actions.js';
+import { AcceptancesBlock } from '../negotiation/acceptances-block.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
@@ -184,6 +186,12 @@ export function ContractDetailPage() {
         currentUserId={me.data?.userId ?? ''}
         approval={d.approval}
       />
+      <NegotiationActions
+        contractId={contract.id}
+        currentVersionId={contract.currentVersionId}
+        allowedActions={allowedActions}
+        me={me.data}
+      />
       <TerminateContract
         contractId={contract.id}
         customerName={customer.name}
@@ -198,6 +206,7 @@ export function ContractDetailPage() {
         renewal={d.renewal}
         predecessor={d.predecessor}
       />
+      {!imported && <AcceptancesBlock contractId={contract.id} currentVersionId={contract.currentVersionId} />}
     </div>
   );
 
