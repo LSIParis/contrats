@@ -52,7 +52,7 @@ export const SETTINGS = {
   /** Conservation après la fin du contrat, en années (prescription commerciale, art. L110-4 C. com.). */
   'retention.yearsAfterEnd': { schema: z.number().int().min(1).max(30), default: 5 },
 
-  // --- Lot 9 : propositions commerciales (11-propositions.md, hypothèses V2-H54 à V2-H60) ---
+  // --- Lot 9 : propositions commerciales (11-propositions.md, hypothèses V2-H55, V2-H56, V2-H58 à V2-H60) ---
   /** Revue interne obligatoire si une remise appliquée dépasse ce pourcentage. */
   'proposals.reviewDiscountPercent': { schema: z.number().min(0).max(100), default: 10 },
   /** Revue interne obligatoire si le total HT sur la durée d'engagement dépasse ce montant (centimes) ; null = jamais. */

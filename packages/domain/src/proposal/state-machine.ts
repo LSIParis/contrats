@@ -53,7 +53,7 @@ const TRANSITIONS: Record<ProposalStatus, readonly ProposalEventType[]> = {
   VIEWED: ['OPEN_DISCUSSION', 'ACCEPT', ...OPEN],
   IN_DISCUSSION: ['CLOSE_DISCUSSION', 'ACCEPT', ...OPEN],
   // Acceptée mais pas encore signée : la version n'est pas signée, une
-  // nouvelle version peut encore la remplacer (V2-H44).
+  // nouvelle version peut encore la remplacer (V2-H42).
   ACCEPTED: ['START_SIGNATURE', 'COMPLETE_CLICK_ACCEPT', 'REVISE'],
   // Pendant la signature, rien ne bouge côté LSI : seul DocuSeal conclut.
   PENDING_SIGNATURE: ['SIGNATURE_COMPLETED', 'SIGNATURE_DECLINED', 'SIGNATURE_EXPIRED'],
