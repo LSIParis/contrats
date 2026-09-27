@@ -62,6 +62,7 @@ export type SectionKind = 'COVER' | 'LIBRARY' | 'TEXT' | 'CLIENT_INPUT' | 'PRICI
 export interface Section {
   key: string; title: string; kind: SectionKind; position?: number; optional: boolean; excluded: boolean;
   validationStatus?: 'VALIDATED' | 'TO_VALIDATE'; libraryItemKey: string | null; guidance: string | null; aiPendingReview?: boolean;
+  aiSources?: { url: string; title?: string }[] | null;
   blocks: Block[];
 }
 
@@ -157,6 +158,7 @@ export const proposalsApi = {
   reply: (pid: string, b: { body: string; parentId?: string; sectionKey?: string }) => apiPost<ProposalComment>(`${id(pid)}/comments`, b),
   preview: (pid: string) => apiGet<{ html: string }>(`${id(pid)}/preview`),
   pdfUrl: (pid: string) => `${id(pid)}/pdf`,
+  validateAiSection: (pid: string, key: string) => apiPost<ProposalDetail>(`${id(pid)}/sections/${encodeURIComponent(key)}/ai-validate`, {}),
 };
 
 // --- Administration ------------------------------------------------------------

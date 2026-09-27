@@ -10,6 +10,8 @@ import { ErrorNote } from '../../ui/region-card.js';
 import { Select } from '../../ui/select.js';
 import { useToast } from '../../ui/toast.js';
 import { LibraryPicker } from './library-picker.js';
+import { AiDraftButton, AiRephrase, ProposalAiContext, useProposalAiState } from './proposal-ai.js';
+import { AiSources } from '../ai/ai-notice.js';
 import { proposalsApi, sha256Hex, type Block, type BlockType, type LibraryItem, type ProposalDetail, type Section } from './proposal-api.js';
 import { BLOCK_TYPE_LABELS, findMergeTags, MERGE_TAGS, SECTION_KIND_LABELS } from './proposal-labels.js';
 
@@ -129,6 +131,14 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
       toast.show('Document Word importé : sections de texte remplacées.', 'success');
     },
   });
+  const ai = useProposalAiState(pid, editable);
+  const validateAi = useMutation({
+    mutationFn: (key: string) => proposalsApi.validateAiSection(pid, key),
+    onSuccess: (d) => {
+      onDetail(d);
+      toast.show('Section relue et validée.', 'success');
+    },
+  });
   const validateSection = useMutation({
     mutationFn: (key: string) => proposalsApi.validateSection(pid, key),
     onSuccess: (d) => {
@@ -151,6 +161,7 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
   const serverSection = (key: string) => detail.version.sections.find((s) => s.key === key);
 
   return (
+    <ProposalAiContext.Provider value={ai}>
     <section aria-label="Sections de la proposition" className="flex flex-col gap-4">
       {editable ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -158,6 +169,10 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
             Ajouter une section de texte
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setPicker(true)}>Ajouter depuis la bibliothèque</Button>
+          <AiDraftButton
+            disabledReason={dirty ? 'Enregistrez ou annulez les modifications en cours avant une rédaction par l’IA.' : null}
+            onDone={(d) => { setDirty(false); onDetail(d); }}
+          />
           <label className="inline-flex cursor-pointer items-center gap-2 text-13 text-primary">
             <span>Importer un document Word (.docx)</span>
             <input
@@ -183,7 +198,7 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
             : 'Lecture seule.'}
         </p>
       )}
-      <ErrorNote>{errorMessage(save.error) ?? errorMessage(importDocx.error) ?? errorMessage(validateSection.error)}</ErrorNote>
+      <ErrorNote>{errorMessage(save.error) ?? errorMessage(importDocx.error) ?? errorMessage(validateSection.error) ?? errorMessage(validateAi.error)}</ErrorNote>
       {importDocx.isPending && <p role="status" className="text-13 text-ink-muted">Import du document…</p>}
 
       <ol className="flex flex-col gap-3">
@@ -206,7 +221,6 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
                 {locked && <Badge tone="muted">Obligatoire</Badge>}
                 {s.optional && <Badge tone="info">Facultative</Badge>}
                 {toValidate && <Badge tone="warn">À valider</Badge>}
-                {server?.aiPendingReview && <Badge tone="warn">Généré par IA — à relire</Badge>}
                 <span className="flex-1" />
                 {canValidate && toValidate && (
                   <Button size="sm" variant="warn" disabled={validateSection.isPending} onClick={() => validateSection.mutate(s.key)}>
@@ -240,6 +254,16 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
               )}
               {!editable && s.optional && s.excluded && <p className="text-13 text-ink-faint">Section exclue de la proposition.</p>}
 
+              {server?.aiPendingReview && (
+                <section aria-label={`Généré par IA — ${s.title}`} className="flex flex-col gap-2 rounded border border-warn bg-warn-bg px-3 py-2 text-13 text-warn">
+                  <p className="font-button">Généré par IA — à relire</p>
+                  <p>Relisez et corrigez le texte, puis validez la section : tant qu’elle ne l’est pas, la proposition ne peut être ni prête ni envoyée.</p>
+                  <AiSources sources={(server.aiSources ?? []).map((x) => ({ url: x.url, ...(x.title ? { title: x.title } : {}) }))} />
+                  {draft && allows(me, 'proposals.write') && (
+                    <div><Button size="sm" variant="warn" disabled={validateAi.isPending} onClick={() => validateAi.mutate(s.key)}>Valider cette section</Button></div>
+                  )}
+                </section>
+              )}
               {s.guidance && <p className="rounded border border-line bg-slate-50 px-3 py-2 text-13 text-ink-muted"><strong>Consigne (jamais envoyée) :</strong> {s.guidance}</p>}
               {issuesOf(s.key).length > 0 && (
                 <ul className="list-disc pl-5 text-13 text-warn">{issuesOf(s.key).map((iss, n) => <li key={n}>{iss.message}</li>)}</ul>
@@ -267,6 +291,7 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
 
       {picker && <LibraryPicker onClose={() => setPicker(false)} onPick={(item) => void addFromLibrary(item)} />}
     </section>
+    </ProposalAiContext.Provider>
   );
 }
 
@@ -411,6 +436,7 @@ function MarkdownField({ label, tagLabel, value, editable, issues, onChange }: {
             </Select>
             <Button size="sm" variant="ghost" aria-label={`Insérer la balise — ${tagLabel}`} onClick={insertTag}>Insérer la balise</Button>
           </div>
+          <AiRephrase label={tagLabel} text={value} onReplace={onChange} />
         </>
       ) : (
         <div className="whitespace-pre-wrap rounded border border-line bg-slate-50 px-3 py-2 text-13">{value || <span className="text-ink-faint">(vide)</span>}</div>
