@@ -180,6 +180,24 @@ enum SignatureRequestStatus {
   FAILED
 }
 
+/// Lot 4 (migration 24) : voie de création de la soumission DocuSeal.
+enum SignatureMode {
+  PDF
+  TEMPLATE
+}
+
+/// Remise : lien par e-mail ou signature intégrée (embed_src).
+enum SignatureDelivery {
+  EMAIL
+  EMBEDDED
+}
+
+/// Lien entre l'empreinte envoyée et celle du document signé rapatrié.
+enum HashRelation {
+  IDENTICAL
+  SIGNED_OVERLAY
+}
+
 enum SignatureEventType {
   FORM_VIEWED
   FORM_STARTED
@@ -803,6 +821,16 @@ model SignatureRequest {
 
   lastSyncedAt DateTime? @map("last_synced_at")
   errorMessage String?   @map("error_message")
+
+  // --- Lot 4 (migration 24) ----------------------------------------------
+  mode             SignatureMode     @default(PDF)
+  delivery         SignatureDelivery @default(EMAIL)
+  /// CLIENT_THEN_LSI | LSI_THEN_CLIENT | PARALLEL | AS_DEFINED (CHECK en base).
+  signingOrder     String?           @map("signing_order")
+  /// Empreinte du PDF effectivement ENVOYÉ, recopiée ici.
+  sentPdfSha256    String?           @map("sent_pdf_sha256") @db.Char(64)
+  hashRelation     HashRelation?     @map("hash_relation")
+  auditTrailSha256 String?           @map("audit_trail_sha256") @db.Char(64)
 
   createdAt       DateTime @map("created_at")
   updatedAt       DateTime @map("updated_at")

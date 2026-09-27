@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { withScope, type Scope } from '@lsi/persistence';
+import { uuidv7, withScope, type Scope } from '@lsi/persistence';
 import { linkDocumentHashes, type DocumentHashLink, type ESignatureProvider } from '@lsi/domain';
 import { ESIGNATURE_PROVIDER } from './provider.token.js';
 import { DOCUMENT_STORAGE, type DocumentStorage } from '../documents/document-storage.port.js';
@@ -48,20 +48,20 @@ export class ProofCaptureService {
     // Tout en OCTETS : le PDF fusionné (documents?merge=true) fait foi comme
     // « document signé », le journal d'audit l'accompagne. Aucune URL du
     // provider n'est conservée.
-    const docs = await this.provider.downloadCompletedDocuments(sr.providerSubmissionId);
+    const docs0 = await this.provider.downloadCompletedDocuments(sr.providerSubmissionId);
     const objScope = { tenantId: sr.tenantId, customerId: sr.customerId };
     const prefix = `t/${sr.tenantId}/c/${sr.customerId}/contracts/${sr.contractId}/signed/${sr.id}`;
 
     const signedKey = `${prefix}/document.pdf`;
-    const signedHash = sha256(docs.mergedPdf);
-    await this.storage.put(signedKey, docs.mergedPdf, objScope, 'application/pdf');
+    const signedHash = sha256(docs0.mergedPdf);
+    await this.storage.put(signedKey, docs0.mergedPdf, objScope, 'application/pdf');
 
     let auditKey: string | null = null;
     let auditHash: string | null = null;
-    if (docs.auditLogPdf) {
+    if (docs0.auditLogPdf) {
       auditKey = `${prefix}/audit-trail.pdf`;
-      auditHash = sha256(docs.auditLogPdf);
-      await this.storage.put(auditKey, docs.auditLogPdf, objScope, 'application/pdf');
+      auditHash = sha256(docs0.auditLogPdf);
+      await this.storage.put(auditKey, docs0.auditLogPdf, objScope, 'application/pdf');
     }
 
     // Lien d'empreintes envoyé ↔ signé (06-docuseal.md §Empreintes). DocuSeal
@@ -79,18 +79,44 @@ export class ProofCaptureService {
       this.log.error(`empreinte envoyée inexploitable (version ${sr.versionId}) : ${(e as Error).message}`);
     }
 
-    // Étape 3 : enregistrer les preuves (dans le scope).
-    await withScope(scope, (tx) =>
-      tx.signatureRequest.update({
+    // Étape 3 : enregistrer les preuves (dans le scope). Les deux empreintes
+    // (envoyée, signée) et leur relation sont conservées (06-docuseal §Empreintes) ;
+    // les fichiers rejoignent le référentiel des documents en écriture unique,
+    // le PDF signé DÉRIVANT du PDF figé envoyé.
+    await withScope(scope, async (tx) => {
+      await tx.signatureRequest.update({
         where: { id: signatureRequestId },
         data: {
           signedPdfObjectKey: signedKey,
           signedPdfSha256: signedHash,
           auditTrailObjectKey: auditKey,
+          auditTrailSha256: auditHash,
+          hashRelation: link?.relation ?? null,
+          sentPdfSha256: sr.sentPdfSha256 ?? link?.sentSha256 ?? null,
           updatedAt: now,
         },
-      }),
-    );
+      });
+      const sent = version?.pdfSha256
+        ? await tx.storedDocument.findFirst({
+            where: { contractId: sr.contractId, kind: 'CONTRACT_PDF', sha256: version.pdfSha256 },
+            select: { id: true },
+          })
+        : null;
+      const docs = [
+        { kind: 'SIGNED_PDF' as const, key: signedKey, sha: signedHash, size: docs0.mergedPdf.length, name: 'document-signe.pdf', derived: sent?.id ?? null },
+        ...(auditKey && auditHash && docs0.auditLogPdf
+          ? [{ kind: 'SIGNATURE_AUDIT_TRAIL' as const, key: auditKey, sha: auditHash, size: docs0.auditLogPdf.length, name: 'journal-signature.pdf', derived: null }]
+          : []),
+      ];
+      await tx.storedDocument.createMany({
+        data: docs.map((d) => ({
+          id: uuidv7(), tenantId: sr.tenantId, customerId: sr.customerId, contractId: sr.contractId,
+          kind: d.kind, origin: 'DOCUSEAL' as const, objectKey: d.key, filename: d.name, contentType: 'application/pdf',
+          sizeBytes: BigInt(d.size), sha256: d.sha, derivedFromId: d.derived, createdAt: now,
+        })),
+        skipDuplicates: true,
+      });
+    });
 
     this.log.log(
       `preuves capturées pour signature_request=${signatureRequestId} ` +
@@ -98,9 +124,6 @@ export class ProofCaptureService {
         `relation=${link?.relation ?? 'INCONNUE'}, audit=${auditHash?.slice(0, 12) ?? '∅'})`,
     );
     // audit_log est écrit par l'appelant, qui connaît l'acteur.
-    // TODO(schéma) : persister `link` (sentSha256, relation) et auditHash
-    // quand les colonnes existeront (06-docuseal.md §Empreintes) — la
-    // migration relève du lot schéma, pas de cet adaptateur.
     return true;
   }
 }

@@ -9,6 +9,7 @@ import { SessionService } from '../../src/auth/session.service.js';
 import { ESIGNATURE_PROVIDER } from '../../src/signature/provider.token.js';
 import { DOCUMENT_RENDERER } from '../../src/documents/renderer.token.js';
 import { FakeProvider, FakeRenderer } from '../support/fakes.js';
+import { DocusealReadiness } from '../../src/signature/docuseal-readiness.service.js';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 import { internalScope, adminScope, withScope, uuidv7 } from '@lsi/persistence';
 
@@ -38,6 +39,10 @@ beforeAll(async () => {
   app = await createTestApp(mod);
 
   fx = await seedTwoCustomers();
+  // Signature électronique activée pour ce tenant (désactivée par défaut, brief).
+  await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+    tx.tenantFeatureFlag.create({ data: { tenantId: fx.tenantId, key: 'contrats.docuseal.enabled', enabled: true, updatedAt: new Date() } }),
+  );
 
   await app.get(SessionService).put({
     sessionId: SESS_AM_A,
@@ -292,12 +297,33 @@ describe('§11.3 — contenu de la demande', () => {
     expect(cmd.submitters.map((s) => s.externalId).sort()).toEqual(signers.map((s) => s.id).sort());
   });
 
-  test('l’ordre est préservé : LSI d’abord, client ensuite (RM-13)', async () => {
+  test('ordre par défaut : le client, puis LSI-Maintenance (brief §7, paramètre du tenant)', async () => {
     await send(contractId);
     const cmd = provider.calls[0]!;
-    expect(cmd.order).toBe('preserved');
-    expect(cmd.submitters[0]!.party).toBe('LSI');
-    expect(cmd.submitters[1]!.party).toBe('CLIENT');
+    expect(cmd.signingOrder).toBe('CLIENT_THEN_LSI');
+    const sr = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.signatureRequest.findFirst({ where: { contractId }, orderBy: { createdAt: 'desc' } }));
+    expect(sr).toMatchObject({ signingOrder: 'CLIENT_THEN_LSI', delivery: 'EMAIL', mode: 'PDF' });
+  });
+
+  test('ordre et remise choisis à l’envoi : LSI d’abord, signature intégrée', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/v1/contracts/${contractId}/send-for-signature`)
+      .set('x-lsi-session', SESS_AM_A).set('Idempotency-Key', uuidv7())
+      .send({ ...(body() as object), signingOrder: 'LSI_THEN_CLIENT', delivery: 'EMBEDDED' });
+    expect(res.status).toBe(202);
+    expect(provider.calls[0]).toMatchObject({ signingOrder: 'LSI_THEN_CLIENT', delivery: 'EMBEDDED' });
+  });
+
+  test('le PDF figé envoyé est référencé (CONTRACT_PDF) et son empreinte portée par la demande', async () => {
+    await send(contractId);
+    const [sr, doc, events] = await withScope(adminScope(fx.tenantId, fx.adminUserId), async (tx) => [
+      await tx.signatureRequest.findFirst({ where: { contractId }, orderBy: { createdAt: 'desc' } }),
+      await tx.storedDocument.findFirst({ where: { contractId, kind: 'CONTRACT_PDF' } }),
+      await tx.lifecycleEvent.findMany({ where: { contractId }, orderBy: { seq: 'asc' } }),
+    ]);
+    expect(doc!.sha256).toBe(sr!.sentPdfSha256);
+    expect(events.at(-1)).toMatchObject({ fromStatus: 'APPROVED', toStatus: 'PENDING_SIGNATURE', event: 'SEND_FOR_SIGNATURE' });
   });
 
   test('chaque signataire porte le roleLabel de sa partie', async () => {
@@ -417,5 +443,40 @@ describe('cloisonnement', () => {
     const res = await send(fx.customerB.contractId);
     expect(res.status).toBe(404);
     expect(provider.calls).toHaveLength(0);
+  });
+});
+
+describe('disponibilité effective de la signature (drapeau + sonde DocuSeal)', () => {
+  test('drapeau désactivé → 503 DOCUSEAL_DISABLED, rien n’est créé', async () => {
+    const { id } = await seedApprovedContract();
+    await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.tenantFeatureFlag.update({ where: { tenantId_key: { tenantId: fx.tenantId, key: 'contrats.docuseal.enabled' } }, data: { enabled: false } }));
+    try {
+      const before = provider.calls.length;
+      const res = await send(id);
+      expect(res.status, JSON.stringify(res.body)).toBe(503);
+      expect(res.body.code).toBe('DOCUSEAL_DISABLED');
+      expect(provider.calls.length).toBe(before);
+    } finally {
+      await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+        tx.tenantFeatureFlag.update({ where: { tenantId_key: { tenantId: fx.tenantId, key: 'contrats.docuseal.enabled' } }, data: { enabled: true } }));
+    }
+  });
+
+  test('instance injoignable → 503 DOCUSEAL_UNAVAILABLE (la signature est neutralisée, pas l’application)', async () => {
+    const { id } = await seedApprovedContract();
+    const original = provider.checkReadiness.bind(provider);
+    provider.checkReadiness = async () => ({ reachable: false, tokenValid: false, detail: 'down' });
+    const readiness = app.get(DocusealReadiness);
+    await readiness.refresh();
+    try {
+      const res = await send(id);
+      expect(res.status, JSON.stringify(res.body)).toBe(503);
+      expect(res.body.code).toBe('DOCUSEAL_UNAVAILABLE');
+      await request(app.getHttpServer()).get('/healthz').expect(200);
+    } finally {
+      provider.checkReadiness = original;
+      await readiness.refresh();
+    }
   });
 });

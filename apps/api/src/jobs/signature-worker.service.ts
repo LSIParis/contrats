@@ -10,7 +10,8 @@ import { ReminderDispatchService } from './reminder-dispatch.service.js';
 import { ReminderSendService } from './reminder-send.service.js';
 import { ImportsService } from '../imports/imports.service.js';
 import { DeadlinesService } from '../deadlines/deadlines.service.js';
-import { findPendingOcrImports } from '@lsi/persistence';
+import { findPendingOcrImports, findSignaturesNeedingSync } from '@lsi/persistence';
+import { DocusealWebhookService } from '../webhooks/docuseal-webhook.service.js';
 import { WebhookDeliveryService } from '../webhooks-out/webhook-delivery.service.js';
 
 const RECONCILE_EVERY_MS = 60 * 60 * 1_000; // horaire
@@ -55,6 +56,7 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly deadlines: DeadlinesService,
     private readonly webhooks: WebhookDeliveryService,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
+    private readonly docuseal: DocusealWebhookService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -101,6 +103,18 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
             if (r === 'RETRY') setTimeout(() => void this.queue.enqueueImportOcr(d), 60_000).unref();
             return;
           }
+          case 'signatures-sync': {
+            // Webhooks perdus : relecture de l'état chez DocuSeal, rejoué dans
+            // le MÊME pipeline idempotent que les webhooks (06-docuseal).
+            for (const sr of await findSignaturesNeedingSync()) {
+              try {
+                await this.docuseal.reconcileFromProvider(sr.providerSubmissionId);
+              } catch (e) {
+                this.log.warn(`synchronisation de ${sr.id} impossible : ${(e as Error).message}`);
+              }
+            }
+            return;
+          }
           case 'deadlines-sweep': {
             await this.deadlines.runAll(new Date());
             for (const ref of await findPendingOcrImports()) {
@@ -134,6 +148,11 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
       'lifecycle-sweep',
       {},
       { repeat: { every: LIFECYCLE_EVERY_MS }, jobId: 'lifecycle-daily' },
+    );
+    await this.scheduler.add(
+      'signatures-sync',
+      {},
+      { repeat: { every: 30 * 60 * 1_000 }, jobId: 'signatures-sync-30min' },
     );
     await this.scheduler.add(
       'deadlines-sweep',

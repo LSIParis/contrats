@@ -355,3 +355,16 @@ Ce qu'il faudrait changer :
   `docuseal-readiness.test.ts`.
 - Instance réelle (ignorés si absente) :
   `tests/integration/docuseal-ee.integration.test.ts`.
+
+## Câblage applicatif (lot 4, migration 24)
+
+| Sujet | Réalisation |
+|---|---|
+| Disponibilité effective | `SignatureAvailabilityService` : drapeau `contrats.docuseal.enabled` **et** sonde DocuSeal (`/templates?limit=1`). Sinon l'envoi répond **503** `DOCUSEAL_DISABLED` / `DOCUSEAL_UNAVAILABLE` et rien n'est créé ; `GET /v1/signature/availability` informe l'interface ; `/readyz` rapporte DocuSeal sans échouer. |
+| Ordre des signataires | Choisi à l'envoi (`signingOrder`) ou paramètre du tenant `signature.defaultOrder` (défaut : **client puis LSI-Maintenance**). Enregistré sur `signature_requests.signing_order`. |
+| Expiration | `expireInDays` à l'envoi, sinon `signature.expireDays` (défaut 30). |
+| Remise | `delivery` : `EMAIL` (défaut) ou `EMBEDDED` (pas d'e-mail DocuSeal ; signature dans l'application). |
+| Signature intégrée | `GET /v1/contracts/:id/signing` (signataire interne, `contracts.signInternal`) et `GET /v1/portal/contracts/:id/signing` (client) renvoient l'`embed_src` du signataire **qui est la personne connectée** (rapprochement par e-mail de session), jamais celui d'un autre. |
+| PDF figé | À l'envoi : `contract_versions.pdf_sha256`, `signature_requests.sent_pdf_sha256`, et un `stored_documents` `CONTRACT_PDF` (écriture unique). La transition `SEND_FOR_SIGNATURE` passe par la machine et le journal. |
+| Preuves | À la complétion : PDF fusionné et journal d'audit rapatriés, hachés, stockés ; `signed_pdf_sha256`, `audit_trail_sha256`, `hash_relation` (`SIGNED_OVERLAY` : DocuSeal réécrit le PDF) ; documents `SIGNED_PDF` (**dérivé** du `CONTRACT_PDF` envoyé) et `SIGNATURE_AUDIT_TRAIL`. Capture idempotente. |
+| Réconciliation | Job `signatures-sync` toutes les 30 min : `app_find_signatures_needing_sync` (SENT / PARTIALLY_COMPLETED sans nouvelle depuis 60 min) → `reconcileFromProvider`, rejoué dans le pipeline idempotent des webhooks. Le job horaire historique réenfile les captures de preuve manquantes. |

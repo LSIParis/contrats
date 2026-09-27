@@ -34,6 +34,8 @@ import { StructureService } from './structure/structure.service.js';
 import { ClauseLibraryService } from './structure/clause-library.service.js';
 import { NegotiationController } from './negotiation/negotiation.controller.js';
 import { AcceptanceService } from './negotiation/acceptance.service.js';
+import { SignatureAvailabilityService } from './signature/signature-availability.service.js';
+import { SigningController } from './signature/signing.controller.js';
 import { PricingController } from './pricing/pricing.controller.js';
 import { PricingCatalogController } from './pricing/catalog.controller.js';
 import { PricingService } from './pricing/pricing.service.js';
@@ -140,6 +142,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     DeadlinesController,
     StructureController,
     NegotiationController,
+    SigningController,
     PricingController,
     PricingCatalogController,
     TemplatesController,
@@ -156,6 +159,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     StructureService,
     ClauseLibraryService,
     AcceptanceService,
+    SignatureAvailabilityService,
     // Tarification (lot 3, 04-tarification.md §17). Le QuantityProvider est un
     // PORT : quantités manuelles par défaut ; un connecteur réel (RMM de
     // Client Help) le remplacera ici, sans toucher au service.

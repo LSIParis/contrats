@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * Pas de tenantId, pas de customerId : le contrat est désigné par l'URL et
@@ -30,4 +30,17 @@ export class SendForSignatureDto {
   // Il est construit côté serveur depuis une constante. Le laisser entrer
   // ici ouvrirait un open redirect — la valeur est rendue dans le
   // navigateur du signataire (§11.7).
+
+  /**
+   * Ordre des signataires. Défaut : paramètre du tenant `signature.defaultOrder`
+   * (client puis LSI-Maintenance, brief §7).
+   */
+  @IsOptional()
+  @IsIn(['CLIENT_THEN_LSI', 'LSI_THEN_CLIENT', 'PARALLEL', 'AS_DEFINED'])
+  signingOrder?: 'CLIENT_THEN_LSI' | 'LSI_THEN_CLIENT' | 'PARALLEL' | 'AS_DEFINED';
+
+  /** Lien par e-mail (défaut) ou signature intégrée dans l'application (embed_src). */
+  @IsOptional()
+  @IsIn(['EMAIL', 'EMBEDDED'])
+  delivery?: 'EMAIL' | 'EMBEDDED';
 }
