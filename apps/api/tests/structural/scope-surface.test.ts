@@ -1,18 +1,20 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { AppModule } from '../../src/app.module.js';
 import { listRoutes, type RouteInfo } from '../support/introspect.js';
 import { IS_PUBLIC_KEY } from '../../src/auth/public.decorator.js';
 import { Reflector } from '@nestjs/core';
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
+import { ApiClientGuard } from '../../src/public-api/api-client.guard.js';
 
 let app: INestApplication;
 let routes: RouteInfo[];
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication();
-  await app.init();
+  app = await createTestApp(mod);
   routes = listRoutes(app);
 });
 
@@ -36,12 +38,23 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
   test('aucune route n’est accessible sans guard ni @Public() délibéré', () => {
     const reflector = app.get(Reflector);
     const unguarded: string[] = [];
+    const apiGuarded: string[] = [];
 
     for (const r of routes) {
       const isPublic = reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [r.handler, r.controller]);
       // Le guard global couvre TOUT. La seule échappatoire est @Public(),
       // qui est cherchable dans le dépôt et refusable en revue.
       if (isPublic === undefined) continue; // couvert par le guard global
+      // API publique /api/v1 : @Public() pour le guard de SESSION, mais gardée
+      // par la clé d'API (ApiClientGuard) — ce n'est pas une route ouverte.
+      const guards = [
+        ...((Reflect.getMetadata(GUARDS_METADATA, r.controller) as unknown[]) ?? []),
+        ...((Reflect.getMetadata(GUARDS_METADATA, r.handler) as unknown[]) ?? []),
+      ];
+      if (isPublic === true && guards.includes(ApiClientGuard)) {
+        apiGuarded.push(`${r.method} ${r.path}`);
+        continue;
+      }
       if (isPublic === true) {
         // Une route publique est légitime (webhook, healthcheck), mais elle
         // doit être rare et intentionnelle.
@@ -52,15 +65,33 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
     // On fige la liste : ajouter une route publique devient une décision
     // explicite qui casse ce test et exige de le mettre à jour.
     expect(unguarded.sort()).toEqual([
+      'GET /api/v1/docs',
+      'GET /api/v1/openapi.json',
       'GET /health',
       'GET /health/ready',
+      'GET /healthz',
+      'GET /readyz',
       'GET /v1/auth/callback',
       'GET /v1/auth/login',
       'GET /v1/portal/auth/verify',
       'POST /v1/portal/auth/logout',
       'POST /v1/portal/auth/request-link',
       'POST /v1/webhooks/docuseal',
-    ]);
+      // Lot 9 — page publique d'une proposition : jeton haché résolu en base,
+      // lecture confinée à la proposition (RLS), débit limité, noindex.
+      'GET /v1/public/proposals/:token',
+      'GET /v1/public/proposals/:token/pdf',
+      'POST /v1/public/proposals/:token/accept',
+      'POST /v1/public/proposals/:token/comments',
+      'POST /v1/public/proposals/:token/decline',
+      'POST /v1/public/proposals/:token/events',
+      'POST /v1/public/proposals/:token/otp',
+      'POST /v1/public/proposals/:token/otp/verify',
+      'PUT /v1/public/proposals/:token/selection',
+    ].sort());
+    // Toute route /api/v1 hors description publique est gardée par la clé d'API.
+    expect(apiGuarded.length).toBeGreaterThan(0);
+    expect(apiGuarded.every((r) => r.includes(' /api/v1/'))).toBe(true);
   });
 });
 

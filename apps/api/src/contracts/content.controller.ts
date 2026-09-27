@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import type { FastifyReply } from 'fastify';
+import { sendFile } from '../common/http-io.js';
 import { type Scope } from '@lsi/persistence';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import type { Session } from '../auth/session.service.js';
 import { slugifyFilename } from '../documents/filename.js';
 import { ContentService } from './content.service.js';
@@ -18,7 +20,7 @@ export class ContentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SaveContentDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.content.saveContent(scope, id, dto);
   }
 
@@ -40,29 +42,27 @@ export class ContentController {
   async preview(
     @CurrentScope() scope: Scope,
     @Param('id', ParseUUIDPipe) id: string,
-    @Res() res: Response,
+    @Res() res: FastifyReply,
   ) {
     // La méthode lève AVANT d'écrire dans `res` (404/422) : le filtre
     // d'exception de Nest répond alors normalement.
     const pdf = await this.content.previewPdf(scope, id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline; filename="apercu.pdf"');
-    res.send(pdf);
+    sendFile(res, { body: pdf, contentType: 'application/pdf', filename: 'apercu.pdf', disposition: 'inline' });
   }
 
   @Get(':id/export.pdf')
-  async exportPdf(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async exportPdf(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     const { buffer, title } = await this.content.exportPdf(scope, id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'contrat')}.pdf"`);
-    res.send(buffer);
+    sendFile(res, { body: buffer, contentType: 'application/pdf', filename: `${slugifyFilename(title, 'contrat')}.pdf` });
   }
 
   @Get(':id/export.docx')
-  async exportDocx(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async exportDocx(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     const { buffer, title } = await this.content.exportDocx(scope, id);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(title, 'contrat')}.docx"`);
-    res.send(buffer);
+    sendFile(res, {
+      body: buffer,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: `${slugifyFilename(title, 'contrat')}.docx`,
+    });
   }
 }

@@ -1,0 +1,13 @@
+{
+  "_comment": "GET /submissions/{id}/documents?merge=true — un seul document fusionné.",
+  "status": 200,
+  "body": {
+    "id": "__SUBMISSION_ID__",
+    "documents": [
+      {
+        "name": "LSI-2026-0001",
+        "url": "https://signe.example.test/file/merged-hash/LSI-2026-0001.pdf"
+      }
+    ]
+  }
+}

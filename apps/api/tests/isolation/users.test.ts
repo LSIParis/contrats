@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
@@ -12,7 +13,7 @@ let fx: TwoCustomerFixture;
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true })); await app.init();
+  app = await createTestApp(mod);
   fx = await seedTwoCustomers();
   // seedTwoCustomers ne pose PAS de ligne user_roles MSP_ADMIN sur fx.adminUserId
   // (son statut admin vient uniquement du scope adminScope() posé en session,

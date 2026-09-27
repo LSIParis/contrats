@@ -10,6 +10,24 @@
 set -eu
 cd /app
 
+# Fail-fast : un secret absent ferait tourner l'ALTER ROLE avec un mot de passe
+# vide. Le job échoue alors, et app/worker (service_completed_successfully)
+# ne démarrent pas : mieux vaut une stack arrêtée qu'une base ouverte.
+: "${DATABASE_URL:?DATABASE_URL manquant}"
+for var in LSI_APP_PASSWORD LSI_WEBHOOK_PASSWORD LSI_SCHEDULER_PASSWORD; do
+  eval "val=\${$var:-}"
+  if [ -z "$val" ]; then
+    echo "✗ $var est vide ou absent de l'environnement de la stack." >&2
+    exit 1
+  fi
+  case "$val" in
+    *"'"*|*"\\"*)
+      echo "✗ $var contient une apostrophe ou une barre oblique inverse : refusé (interpolé en SQL)." >&2
+      exit 1
+      ;;
+  esac
+done
+
 echo "→ Application des migrations Prisma…"
 pnpm --filter @lsi/persistence exec prisma migrate deploy
 
@@ -22,5 +40,15 @@ ALTER ROLE lsi_app       LOGIN PASSWORD '${LSI_APP_PASSWORD}';
 ALTER ROLE lsi_webhook   LOGIN PASSWORD '${LSI_WEBHOOK_PASSWORD}';
 ALTER ROLE lsi_scheduler LOGIN PASSWORD '${LSI_SCHEDULER_PASSWORD}';
 SQL
+
+# Lot 9 — données de référence du tenant (annexe C) : modèles de proposition et
+# bibliothèque de contenus. Idempotent (UNCHANGED au second passage), ne réécrit
+# jamais un modèle modifié dans l'interface. Un fichier invalide ou un cas de
+# contrôle chiffré en échec fait échouer CE job : app et worker ne démarrent
+# pas (service_completed_successfully) et le déploiement est annulé.
+if [ "${SEED_PROPOSAL_TEMPLATES:-false}" = "true" ]; then
+  echo "→ Seed des modèles de proposition (tenant ${SEED_TENANT_SLUG:-lsi})…"
+  pnpm --filter @lsi/persistence exec tsx prisma/seed.ts --only=propositions
+fi
 
 echo "✓ Migrations appliquées et mots de passe de rôles renouvelés."

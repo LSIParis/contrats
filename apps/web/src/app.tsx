@@ -5,6 +5,11 @@ import { DashboardPage } from './features/dashboard/dashboard-page.js';
 import { ContractsPage } from './features/contracts/contracts-page.js';
 import { ContractNewPage } from './features/contracts/contract-new-page.js';
 import { ContractImportPage } from './features/contracts/contract-import-page.js';
+import { ImportValidationPage } from './features/imports/import-validation-page.js';
+import { SettingsPage } from './features/settings/settings-page.js';
+import { ApiClientsPage } from './features/settings/api-clients-page.js';
+import { WebhooksPage } from './features/settings/webhooks-page.js';
+import { PricingCatalogPage } from './features/pricing/pricing-catalog-page.js';
 import { ContractDetailPage } from './features/contracts/contract-detail-page.js';
 import { ContractEditPage } from './features/contracts/contract-edit-page.js';
 import { VersionsPage } from './features/contracts/versions-page.js';
@@ -16,6 +21,17 @@ import { AuditPage } from './features/audit/audit-page.js';
 import { TemplatesPage } from './features/templates/templates-page.js';
 import { TemplateDetailPage } from './features/templates/template-detail-page.js';
 import { PortalApp } from './portal/portal-app.js';
+import { StructureEditorPage } from './features/structure/structure-editor-page.js';
+import { LibraryPage } from './features/library/library-page.js';
+import { RemindersPage } from './features/reminders/reminders-page.js';
+import { ProposalPublicPage } from './features/proposals/public/proposal-public-page.js';
+import { PendingValidationsPage } from './features/proposals/pending-validations-page.js';
+import { ProposalsPage } from './features/proposals/proposals-page.js';
+import { ProposalWorkspacePage } from './features/proposals/proposal-workspace-page.js';
+import { ProposalDashboardPage, ProposalPipelinePage } from './features/proposals/reports/proposal-reports-pages.js';
+import {
+  ContentLibraryPage, ContractTemplateSlugsPage, ProposalTemplateDetailPage, ProposalTemplatesPage, TermsPage,
+} from './features/proposals/admin/proposal-admin-pages.js';
 
 function InternalRoutes() {
   return (
@@ -29,14 +45,33 @@ function InternalRoutes() {
         <Route path="/contracts" element={<ContractsPage />} />
         <Route path="/contracts/new" element={<ContractNewPage />} />
         <Route path="/contracts/import" element={<ContractImportPage />} />
+        <Route path="/contracts/:id/import" element={<ImportValidationPage />} />
         <Route path="/contracts/:id/edit" element={<ContractEditPage />} />
         <Route path="/contracts/:id/versions" element={<VersionsPage />} />
+        <Route path="/contracts/:id/structure" element={<StructureEditorPage />} />
         <Route path="/contracts/:id" element={<ContractDetailPage />} />
-        <Route path="/reminders" element={<div>Rappels</div>} />
+        <Route path="/reminders" element={<RemindersPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings/api" element={<ApiClientsPage />} />
+        <Route path="/settings/webhooks" element={<WebhooksPage />} />
+        <Route path="/pricing" element={<PricingCatalogPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/:id" element={<TemplateDetailPage />} />
+        <Route path="/library" element={<LibraryPage />} />
+        <Route path="/proposal-admin/pending" element={<PendingValidationsPage />} />
+        {/* Lot 9 : propositions commerciales (interface interne). */}
+        <Route path="/proposals" element={<ProposalsPage />} />
+        <Route path="/proposals/pipeline" element={<ProposalPipelinePage />} />
+        <Route path="/proposals/dashboard" element={<ProposalDashboardPage />} />
+        <Route path="/proposals/:id" element={<ProposalWorkspacePage />} />
+        <Route path="/proposal-admin" element={<Navigate to="/proposal-admin/templates" replace />} />
+        <Route path="/proposal-admin/templates" element={<ProposalTemplatesPage />} />
+        <Route path="/proposal-admin/templates/:slug" element={<ProposalTemplateDetailPage />} />
+        <Route path="/proposal-admin/library" element={<ContentLibraryPage />} />
+        <Route path="/proposal-admin/terms" element={<TermsPage />} />
+        <Route path="/proposal-admin/contract-templates" element={<ContractTemplateSlugsPage />} />
       </Route>
     </Routes>
   );
@@ -47,6 +82,8 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/portal/*" element={<PortalApp />} />
+        {/* Lot 9 : page publique d'une proposition — lien personnel, HORS session. */}
+        <Route path="/p/:token" element={<ProposalPublicPage />} />
         <Route
           path="/*"
           element={

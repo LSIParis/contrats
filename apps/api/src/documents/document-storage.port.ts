@@ -26,6 +26,8 @@ export interface DocumentStorage {
   get(key: string, scope: ObjectScope): Promise<Buffer | null>;
   /** URL présignée à durée courte (§10.7) : jamais d'URL S3 durable en base. */
   presignedGetUrl(key: string, scope: ObjectScope, ttlSeconds: number): Promise<string>;
+  /** Sonde de disponibilité (/readyz). Ne lève jamais : `false` si injoignable. */
+  ping(): Promise<boolean>;
 }
 
 /**

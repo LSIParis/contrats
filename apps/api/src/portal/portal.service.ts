@@ -14,7 +14,13 @@ function docusealSignBase(): string {
 const CLIENT_VISIBLE_STATUSES: ContractStatus[] = [
   'PENDING_SIGNATURE', 'PARTIALLY_SIGNED', 'SIGNED', 'ACTIVE',
   'EXPIRED', 'RENEWED', 'TERMINATED', 'CANCELLED', 'DECLINED',
+  // v2 : la proposition est PRÉSENTÉE au client dès SENT_TO_CLIENT.
+  'SENT_TO_CLIENT', 'IN_NEGOTIATION', 'ACCEPTED', 'SIGNATURE_EXPIRED',
+  'RENEWAL_DUE', 'TERMINATION_PENDING',
 ];
+
+/** États où le client peut lire la version présentée (proposition, négociation, acceptation). */
+const PROPOSAL_STATUSES: ContractStatus[] = ['SENT_TO_CLIENT', 'IN_NEGOTIATION', 'ACCEPTED'];
 
 /** Allow-list des colonnes client-safe — appliquée au niveau requête (défense en profondeur). */
 const CLIENT_SAFE_SELECT = {
@@ -31,6 +37,19 @@ export class PortalService {
       startDate: c.startDate, endDate: c.endDate, amountCents: c.amountCents, currency: c.currency,
       billingFrequency: c.billingFrequency,
     };
+  }
+
+  /**
+   * Version PRÉSENTÉE au client : c'est ce texte-là qu'il accepte. Le corps
+   * est le document composé (assaini à l'écriture).
+   */
+  async proposal(scope: Scope, id: string) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true, status: true, currentVersionId: true, reference: true, title: true } });
+      if (!c || !PROPOSAL_STATUSES.includes(c.status) || !c.currentVersionId) throw new NotFoundException('Proposition introuvable');
+      const v = await tx.contractVersion.findUnique({ where: { id: c.currentVersionId }, select: { id: true, versionNumber: true, bodyHtml: true, createdAt: true } });
+      return { contractId: c.id, reference: c.reference, title: c.title, status: c.status, version: v };
+    });
   }
 
   async list(scope: Scope) {
@@ -156,5 +175,12 @@ export class PortalService {
       }] });
       return { id };
     });
+  }
+
+  /** Nom et e-mail de l'utilisateur client (session), pour tracer une acceptation. */
+  async identity(scope: Scope, userId: string): Promise<{ fullName: string; email: string }> {
+    const u = await withScope(scope, (tx) => tx.user.findUnique({ where: { id: userId }, select: { fullName: true, email: true } }));
+    if (!u) throw new NotFoundException('Utilisateur introuvable');
+    return u;
   }
 }

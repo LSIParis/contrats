@@ -15,18 +15,40 @@ export {
   adminScope,
   clientScope,
   systemScope,
+  tenantSystemScope,
+  proposalLinkScope,
   type Scope,
   type ActorKind,
 } from './scope.js';
 export { uuidv7 } from './uuid.js';
 export {
   resolveWebhookScope,
+  resolveProposalWebhookScope,
   type ResolvedWebhookScope,
+  type ResolvedProposalWebhookScope,
 } from './webhook-scope-lookup.js';
-export { findSignaturesNeedingProof } from './reconciliation-lookup.js';
+export {
+  resolveProposalLink,
+  findProposalsToExpire,
+  findProposalFollowUpsDue,
+  findProposalsToConvert,
+  findProposalSignaturesNeedingSync,
+  findProposalSignaturesNeedingProof,
+  findProposalTrackingTenants,
+  purgeProposalViewEvents,
+  nextProposalSequence,
+  type ResolvedProposalLink,
+} from './proposal-lookup.js';
+export { findSignaturesNeedingProof, findSignaturesNeedingSync } from './reconciliation-lookup.js';
+export { resolveApiKeyPrefix, type ResolvedApiKey } from './api-key-lookup.js';
 export {
   findContractsToActivate,
   findContractsToExpire,
+  findTerminationsDue,
+  findContractsForDeadlines,
+  findPendingOcrImports,
+  findTacitRenewalsDue,
+  findExpressRenewalsToOpen,
   type ScopeRef,
 } from './lifecycle-lookup.js';
 export { findDueReminders, type DueReminderRef } from './scheduler-lookup.js';
@@ -40,3 +62,10 @@ export {
 export { createCustomer, CustomerSirenConflict, type NewCustomerInput } from './customer-write.js';
 export { appendAudit, verifyAuditChain, type AuditAppendInput } from './audit-write.js';
 export { pingDatabase } from './health.js';
+export {
+  publishWebhookEvent,
+  findDueWebhookDeliveries,
+  type WebhookEventInput,
+  type DueWebhookDeliveryRef,
+} from './webhook-outbox.js';
+export { setTransitionContext } from './transition.js';

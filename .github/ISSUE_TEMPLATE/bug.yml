@@ -1,0 +1,66 @@
+name: Anomalie
+description: Signaler un comportement incorrect de l'application Contrats
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de ce signalement. **N'incluez aucune donnée client réelle**
+        (nom, contrat, montant, pièce jointe), aucun secret, jeton ni clé d'API.
+        Une faille de sécurité ne se déclare pas ici : voir le lien « Signaler une vulnérabilité ».
+  - type: dropdown
+    id: environnement
+    attributes:
+      label: Environnement
+      options:
+        - Production (contrats.lsi-maintenance.fr)
+        - Préproduction
+        - Développement local
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Valeurs `version` et `revision` renvoyées par `/healthz`.
+      placeholder: '{"version":"1.2.3","revision":"abc123…"}'
+  - type: textarea
+    id: constat
+    attributes:
+      label: Ce qui se passe
+      description: Description factuelle, message d'erreur, identifiant de corrélation des logs.
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce qui était attendu
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: |
+        1. Se connecter en tant que …
+        2. Ouvrir le contrat …
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - Bloquant (signature, preuve ou données compromises)
+        - Majeur (fonctionnalité inutilisable, contournement possible)
+        - Mineur (gêne, affichage)
+    validations:
+      required: true
+  - type: checkboxes
+    id: isolation
+    attributes:
+      label: Isolation multi-tenante
+      options:
+        - label: Le problème permet de voir ou de modifier des données d'un autre client / tenant (à traiter en priorité absolue).

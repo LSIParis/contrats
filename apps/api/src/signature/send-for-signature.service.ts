@@ -16,11 +16,19 @@ import {
   type ESignatureProvider,
   type DocumentRenderer,
   type SubmitterCommand,
+  hiddenTagHtml,
+  initialsFooterHtml,
+  documentFooterHtml,
+  signatureBlockTags,
+  signerRoleLabel,
 } from '@lsi/domain';
 import { ESIGNATURE_PROVIDER } from './provider.token.js';
 import { DOCUMENT_RENDERER } from '../documents/renderer.token.js';
 import { DOCUMENT_STORAGE, type DocumentStorage } from '../documents/document-storage.port.js';
 import type { SendForSignatureDto } from '../contracts/dto/send-for-signature.dto.js';
+import { persistTransition, toContractSnapshot } from '../contracts/snapshot.js';
+import { TenantConfigService } from '../tenant/tenant-config.service.js';
+import { SignatureAvailabilityService } from './signature-availability.service.js';
 
 /**
  * Envoi en signature. (§11.2, §11.3, §11.8, EC-04)
@@ -49,6 +57,8 @@ export class SendForSignatureService {
     @Inject(ESIGNATURE_PROVIDER) private readonly provider: ESignatureProvider,
     @Inject(DOCUMENT_RENDERER) private readonly renderer: DocumentRenderer,
     @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
+    private readonly availability: SignatureAvailabilityService,
+    private readonly config: TenantConfigService,
   ) {}
 
   async send(scope: Scope, contractId: string, dto: SendForSignatureDto, idempotencyKey: string, now: Date) {
@@ -61,6 +71,14 @@ export class SendForSignatureService {
     if (existing) {
       return { signatureRequestId: existing.id, status: existing.status };
     }
+
+    // Signature électronique EFFECTIVE (drapeau du tenant + sonde DocuSeal) :
+    // sinon 503 explicite, rien n'est créé (brief §7).
+    await this.availability.assertEnabled(scope);
+    const defaultOrder = await this.config.setting(scope, 'signature.defaultOrder');
+    const signingOrder = dto.signingOrder ?? (defaultOrder === 'LSI_FIRST' ? 'LSI_THEN_CLIENT' : 'CLIENT_THEN_LSI');
+    const delivery = dto.delivery ?? 'EMAIL';
+    const expireInDays = dto.expireInDays ?? (await this.config.setting(scope, 'signature.expireDays'));
 
     // --- tx1 : valider et préparer -----------------------------------------
     const prepared = await withScope(scope, async (tx) => {
@@ -110,7 +128,10 @@ export class SendForSignatureService {
             provider: this.provider.name,
             status: 'CREATING',
             idempotencyKey,
-            expireAt: this.expiry(now, dto.expireInDays),
+            expireAt: this.expiry(now, expireInDays),
+            mode: 'PDF',
+            delivery,
+            signingOrder,
             createdAt: now,
             updatedAt: now,
             createdByUserId: scope.userId,
@@ -137,13 +158,23 @@ export class SendForSignatureService {
     // Le corps du contrat ne porte AUCUN champ de signature. Sans balise, la
     // submission DocuSeal n'aurait rien à faire signer (découvert en testant
     // contre l'EE réelle). On annexe donc un bloc de signature avec une
-    // balise {{Signature;role=…}} par signataire — le rôle DOIT correspondre
-    // au roleLabel du submitter (§11.3).
+    // balise de signature + date de signature par signataire (text-tags.ts)
+    // — le rôle DOIT correspondre au roleLabel du submitter (§11.3).
     const withSignatureBlock = version.bodyHtml + this.buildSignatureBlock(signers);
 
+    // Paraphe de chaque page, en pied de page (brief §7). ACTIVÉ PAR
+    // DOCUSEAL_INITIALS_FOOTER=true, une fois validé contre l'instance réelle
+    // par le test d'intégration : la balise y est reconstituée par Chromium
+    // autour du numéro de page (06-docuseal.md §Gabarit).
+    const roles = [...new Set(signers.map((s) => signerRoleLabel(s.party)))];
     const rendered = await this.renderer.render({
       html: withSignatureBlock,
       documentTitle: `${contract.reference} — ${contract.title}`,
+      // Référence et pagination sur chaque page ; paraphes DocuSeal en plus si activés.
+      footerHtml: documentFooterHtml(
+        contract.reference,
+        process.env.DOCUSEAL_INITIALS_FOOTER === 'true' ? initialsFooterHtml(roles) : '',
+      ),
     });
 
     // Le scope est dans le CHEMIN de stockage (§10.7) : politiques IAM et
@@ -158,18 +189,30 @@ export class SendForSignatureService {
 
     // Le hash est stocké AVANT l'envoi : c'est ce qui permet d'affirmer plus
     // tard « le document envoyé est exactement celui-ci » (§11.2).
-    await withScope(scope, (tx) =>
-      tx.contractVersion.update({
+    await withScope(scope, async (tx) => {
+      await tx.contractVersion.update({
         where: { id: version.id },
         data: { pdfObjectKey: objectKey, pdfSha256: rendered.sha256 },
-      }),
-    );
+      });
+      await tx.signatureRequest.update({ where: { id: sigReq.id }, data: { sentPdfSha256: rendered.sha256 } });
+      // Le PDF FIGÉ envoyé en signature rejoint le référentiel des documents
+      // (écriture unique) : le PDF signé rapatrié en dérivera.
+      await tx.storedDocument.createMany({
+        data: [{
+          id: uuidv7(), tenantId: scope.tenantId, customerId: contract.customerId, contractId,
+          kind: 'CONTRACT_PDF', origin: 'GENERATED', objectKey, filename: `${contract.reference}.pdf`,
+          contentType: 'application/pdf', sizeBytes: BigInt(rendered.pdf.length), sha256: rendered.sha256,
+          uploadedByUserId: /^[0-9a-f-]{36}$/i.test(scope.userId) ? scope.userId : null, createdAt: now,
+        }],
+        skipDuplicates: true,
+      });
+    });
 
     const submitters: SubmitterCommand[] = [...signers]
       .sort((a, b) => a.signingOrder - b.signingOrder)
       .map((s) => ({
         party: s.party,
-        roleLabel: this.roleLabel(s.party), // même valeur que la balise du doc
+        roleLabel: signerRoleLabel(s.party), // même valeur que la balise du doc
         externalId: s.id, // ← clé de rapprochement des webhooks (§11.5)
         fullName: s.fullName,
         email: s.email,
@@ -191,8 +234,13 @@ export class SendForSignatureService {
     try {
       submission = await this.provider.createSubmission({
         pdf: rendered.pdf,
+        // L'adaptateur revérifie : le PDF envoyé est celui dont l'empreinte
+        // vient d'être stockée sur la version (§11.2).
+        pdfSha256: rendered.sha256,
         documentName: `${contract.reference}.pdf`,
-        order: 'preserved', // RM-13 : LSI d'abord, client ensuite
+        // Ordre : paramètre du tenant (client puis LSI par défaut) ou choix à l'envoi.
+        signingOrder,
+        delivery,
         expireAt: sigReq.expireAt!,
         subject: dto.subject ?? `Contrat ${contract.reference} — signature requise`,
         body: dto.body ?? 'Bonjour,\n\nVeuillez signer : {{submitter.link}}',
@@ -255,12 +303,10 @@ export class SendForSignatureService {
         });
       }
 
-      // MAINTENANT seulement, le contrat bouge.
-      const next = applyEvent(this.toSnapshot(contract), { type: 'SEND_FOR_SIGNATURE', actorUserId: scope.userId }, now);
-      await tx.contract.update({
-        where: { id: contractId },
-        data: { status: next.status, updatedAt: now, updatedByUserId: scope.userId },
-      });
+      // MAINTENANT seulement, le contrat bouge — via la machine (journal des transitions).
+      const event = { type: 'SEND_FOR_SIGNATURE', actorUserId: scope.userId } as const;
+      const next = applyEvent(toContractSnapshot(contract), event, now);
+      await persistTransition(tx, contractId, event, next, now, scope.userId);
 
       return { signatureRequestId: sigReq.id, status: 'SENT' as const };
     });
@@ -269,7 +315,7 @@ export class SendForSignatureService {
   /** Valide la transition SANS la persister : le domaine décide, tôt. */
   private assertCanSend(contract: any): void {
     try {
-      applyEvent(this.toSnapshot(contract), { type: 'SEND_FOR_SIGNATURE', actorUserId: 'check' }, new Date());
+      applyEvent(toContractSnapshot(contract), { type: 'SEND_FOR_SIGNATURE', actorUserId: 'check' }, new Date());
     } catch (e) {
       if (e instanceof InvalidTransitionError) {
         throw new ConflictException({
@@ -286,60 +332,28 @@ export class SendForSignatureService {
     }
   }
 
-  private toSnapshot(c: any) {
-    return {
-      id: c.id,
-      type: c.type,
-      status: c.status,
-      startDate: c.startDate,
-      endDate: c.endDate,
-      noticePeriodDays: c.noticePeriodDays,
-      currentVersionId: c.currentVersionId,
-      approvedVersionId: c.approvedVersionId,
-      submittedByUserId: null,
-      // Les signataires sont vérifiés depuis le DTO en amont : à ce stade
-      // ils viennent d'être créés.
-      hasLsiSigner: true,
-      hasClientSigner: true,
-      hasRequiredAttachments: true,
-      openAmendmentExists: false,
-      hasSignedSuccessor: c.successorContractId !== null,
-      signedAt: c.signedAt,
-      activatedAt: c.activatedAt,
-      terminatedAt: c.terminatedAt,
-    };
-  }
-
   /**
-   * Le libellé de rôle DocuSeal par partie. Source unique.
+   * Bloc de signature annexé au document, balises DocuSeal par signataire.
    *
-   * Utilisé à la fois pour la balise {{...;role=…}} du document et pour le
-   * `roleLabel` du submitter. S'ils divergeaient, le signataire n'aurait
-   * aucun champ à signer — le genre de bug silencieux qu'on ne voit qu'en
-   * envoyant un vrai contrat.
-   */
-  private roleLabel(party: 'LSI' | 'CLIENT'): string {
-    return party === 'LSI' ? 'LSI Maintenance' : 'Client';
-  }
-
-  /**
-   * Bloc de signature annexé au document, une balise DocuSeal par signataire.
-   *
-   * `{{Signature;role=<rôle>;type=signature}}` : DocuSeal parse ces balises du
-   * texte du PDF et les transforme en champs de signature attribués au bon
-   * rôle. On ajoute la date de signature à côté — utile en preuve.
+   * Signature + date de signature (`datenow`, non modifiable) : DocuSeal
+   * parse ces balises du texte du PDF et les transforme en champs attribués
+   * au bon rôle. Le libellé de rôle vient de `signerRoleLabel` — la MÊME
+   * source que le `roleLabel` du submitter. Balises en texte blanc : le PDF
+   * figé reste lisible (06-docuseal.md §Gabarit).
    */
   private buildSignatureBlock(signers: readonly { party: 'LSI' | 'CLIENT'; fullName: string }[]): string {
     const rows = [...signers]
       .sort((a, b) => (a.party === 'LSI' ? -1 : 1) - (b.party === 'LSI' ? -1 : 1))
       .map((s) => {
-        const role = this.roleLabel(s.party);
+        const role = signerRoleLabel(s.party);
+        const tags = signatureBlockTags(role);
         const who = s.party === 'LSI' ? 'Pour LSI Maintenance' : 'Pour le client';
         return `<td style="width:50%;vertical-align:top;padding:8px;">
   <div style="font-weight:bold;">${who}</div>
   <div>${escapeHtml(s.fullName)}</div>
-  <div style="margin-top:12px;">Signature : {{Signature;role=${role};type=signature}}</div>
-  <div style="margin-top:8px;">Date : {{Date;role=${role};type=date}}</div>
+  <div style="margin-top:12px;">Signature :</div>
+  <div style="height:64px;">${hiddenTagHtml(tags.signature)}</div>
+  <div style="margin-top:8px;">Date de signature : ${hiddenTagHtml(tags.date)}</div>
 </td>`;
       })
       .join('\n');

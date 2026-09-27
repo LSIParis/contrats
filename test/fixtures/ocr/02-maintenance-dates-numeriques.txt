@@ -1,0 +1,28 @@
+CONTRAT DE MAINTENANCE INFORMATIQUE N° 2023-014
+
+Entre :
+GAMMA TECHNIQUE
+Société par actions simplifiée
+SIRET : 555 123 454 00027
+Siège : 3 place de l'Exemple, 33000 Bordeaux
+Ci-après désignée le Mainteneur
+
+Et :
+La société DELTA CONSEIL, SA, SIREN 111 222 334, sise 22 boulevard Fictif, 44000 Nantes,
+Ci-après désignée le Client
+
+1. DURÉE DU CONTRAT
+Durée : 3 ans à compter du 01/03/2023.
+Au terme de cette durée, le contrat pourra être renouvelé par avenant exprès des parties. À défaut, il prendra fin à son échéance.
+
+2. RÉSILIATION
+Chaque partie peut résilier le contrat en respectant un préavis de 90 jours notifié par écrit.
+
+3. CONDITIONS FINANCIÈRES
+Le forfait annuel de maintenance est fixé à 12.000 EUR HT, payable par trimestre.
+Les interventions hors forfait sont facturées 85 € HT de l'heure.
+Le forfait est indexé chaque année sur l'indice ICHT-Rev-TS.
+
+Signé le 20/02/2023
+
+Pour GAMMA TECHNIQUE          Pour DELTA CONSEIL

@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import type { Scope } from '@lsi/persistence';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import type { Session } from '../auth/session.service.js';
 import { AuditReadService } from './audit-read.service.js';
 import { ListAuditDto } from './dto/list-audit.dto.js';
@@ -11,13 +12,13 @@ export class AuditController {
 
   @Get()
   list(@CurrentScope() scope: Scope, @CurrentSession() session: Session, @Query() q: ListAuditDto) {
-    assertRole(session, ['MSP_ADMIN']);
+    assertCan(session, 'audit.read');
     return this.audit.list(scope, q);
   }
 
   @Get('verify')
   verify(@CurrentScope() scope: Scope, @CurrentSession() session: Session) {
-    assertRole(session, ['MSP_ADMIN']);
+    assertCan(session, 'audit.read');
     return this.audit.verify(scope);
   }
 }

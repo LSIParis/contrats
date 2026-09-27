@@ -5,6 +5,7 @@ import {
   applyEvent,
   allowedEvents,
   isNoticeRespected,
+  computeTerminationEffectiveDate,
   assertCanRenew,
   assertCanAmend,
   InvalidTransitionError,
@@ -12,13 +13,14 @@ import {
   type ContractEvent,
   type ContractSnapshot,
 } from '@lsi/domain';
+import { persistTransition, toContractSnapshot } from './snapshot.js';
+import { StructureService } from '../structure/structure.service.js';
 import {
   DOCUMENT_STORAGE,
   assertKeyMatchesScope,
   type DocumentStorage,
 } from '../documents/document-storage.port.js';
 import type { CreateContractDto } from './dto/create-contract.dto.js';
-import type { ImportContractDto } from './dto/import-contract.dto.js';
 import type { ListContractsDto } from './dto/list-contracts.dto.js';
 import type { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import type { AmendContractDto } from './dto/amend-contract.dto.js';
@@ -39,7 +41,10 @@ const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', '
  */
 @Injectable()
 export class ContractsService {
-  constructor(@Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage) {}
+  constructor(
+    @Inject(DOCUMENT_STORAGE) private readonly storage: DocumentStorage,
+    private readonly structure: StructureService,
+  ) {}
 
   async create(scope: Scope, dto: CreateContractDto, now: Date) {
     return withScope(scope, async (tx) => {
@@ -78,6 +83,12 @@ export class ContractsService {
         },
       });
 
+      if (dto.templateVersionId) {
+        // Clauses du modèle COPIÉES (jamais référencées) : une mise à jour du
+        // modèle ne modifiera pas ce contrat (brief §4).
+        await this.structure.initializeFromTemplate(tx, id, dto.templateVersionId, versionId, now, scope.userId);
+        return tx.contract.findUniqueOrThrow({ where: { id } });
+      }
       await tx.contractVersion.create({
         data: {
           id: versionId,
@@ -93,66 +104,6 @@ export class ContractsService {
       });
 
       return contract;
-    });
-  }
-
-  /**
-   * Enregistrement d'un contrat existant (déjà signé hors LSI) : pas de
-   * cycle DRAFT→…→ACTIVE, on crée directement en ACTIVE/IMPORTED avec le
-   * document source comme preuve. L'unicité de référence est vérifiée
-   * AVANT de stocker le fichier — pas d'objet orphelin en cas de 409.
-   */
-  async importContract(
-    scope: Scope,
-    dto: ImportContractDto,
-    file: { buffer: Buffer; mimetype: string; originalname: string },
-    now: Date,
-  ): Promise<{ id: string }> {
-    return withScope(scope, async (tx) => {
-      const customer = await tx.customer.findUnique({ where: { id: dto.customerId } });
-      if (!customer) throw new NotFoundException('Client introuvable');
-      // Unicité de référence AVANT de stocker le fichier (pas d'objet orphelin).
-      const dup = await tx.contract.findFirst({ where: { reference: dto.reference }, select: { id: true } });
-      if (dup) throw new ConflictException({ code: 'REF_DUP', detail: 'Un contrat avec cette référence existe déjà.' });
-
-      const id = uuidv7();
-      const ext = file.mimetype === 'application/pdf' ? 'pdf' : 'docx';
-      const key = `t/${scope.tenantId}/c/${dto.customerId}/imported/${id}.${ext}`;
-      assertKeyMatchesScope(key, { tenantId: scope.tenantId, customerId: dto.customerId });
-      await this.storage.put(key, file.buffer, { tenantId: scope.tenantId, customerId: dto.customerId }, file.mimetype);
-      const sha256 = createHash('sha256').update(file.buffer).digest('hex');
-
-      try {
-        await tx.contract.create({
-          data: {
-            id, tenantId: scope.tenantId, customerId: dto.customerId,
-            reference: dto.reference, title: dto.title, type: 'MAIN',
-            status: 'ACTIVE', origin: 'IMPORTED', category: dto.category ?? 'MAINTENANCE',
-            currentVersionId: null,
-            startDate: dto.startDate ? new Date(dto.startDate) : null,
-            endDate: dto.endDate ? new Date(dto.endDate) : null,
-            noticePeriodDays: dto.noticePeriodDays ?? null,
-            amountCents: dto.amountCents !== undefined ? BigInt(dto.amountCents) : null,
-            billingFrequency: 'MONTHLY',
-            signedAt: dto.signedAt ? new Date(dto.signedAt) : null,
-            activatedAt: dto.startDate ? new Date(dto.startDate) : now,
-            importedDocumentKey: key, importedDocumentName: file.originalname,
-            importedDocumentSha256: sha256, importedDocumentContentType: file.mimetype,
-            ownerUserId: scope.userId, createdAt: now, updatedAt: now,
-            createdByUserId: scope.userId, updatedByUserId: scope.userId,
-          },
-        });
-      } catch (e) {
-        // Le pré-check `findFirst` ci-dessus est TOCTOU : une course
-        // concurrente sur (tenantId, reference) viole la contrainte unique
-        // et Prisma lève P2002 — on la traduit en 409 plutôt que de laisser
-        // fuiter une erreur brute en 500 (même filet que renew/amend).
-        if ((e as { code?: string }).code === 'P2002') {
-          throw new ConflictException({ code: 'REF_DUP', detail: 'Un contrat avec cette référence existe déjà.' });
-        }
-        throw e;
-      }
-      return { id };
     });
   }
 
@@ -384,7 +335,7 @@ export class ContractsService {
         orderBy: { submittedAt: 'desc' },
       });
 
-      const snapshot = this.toSnapshot(c, approval?.submittedByUserId ?? null);
+      const snapshot = toContractSnapshot(c, { submittedByUserId: approval?.submittedByUserId ?? null });
 
       let next: ContractSnapshot;
       try {
@@ -457,18 +408,7 @@ export class ContractsService {
         });
       }
 
-      return tx.contract.update({
-        where: { id },
-        data: {
-          status: next.status,
-          approvedVersionId: next.approvedVersionId,
-          signedAt: next.signedAt ?? null,
-          activatedAt: next.activatedAt ?? null,
-          terminatedAt: next.terminatedAt ?? null,
-          updatedAt: now,
-          updatedByUserId: scope.userId,
-        },
-      });
+      return persistTransition(tx, id, event, next, now, scope.userId);
     });
   }
 
@@ -486,11 +426,24 @@ export class ContractsService {
       });
       if (!c) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
-      const effectiveDate = new Date(dto.effectiveDate);
+      // Date due selon le préavis et la période en cours (brief §2) : c'est la
+      // référence du respect du préavis, y compris quand une date est demandée.
+      const due = computeTerminationEffectiveDate({
+        today: now,
+        notice: { days: c.noticePeriodDays, months: c.noticePeriodMonths },
+        periodEnd: c.endDate,
+        renewalPeriodMonths: c.renewalMode === 'TACIT' ? c.renewalPeriodMonths : null,
+      }).effectiveDate;
+      const effectiveDate = dto.effectiveDate ? new Date(dto.effectiveDate) : due;
       const isAdmin = session.roles.includes('MSP_ADMIN');
-      const snapshot = this.toSnapshot(c, null);
+      const snapshot = toContractSnapshot(c);
+      const event: ContractEvent = {
+        type: 'TERMINATE', actorUserId: session.userId, reason: dto.reason, effectiveDate, isAdmin, overrideReason: dto.overrideReason,
+        minEffectiveDate: due,
+      };
+      let next: ContractSnapshot;
       try {
-        applyEvent(snapshot, { type: 'TERMINATE', actorUserId: session.userId, reason: dto.reason, effectiveDate, isAdmin, overrideReason: dto.overrideReason }, now);
+        next = applyEvent(snapshot, event, now);
       } catch (e) {
         if (e instanceof InvalidTransitionError) {
           throw new ConflictException({ code: e.code, detail: e.message, currentStatus: e.currentStatus, allowedTransitions: e.allowedTransitions });
@@ -501,7 +454,7 @@ export class ContractsService {
         throw e;
       }
 
-      const noticeRespected = isNoticeRespected(c.noticePeriodDays, effectiveDate, now);
+      const noticeRespected = effectiveDate.getTime() >= due.getTime();
 
       await tx.cancellation.create({
         data: {
@@ -514,12 +467,12 @@ export class ContractsService {
         },
       });
 
-      await tx.contract.update({
-        where: { id },
-        data: { status: 'TERMINATED', terminatedAt: now, updatedAt: now, updatedByUserId: session.userId },
-      });
+      // L'état vient de la machine : TERMINATION_PENDING tant que la date
+      // d'effet n'est pas atteinte (le job quotidien achève la résiliation),
+      // TERMINATED si elle l'est déjà.
+      await persistTransition(tx, id, event, next, now, session.userId);
 
-      return { status: 'TERMINATED' as const, effectiveDate: dto.effectiveDate, noticeRespected };
+      return { status: next.status, effectiveDate: effectiveDate.toISOString().slice(0, 10), noticeRespected };
     });
   }
 
@@ -541,7 +494,7 @@ export class ContractsService {
       if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
       try {
-        assertCanRenew(this.toSnapshot(parent, null));
+        assertCanRenew(toContractSnapshot(parent));
       } catch (e) {
         if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
         throw e;
@@ -677,7 +630,7 @@ export class ContractsService {
       if (!parent) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
       try {
-        assertCanAmend(this.toSnapshot(parent, null));
+        assertCanAmend(toContractSnapshot(parent));
       } catch (e) {
         if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message, rule: e.rule });
         throw e;
@@ -749,40 +702,26 @@ export class ContractsService {
         include: { signers: { select: { party: true } } },
       });
       if (!c) throw new NotFoundException('Contrat introuvable');
-      return allowedEvents(this.toSnapshot({ ...c, attachments: [], amendments: [] }, null));
+      return allowedEvents(toContractSnapshot({ ...c, amendments: [] }), new Date());
     });
   }
 
-  private toSnapshot(c: any, submittedByUserId: string | null): ContractSnapshot {
-    const OPEN = ['CANCELLED', 'DECLINED', 'TERMINATED', 'EXPIRED', 'RENEWED'];
-    return {
-      id: c.id,
-      type: c.type,
-      status: c.status,
-      startDate: c.startDate,
-      endDate: c.endDate,
-      noticePeriodDays: c.noticePeriodDays,
-      currentVersionId: c.currentVersionId,
-      approvedVersionId: c.approvedVersionId,
-      submittedByUserId,
-      hasLsiSigner: (c.signers ?? []).some((s: any) => s.party === 'LSI'),
-      hasClientSigner: (c.signers ?? []).some((s: any) => s.party === 'CLIENT'),
-      // Simplification MVP : la notion de pièce jointe OBLIGATOIRE dépendra
-      // du modèle (ticket C-02). Aucune n'est obligatoire aujourd'hui.
-      hasRequiredAttachments: true,
-      openAmendmentExists: (c.amendments ?? []).some((a: any) => !OPEN.includes(a.status)),
-      // `successorContractId` est désormais posé dès la création d'un
-      // successeur DRAFT non signé (cf. `renew`) : un lien existant ne veut
-      // PAS dire « signé ». La transition EXPIRE→RENEWED n'est décidée que
-      // par le sweep de cycle de vie (lifecycle.service.ts), qui construit
-      // son propre snapshot à partir du VRAI `signedAt` du successeur. Ce
-      // snapshot générique ne doit donc jamais prétendre à un successeur
-      // signé à partir d'un simple lien (cf. signature-actions.service.ts).
-      hasSignedSuccessor: false,
-      signedAt: c.signedAt,
-      activatedAt: c.activatedAt,
-      terminatedAt: c.terminatedAt,
-    };
+  async lifecycle(scope: Scope, id: string) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id }, select: { id: true } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      const events = await tx.lifecycleEvent.findMany({ where: { contractId: id }, orderBy: { seq: 'asc' } });
+      const userIds = [...new Set(events.map((e) => e.actorUserId).filter((x): x is string => !!x))];
+      const users = await tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } });
+      const names = new Map(users.map((u) => [u.id, u.fullName]));
+      return {
+        items: events.map((e) => ({
+          at: e.occurredAt, from: e.fromStatus, to: e.toStatus, event: e.event, reason: e.reason,
+          actor: e.actorUserId ? { id: e.actorUserId, name: names.get(e.actorUserId) ?? null } : null,
+          actorKind: e.actorKind,
+        })),
+      };
+    });
   }
 
   private async nextReference(tx: any, tenantId: string, now: Date): Promise<string> {

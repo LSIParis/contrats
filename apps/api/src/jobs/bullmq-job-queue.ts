@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import {
   QUEUE_NAME,
   type CaptureProofJob,
+  type ImportOcrJob,
   type JobQueue,
   type SendReminderJob,
 } from './job-queue.port.js';
@@ -60,6 +61,19 @@ export class BullMqJobQueue implements JobQueue, OnModuleDestroy {
       // Séparateur « - » (jamais « : ») : cf. enqueueCaptureProof — BullMQ v5
       // rejette un jobId contenant « : ».
       jobId: `reminder-${data.reminderId}`,
+    });
+  }
+
+  async enqueueImportOcr(data: ImportOcrJob): Promise<void> {
+    await this.queue.add('import-ocr', data, {
+      // Les nouvelles tentatives sont gérées par ImportsService (compteur en
+      // base, 3 essais) : BullMQ ne réessaie pas en plus, sinon on compterait
+      // double et l'état en base divergerait de l'état de la file.
+      attempts: 1,
+      removeOnComplete: 200,
+      removeOnFail: 1_000,
+      // Un OCR par import et par tentative : un double enfilement est dédoublonné.
+      jobId: `ocr-${data.importId}-${Date.now()}`,
     });
   }
 

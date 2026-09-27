@@ -3,6 +3,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { assertKeyMatchesScope, type DocumentStorage, type ObjectScope } from './document-storage.port.js';
@@ -39,6 +40,17 @@ export class S3Storage implements DocumentStorage {
       forcePathStyle: !!endpoint, // MinIO exige le path-style
       credentials: { accessKeyId, secretAccessKey },
     });
+  }
+
+  async ping(): Promise<boolean> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      return true;
+    } catch (e) {
+      // Journalisé sans l'URL ni les identifiants : juste la nature de l'erreur.
+      this.log.warn(`Stockage injoignable : ${(e as Error).name}`);
+      return false;
+    }
   }
 
   async put(key: string, data: Buffer, scope: ObjectScope, contentType = 'application/octet-stream'): Promise<void> {

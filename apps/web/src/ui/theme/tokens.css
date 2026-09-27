@@ -1,0 +1,61 @@
+/* ============================================================================
+   LSI Contrats — jetons de design, recopiés de lticket.
+   Source : LSIParis/ticket, apps/console/src/styles.css, bloc :root (l. 6-63).
+   Pendant TypeScript : ./tokens.ts (utilisé par tailwind.config.ts et les tests).
+   Le test theme-tokens.test.ts garantit que les deux fichiers restent identiques.
+   Pas de mode sombre : lticket déclare `color-scheme: light` (l. 62) et n'a aucune
+   règle prefers-color-scheme.
+   ========================================================================== */
+
+:root {
+  /* Menthe (accent) — styles.css l. 8-10 */
+  --mint-50:#F3FCF9; --mint-100:#E6F9F3; --mint-200:#C8F4E6; --mint-300:#93ECD0;
+  --mint-400:#56E6B8; --mint-500:#1BDA9D; --mint-600:#16B683; --mint-700:#13966C;
+  --mint-800:#0F7B59; --mint-900:#0B5B42; --mint-950:#062D21;
+  /* Pétrole (surfaces sombres) — styles.css l. 12 */
+  --petrol-700:#3B5E6D; --petrol-800:#304D5A; --petrol-900:#243942; --petrol-950:#121D21;
+  /* Slate (neutres) — styles.css l. 14-16 */
+  --slate-50:#F9FAFB; --slate-100:#F3F5F6; --slate-200:#E5E9EB; --slate-300:#CED5DA;
+  --slate-400:#96A5B0; --slate-500:#677B89; --slate-600:#53636E; --slate-700:#424E57;
+  --slate-800:#303940; --slate-900:#232A2F; --slate-950:#14171A;
+
+  /* Sémantiques (≥ 4,5:1 sur leur propre fond) — styles.css l. 28-31 */
+  --success:#117F3A; --success-bg:#E7F6EC;
+  --warn:#B25209;    --warn-bg:#FBF0DD;
+  --danger:#D12424;  --danger-bg:#FCE9E9;
+  --danger-hover:#B91C1C; /* .btn-danger:hover — l. 234 */
+  --info:#0F7B59;    --info-bg:#F3FCF9;
+
+  /* Rôles — styles.css l. 34-49 */
+  --bg:#F9FAFB;
+  --surface:#FFFFFF;
+  --border:#E5E9EB;
+  --border-strong:#CED5DA;
+  --text:#232A2F;
+  --text-muted:#53636E;
+  --text-faint:#637684;
+  --primary:#0F7B59;
+  --primary-hover:#0B5B42;
+  --accent:#1BDA9D;
+  --focus:#13966C;
+  --overlay:rgba(18, 29, 33, .45); /* .modal-fond — l. 749 */
+
+  /* Forme — styles.css l. 52-56 */
+  --radius-sm:6px; --radius:10px; --radius-lg:14px; --radius-full:999px;
+  --shadow-sm:0 1px 2px rgba(18,29,33,.06);
+  --shadow:0 1px 3px rgba(18,29,33,.08), 0 1px 2px rgba(18,29,33,.04);
+  --shadow-md:0 4px 12px rgba(18,29,33,.08);
+  --shadow-pop:0 8px 28px rgba(18,29,33,.16);
+
+  /* Espacements & gabarit — styles.css l. 57-59, 145-153 */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px;
+  --sidebar-w:248px;
+  --content-max:1180px;
+  --topbar-h:60px;
+
+  /* Typographie — styles.css l. 60 (Inter auto-hébergée via @fontsource/inter) */
+  --font:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  color-scheme: light;
+}

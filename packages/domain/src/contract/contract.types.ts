@@ -24,6 +24,14 @@ export const CONTRACT_STATUSES = [
   'RENEWED',
   'CANCELLED',
   'DECLINED',
+  // v2 (docs/contrats/02-cycle-de-vie.md)
+  'SENT_TO_CLIENT',
+  'IN_NEGOTIATION',
+  'ACCEPTED',
+  'SIGNATURE_EXPIRED',
+  'RENEWAL_DUE',
+  'TERMINATION_PENDING',
+  'IMPORTED_PENDING_VALIDATION',
 ] as const;
 
 export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
@@ -34,10 +42,10 @@ export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
  * EXPIRED n'en fait PAS partie — un renouvellement tardif rétroactif est un
  * cas réel et fréquent (§7.2 note 2).
  */
-export const TERMINAL_STATUSES = ['TERMINATED', 'RENEWED', 'CANCELLED', 'DECLINED'] as const;
+export const TERMINAL_STATUSES = ['TERMINATED', 'RENEWED', 'CANCELLED'] as const;
 
 /** Statuts où le fond contractuel est éditable (RM-04). */
-export const EDITABLE_STATUSES = ['DRAFT', 'CHANGES_REQUESTED'] as const;
+export const EDITABLE_STATUSES = ['DRAFT', 'CHANGES_REQUESTED', 'IN_NEGOTIATION'] as const;
 
 export type ContractType = 'MAIN' | 'AMENDMENT';
 
@@ -78,6 +86,16 @@ export interface ContractSnapshot {
   readonly signedAt?: Date | null;
   readonly activatedAt?: Date | null;
   readonly terminatedAt?: Date | null;
+
+  // --- v2 (02-cycle-de-vie.md). Optionnels : absent = null / false. -------
+  /** V2-ACC : version acceptée par le client (distincte de la signature). */
+  readonly acceptedVersionId?: string | null;
+  /** V2-AI : au moins une clause générée par IA n'a pas été validée. */
+  readonly hasUnreviewedAiClauses?: boolean;
+  /** Date d'effet d'une résiliation programmée (TERMINATION_PENDING). */
+  readonly terminationEffectiveDate?: Date | null;
+  /** Variables du contrat type encore sans valeur (`[à compléter : …]`). */
+  readonly hasMissingVariables?: boolean;
 }
 
 export type ContractEvent =
@@ -85,13 +103,24 @@ export type ContractEvent =
   | { type: 'APPROVE'; actorUserId: string }
   | { type: 'REQUEST_CHANGES'; actorUserId: string; reason: string }
   | { type: 'EDIT_CONTENT'; actorUserId: string }
+  | { type: 'SEND_TO_CLIENT'; actorUserId: string }
+  /** L'acceptation porte sur la version PRÉSENTÉE au client (V2-ACC). */
+  | { type: 'CLIENT_ACCEPT'; versionId: string }
+  | { type: 'OPEN_NEGOTIATION'; actorUserId: string; reason: string }
+  | { type: 'REOPEN_NEGOTIATION'; actorUserId: string; reason: string }
   | { type: 'SEND_FOR_SIGNATURE'; actorUserId: string }
   | { type: 'REVOKE_SIGNATURE'; actorUserId: string }
   /** Émis par le SYSTEM sur webhook vérifié uniquement (RM-14). */
   | { type: 'SIGNER_SIGNED'; allSigned: boolean }
   | { type: 'SIGNER_DECLINED'; reason: string }
+  /** Émis par le SYSTEM (webhook submission.expired ou réconciliation). */
+  | { type: 'SIGNATURE_EXPIRE' }
   | { type: 'ACTIVATE' }
+  | { type: 'VALIDATE_IMPORT'; actorUserId: string }
   | { type: 'EXPIRE' }
+  | { type: 'OPEN_RENEWAL' }
+  | { type: 'RENEW_PERIOD'; newEndDate: Date }
+  | { type: 'CLOSE_RENEWAL'; actorUserId: string; reason: string }
   | { type: 'MARK_RENEWED'; successorContractId: string }
   | { type: 'CANCEL'; actorUserId: string; reason: string }
   | {
@@ -101,6 +130,15 @@ export type ContractEvent =
       effectiveDate: Date;
       isAdmin: boolean;
       overrideReason?: string;
-    };
+      /**
+       * Date d'effet due selon le préavis et la période en cours
+       * (computeTerminationEffectiveDate). Fournie, elle remplace le seul
+       * contrôle « aujourd'hui + préavis en jours » : une date antérieure est
+       * une dérogation (administrateur + justification).
+       */
+      minEffectiveDate?: Date;
+    }
+  | { type: 'COMPLETE_TERMINATION' }
+  | { type: 'WITHDRAW_TERMINATION'; actorUserId: string; reason: string };
 
 export type ContractEventType = ContractEvent['type'];

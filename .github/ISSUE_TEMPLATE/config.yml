@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Signaler une vulnérabilité
+    url: mailto:securite@lsi-maintenance.fr
+    about: Ne publiez jamais une faille de sécurité dans une issue. Écrivez-nous directement.

@@ -10,22 +10,22 @@ import {
   Post,
   Query,
   Res,
-  UploadedFile,
-  UseInterceptors,
+  UnprocessableEntityException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
-import type { Scope } from '@lsi/persistence';
+import type { FastifyReply } from 'fastify';
+import { sendFile } from '../common/http-io.js';
+import { appendAudit, type Scope } from '@lsi/persistence';
+import { TenantConfigService } from '../tenant/tenant-config.service.js';
 import { ContractsService } from './contracts.service.js';
 import { SendForSignatureService } from '../signature/send-for-signature.service.js';
 import { CreateContractDto } from './dto/create-contract.dto.js';
-import { ImportContractDto } from './dto/import-contract.dto.js';
 import { SendForSignatureDto } from './dto/send-for-signature.dto.js';
 import { ListContractsDto } from './dto/list-contracts.dto.js';
 import { TerminateContractDto } from './dto/terminate-contract.dto.js';
 import { RefuseRenewalDto } from './dto/refuse-renewal.dto.js';
 import { AmendContractDto } from './dto/amend-contract.dto.js';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import { ServiceReadable } from '../auth/service-readable.decorator.js';
 import type { Session } from '../auth/session.service.js';
 import { IsString, MinLength } from 'class-validator';
@@ -54,6 +54,7 @@ export class ContractsController {
   constructor(
     private readonly contracts: ContractsService,
     private readonly send: SendForSignatureService,
+    private readonly config: TenantConfigService,
   ) {}
 
   @Post()
@@ -62,23 +63,28 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Body() dto: CreateContractDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
-    return this.contracts.create(scope, dto, new Date());
-  }
-
-  @Post('import')
-  @UseInterceptors(FileInterceptor('document', { limits: { fileSize: 20 * 1024 * 1024 } }))
-  async import(
-    @CurrentScope() scope: Scope,
-    @CurrentSession() session: Session,
-    @UploadedFile() file: Express.Multer.File | undefined,
-    @Body() dto: ImportContractDto,
-  ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
-    if (!file) throw new BadRequestException('Document manquant.');
-    const ALLOWED = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!ALLOWED.includes(file.mimetype)) throw new BadRequestException('Format non supporté (PDF ou DOCX).');
-    return this.contracts.importContract(scope, dto, file, new Date());
+    assertCan(session, 'contracts.write');
+    // Lot 9 (brief §12, règle 1) : derrière `contrats.proposals.required`, la
+    // création directe est réservée à l'administrateur, motif obligatoire.
+    // Import, avenant et renouvellement ont leurs propres routes : non concernés.
+    const required = await this.config.isEnabled(scope, 'contrats.proposals.required');
+    if (required && (!session.roles.includes('MSP_ADMIN') || !dto.directCreationReason?.trim())) {
+      throw new UnprocessableEntityException({
+        code: 'PROPOSAL_REQUIRED',
+        detail:
+          'Tout nouveau contrat naît d’une proposition signée. Création directe réservée à un administrateur, avec un motif (directCreationReason).',
+      });
+    }
+    const now = new Date();
+    const created = await this.contracts.create(scope, dto, now);
+    if (required) {
+      await appendAudit({
+        tenantId: scope.tenantId, customerId: dto.customerId, actorUserId: session.userId, actorKind: 'INTERNAL',
+        actorIp: null, actorUserAgent: null, action: 'contract.direct_creation', resourceType: 'contract',
+        resourceId: created.id, after: { reason: dto.directCreationReason }, requestId: null, occurredAt: now,
+      });
+    }
+    return created;
   }
 
   @Get()
@@ -101,13 +107,32 @@ export class ContractsController {
     return this.contracts.signedDocumentUrl(scope, id);
   }
 
+  /**
+   * Document source (ORIGINAL) d'un contrat importé. `?disposition=inline` :
+   * affichage dans l'écran de validation (cadre de même origine, CSP
+   * frame-ancestors 'self') ; par défaut, téléchargement.
+   */
   @Get(':id/imported-document')
-  async importedDocument(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async importedDocument(
+    @CurrentScope() scope: Scope,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('disposition') disposition: string | undefined,
+    @Res() res: FastifyReply,
+  ) {
     const { buffer, name, contentType } = await this.contracts.getImportedDocument(scope, id);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${slugifyFilename(name, 'document')}"`);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.send(buffer);
+    sendFile(res, {
+      body: buffer, contentType, filename: slugifyFilename(name, 'document'),
+      disposition: disposition === 'inline' ? 'inline' : 'attachment',
+    });
+  }
+
+  /**
+   * Journal des transitions (lifecycle_events, écrit par trigger) : qui, quand,
+   * de quel état vers lequel, par quel événement, pour quel motif.
+   */
+  @Get(':id/lifecycle')
+  lifecycle(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    return this.contracts.lifecycle(scope, id);
   }
 
   @Get(':id/allowed-actions')
@@ -123,7 +148,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.contracts.applyEvent(
       scope,
       id,
@@ -140,7 +165,7 @@ export class ContractsController {
   ) {
     // RM-10 : le rôle autorise, mais le DOMAINE refusera si l'acteur est
     // celui qui a soumis. Rôle, scope et état sont trois contrôles distincts.
-    assertRole(session, ['MSP_ADMIN', 'LEGAL_REVIEWER']);
+    assertCan(session, 'contracts.review');
     return this.contracts.applyEvent(
       scope,
       id,
@@ -156,7 +181,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReasonDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'LEGAL_REVIEWER']);
+    assertCan(session, 'contracts.review');
     return this.contracts.applyEvent(
       scope,
       id,
@@ -174,7 +199,7 @@ export class ContractsController {
     @Body() dto: SendForSignatureDto,
     @Headers('idempotency-key') idempotencyKey: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.sendForSignature');
 
     // Obligatoire, pas optionnelle. Sans clé, un timeout réseau suivi d'un
     // réessai enverrait DEUX invitations au client (§11.8). On refuse plutôt
@@ -200,7 +225,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TerminateContractDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.terminate(scope, id, dto, session, new Date());
   }
 
@@ -210,7 +235,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.renew(scope, id, session, new Date());
   }
 
@@ -221,7 +246,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RefuseRenewalDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.refuseRenewal(scope, id, dto.reason, session, new Date());
   }
 
@@ -232,7 +257,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AmendContractDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.write');
     return this.contracts.amend(scope, id, dto, session, new Date());
   }
 
@@ -242,7 +267,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.archive(scope, id, session.userId, new Date());
   }
 
@@ -252,7 +277,7 @@ export class ContractsController {
     @CurrentSession() session: Session,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.unarchive(scope, id, session.userId, new Date());
   }
 
@@ -263,7 +288,7 @@ export class ContractsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReasonDto,
   ) {
-    assertRole(session, ['MSP_ADMIN', 'ACCOUNT_MANAGER']);
+    assertCan(session, 'contracts.lifecycle');
     return this.contracts.applyEvent(
       scope,
       id,

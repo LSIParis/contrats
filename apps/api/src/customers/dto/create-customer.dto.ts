@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -33,4 +33,23 @@ export class CreateCustomerDto {
 
   @IsOptional() @IsString() @MaxLength(2000)
   notes?: string;
+
+  /**
+   * Consommateur ou non-professionnel (art. liminaire C. conso.) : déclenche
+   * l'obligation d'information de la loi Chatel sur les contrats à tacite
+   * reconduction (02-cycle-de-vie §5). Défaut : professionnel.
+   */
+  @IsOptional() @IsBoolean()
+  isConsumer?: boolean;
+
+  /** Référence du client dans Client Help (ou saisie locale). Unique par tenant. */
+  @IsOptional() @IsString() @MaxLength(100)
+  externalRef?: string;
+
+  /**
+   * Statut commercial (lot 9) : un prospect créé depuis une proposition est
+   * `PROSPECT` ; il devient `CLIENT` à la signature. Défaut : `CLIENT`.
+   */
+  @IsOptional() @IsIn(['PROSPECT', 'CLIENT'])
+  commercialStatus?: 'PROSPECT' | 'CLIENT';
 }

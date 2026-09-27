@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
@@ -10,7 +11,7 @@ import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/test
 let app: INestApplication; let fx: TwoCustomerFixture;
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true })); await app.init();
+  app = await createTestApp(mod);
   fx = await seedTwoCustomers();
   const s = app.get(SessionService);
   await s.put({ sessionId: 'sess-admin', userId: fx.adminUserId, tenantId: fx.tenantId, roles: ['MSP_ADMIN'], scope: adminScope(fx.tenantId, fx.adminUserId) }, 3600);
@@ -32,6 +33,13 @@ describe('bibliothèque de modèles', () => {
     expect(detail.body.currentVersion.isImmutable).toBe(false);
     const list = await req('sess-admin', 'get', '/v1/templates').expect(200);
     expect(list.body.items.some((t: any) => t.id === id)).toBe(true);
+  });
+
+  test('la liste expose le slug de rattachement aux modèles de proposition (lot 9)', async () => {
+    const id = await newTemplate();
+    await req('sess-admin', 'put', `/v1/proposal-admin/contract-templates/${id}/slug`).send({ slug: `rssi-${id.slice(-6)}` }).expect(200);
+    const list = await req('sess-admin', 'get', '/v1/templates').expect(200);
+    expect(list.body.items.find((t: any) => t.id === id)).toMatchObject({ slug: `rssi-${id.slice(-6)}` });
   });
 
   test('enregistrement : sanitise + extrait les variables des placeholders', async () => {

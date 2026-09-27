@@ -1,4 +1,4 @@
-import type { Response } from 'express';
+import type { FastifyReply } from 'fastify';
 
 /**
  * Cookie de session. (§13.1)
@@ -15,16 +15,17 @@ import type { Response } from 'express';
 const PROD = process.env.NODE_ENV === 'production';
 export const SESSION_COOKIE = PROD ? '__Host-lsi_sess' : 'lsi_sess';
 
-export function setSessionCookie(res: Response, sessionId: string, maxAgeSeconds: number): void {
-  res.cookie(SESSION_COOKIE, sessionId, {
+export function setSessionCookie(res: FastifyReply, sessionId: string, maxAgeSeconds: number): void {
+  void res.setCookie(SESSION_COOKIE, sessionId, {
     httpOnly: true,
     secure: PROD,
     sameSite: 'strict',
     path: '/',
-    maxAge: maxAgeSeconds * 1000,
+    // @fastify/cookie : maxAge en SECONDES (Express l'attendait en ms).
+    maxAge: maxAgeSeconds,
   });
 }
 
-export function clearSessionCookie(res: Response): void {
-  res.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: PROD, sameSite: 'strict', path: '/' });
+export function clearSessionCookie(res: FastifyReply): void {
+  void res.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: PROD, sameSite: 'strict', path: '/' });
 }

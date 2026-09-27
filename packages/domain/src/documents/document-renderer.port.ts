@@ -8,6 +8,12 @@
 export interface RenderRequest {
   readonly html: string;
   readonly documentTitle: string;
+  /**
+   * Pied de page répété sur chaque page (HTML autonome, styles en ligne).
+   * Porte les balises de paraphe DocuSeal (voir text-tags.ts). Le moteur y
+   * remplace `<span class="pageNumber">` par le numéro de la page courante.
+   */
+  readonly footerHtml?: string;
 }
 
 export interface RenderedDocument {

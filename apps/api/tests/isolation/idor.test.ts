@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
@@ -19,19 +20,10 @@ const SESS_CLIENT_A = 'sess-client-a';
 
 beforeAll(async () => {
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = mod.createNestApplication();
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      // Un champ inconnu dans le body fait ÉCHOUER la requête au lieu d'être
-      // silencieusement ignoré. Sans cela, un `tenantId` envoyé par un client
-      // serait dropped sans bruit — et le jour où un développeur lit le body
-      // brut quelque part, il serait là.
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-  await app.init();
+  // createTestApp applique le ValidationPipe de production : un champ inconnu
+  // dans le body (ex. `tenantId`) fait ÉCHOUER la requête au lieu d'être
+  // silencieusement ignoré.
+  app = await createTestApp(mod);
 
   fx = await seedTwoCustomers();
 

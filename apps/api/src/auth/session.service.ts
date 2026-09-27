@@ -10,7 +10,9 @@ export type RoleCode =
   | 'LEGAL_REVIEWER'
   | 'TECHNICIAN'
   | 'CLIENT_SIGNER'
-  | 'CLIENT_VIEWER';
+  | 'CLIENT_VIEWER'
+  | 'INTERNAL_SIGNATORY'
+  | 'READER';
 
 export interface Session {
   readonly sessionId: string;

@@ -1,31 +1,82 @@
-# Ne pas envoyer au contexte de build ce qui l'alourdit ou ne doit pas y être.
+# Contexte de build de l'image applicative — STRICT.
+# Principe : on n'envoie que ce que le build utilise (manifestes, lockfile,
+# sources apps/* et packages/*, schéma + migrations Prisma, deploy/migrate.sh).
+# Tout le reste est exclu. Une exclusion de trop fait échouer le build (bruyant) ;
+# une inclusion de trop peut faire fuiter un secret dans une couche (silencieux).
+
+# --- Secrets et configuration locale : JAMAIS dans une image --------------
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+id_ed25519*
+id_rsa*
+*_deploy
+*_deploy.pub
+stack.env
+**/stack.env
+*.tfvars
+*.tfstate*
+
+# --- Git, CI, outillage de l'agent -----------------------------------------
+.git
+.gitattributes
+.gitignore
+.github
+.claude
+**/.claude
+worktrees
+.worktrees
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# --- Dépendances et artefacts : reconstruits dans l'image -----------------
 node_modules
 **/node_modules
+.pnpm-store
 dist
 **/dist
-.next
-**/.next
+build
+**/build
 .turbo
 **/.turbo
+*.tsbuildinfo
 coverage
 **/coverage
 test-results
 playwright-report
+.vitest
+*.log
 
-# Secrets et local — JAMAIS dans une image (§13.5)
-.env
-.env.*
-!.env.example
-.env.docuseal
+# --- Tests et configuration de test : jamais exécutés dans l'image --------
+**/tests
+**/test
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+**/*.test.tsx
+**/*.spec.tsx
+**/vitest.config.ts
+**/vitest.integration.config.ts
+**/vitest.setup.ts
+eslint.config.js
 
-# Git et docs : inutiles au runtime
-.git
-.github
+# --- Documentation ---------------------------------------------------------
 docs
 *.md
-!README.md
+**/*.md
+cliff.toml
 
-# Divers
-.vscode
-.idea
-*.log
+# --- Infra hors image applicative -------------------------------------------
+# deploy/ contient d'autres images (ocr, backup) et des scripts d'exploitation :
+# seul migrate.sh est exécuté par le job `migrate`.
+deploy
+!deploy/migrate.sh
+docker-compose*.yml
+Dockerfile
+.dockerignore
+scripts

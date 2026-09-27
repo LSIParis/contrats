@@ -64,6 +64,12 @@ describe('WITH CHECK — on ne peut pas ÉCRIRE hors de son scope', () => {
   test('UPDATE déplaçant un contrat vers un autre client est rejeté', async () => {
     // Sans WITH CHECK, ceci passerait : on lirait son scope mais on écrirait
     // dans celui d'un autre. C'est l'oubli classique des implémentations RLS.
+    //
+    // Depuis la migration 17, même un admin (qui a les deux clients dans son
+    // scope) ne peut plus déplacer un contrat : son historique de transitions
+    // (lifecycle_events, FK composite NO ACTION, append-only) appartient au
+    // client A et ne le suit pas. Un contrat ne change pas de client — il se
+    // résilie et un nouveau est émis. C'est voulu (valeur probante).
     await expect(
       withScope(adminScope(fx.tenantId), (tx) =>
         tx.contract.update({
@@ -71,15 +77,7 @@ describe('WITH CHECK — on ne peut pas ÉCRIRE hors de son scope', () => {
           data: { customerId: fx.customerB.id },
         }),
       ),
-    ).resolves.toBeDefined(); // un admin a les deux clients dans son scope
-
-    // Remise en état
-    await withScope(adminScope(fx.tenantId), (tx) =>
-      tx.contract.update({
-        where: { id: fx.customerA.contractId },
-        data: { customerId: fx.customerA.id },
-      }),
-    );
+    ).rejects.toThrow(/foreign key/i);
 
     // Mais un account manager restreint à A ne peut PAS l'envoyer chez B
     await expect(

@@ -8,17 +8,25 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "start": "node --import @swc-node/register/esm-register src/main.ts",
-    "start:dev": "node --watch --import @swc-node/register/esm-register src/main.ts"
+    "start:dev": "node --watch --import @swc-node/register/esm-register src/main.ts",
+    "start:worker": "node --import @swc-node/register/esm-register src/worker.ts",
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/api",
+    "openapi:generate": "node --import @swc-node/register/esm-register scripts/generate-openapi.ts",
+    "openapi:check": "node --import @swc-node/register/esm-register scripts/generate-openapi.ts --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.114.0",
     "@aws-sdk/client-s3": "^3.1090.0",
     "@aws-sdk/s3-request-presigner": "^3.1090.0",
+    "@fastify/cookie": "^9",
+    "@fastify/multipart": "^8",
+    "@fastify/static": "^7",
     "@lsi/domain": "workspace:*",
     "@lsi/persistence": "workspace:*",
+    "@lsi/pricing": "workspace:*",
     "@nestjs/common": "^10.4.15",
     "@nestjs/core": "^10.4.15",
-    "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/platform-fastify": "^10.4.15",
     "@nestjs/serve-static": "^4.0.2",
     "@swc-node/register": "^1.12.0",
     "@swc/core": "^1.15.43",
@@ -26,7 +34,7 @@
     "bullmq": "^5.80.8",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "cookie-parser": "^1.4.7",
+    "fastify": "4.28.1",
     "ioredis": "^5.11.1",
     "nestjs-pino": "^4.6.1",
     "openid-client": "^6.8.4",
@@ -41,9 +49,6 @@
     "@nestjs/testing": "^10.4.15",
     "@testcontainers/postgresql": "^10.28.0",
     "@testcontainers/redis": "^12.0.4",
-    "@types/cookie-parser": "^1.4.10",
-    "@types/express": "^5.0.0",
-    "@types/multer": "^2.2.0",
     "@types/node": "^22.9.0",
     "@types/sanitize-html": "^2.16.1",
     "@types/supertest": "^6.0.2",
@@ -51,6 +56,7 @@
     "testcontainers": "^10.13.2",
     "typescript": "^5.6.3",
     "unplugin-swc": "^1.5.9",
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.5",
+    "yaml": "2.9.0"
   }
 }

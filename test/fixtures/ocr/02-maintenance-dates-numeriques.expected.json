@@ -1,0 +1,14 @@
+{
+  "prestataireRaisonSociale": "GAMMA TECHNIQUE",
+  "prestataireSiren": "555123454",
+  "clientRaisonSociale": "DELTA CONSEIL",
+  "clientSiren": "111222334",
+  "dateSignature": "2023-02-20",
+  "dateEffet": "2023-03-01",
+  "dureeMois": 36,
+  "reconduction": "EXPRESSE",
+  "preavis": { "quantite": 90, "unite": "JOURS" },
+  "montantMensuelHtCentimes": null,
+  "montantAnnuelHtCentimes": 1200000,
+  "indiceRevision": "ICHT"
+}

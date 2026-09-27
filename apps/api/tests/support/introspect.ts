@@ -1,4 +1,6 @@
-import type { INestApplication } from '@nestjs/common';
+import { RequestMethod, type INestApplication } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants.js';
+import { MetadataScanner, ModulesContainer } from '@nestjs/core';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,27 +13,34 @@ export interface RouteInfo {
 }
 
 /**
- * Énumère les routes réellement montées, depuis le routeur Express.
+ * Énumère les routes déclarées par les contrôleurs RÉELLEMENT enregistrés
+ * dans l'application (conteneur de modules Nest).
  *
- * On lit le routeur plutôt qu'une liste écrite à la main : une liste
- * manuelle serait à jour le jour où on l'écrit, et fausse le lendemain.
+ * On lit les métadonnées de routage de Nest plutôt qu'une liste écrite à la
+ * main : une liste manuelle serait à jour le jour où on l'écrit, et fausse le
+ * lendemain. (Avant la bascule Fastify, on lisait le routeur Express ; lire
+ * les métadonnées Nest rend l'outil indépendant de l'adaptateur HTTP.)
  */
 export function listRoutes(app: INestApplication): RouteInfo[] {
-  const server = app.getHttpServer();
-  const router = server._events?.request?._router ?? server._router;
-  const stack: any[] = router?.stack ?? [];
+  const modules = app.get(ModulesContainer);
+  const scanner = new MetadataScanner();
   const out: RouteInfo[] = [];
-
-  for (const layer of stack) {
-    if (!layer.route) continue;
-    const routePath: string = layer.route.path;
-    for (const l of layer.route.stack ?? []) {
-      out.push({
-        method: (l.method ?? 'get').toUpperCase(),
-        path: routePath,
-        handler: l.handle,
-        controller: l.handle,
-      });
+  for (const mod of modules.values()) {
+    for (const wrapper of mod.controllers.values()) {
+      const ctrl = wrapper.metatype as Function | null;
+      if (!ctrl || !wrapper.instance) continue;
+      const base = String(Reflect.getMetadata(PATH_METADATA, ctrl) ?? '');
+      const proto = Object.getPrototypeOf(wrapper.instance) as Record<string, Function>;
+      for (const name of scanner.getAllMethodNames(proto)) {
+        const handler = proto[name]!;
+        const sub = Reflect.getMetadata(PATH_METADATA, handler) as string | string[] | undefined;
+        if (sub === undefined) continue;
+        const method = RequestMethod[Reflect.getMetadata(METHOD_METADATA, handler) as number];
+        for (const p of Array.isArray(sub) ? sub : [sub]) {
+          const routePath = '/' + [base, p].map((x) => x.replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/');
+          out.push({ method: String(method).toUpperCase(), path: routePath, handler, controller: ctrl });
+        }
+      }
     }
   }
   return out;

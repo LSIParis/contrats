@@ -1,0 +1,113 @@
+{
+  "event_type": "submission.expired",
+  "timestamp": "2026-10-26T08:00:05Z",
+  "data": {
+    "id": "__SUBMISSION_ID__",
+    "name": "LSI-2026-0001.pdf",
+    "source": "api",
+    "submitters_order": "preserved",
+    "slug": "VyL4szTwYoSvXq",
+    "audit_log_url": null,
+    "combined_document_url": null,
+    "completed_at": null,
+    "expire_at": "2026-10-26T08:00:00.000Z",
+    "variables": {},
+    "created_at": "2026-09-26T08:00:00.000Z",
+    "updated_at": "2026-09-27T10:05:00.000Z",
+    "archived_at": null,
+    "submitters": [
+      {
+        "id": 7001,
+        "submission_id": "__SUBMISSION_ID__",
+        "uuid": "0954d146-db8c-4772-aafe-2effc7c0e0c0",
+        "email": "j.dupont@client.example.test",
+        "slug": "dsEeWrhRD8yDXT",
+        "sent_at": "2026-09-26T08:00:01.000Z",
+        "opened_at": null,
+        "completed_at": null,
+        "declined_at": null,
+        "created_at": "2026-09-26T08:00:00.000Z",
+        "updated_at": "2026-09-26T08:00:00.000Z",
+        "name": "J. Dupont",
+        "phone": null,
+        "external_id": "__CLIENT_SIGNER_ID__",
+        "metadata": {
+          "tenant_id": "__TENANT_ID__",
+          "customer_id": "__CUSTOMER_ID__",
+          "contract_id": "__CONTRACT_ID__",
+          "signature_request_id": "__SIGNATURE_REQUEST_ID__"
+        },
+        "status": "opened",
+        "values": [],
+        "preferences": {
+          "send_email": true,
+          "send_sms": false
+        },
+        "role": "Client",
+        "embed_src": "https://signe.example.test/s/dsEeWrhRD8yDXT"
+      },
+      {
+        "id": 7002,
+        "submission_id": "__SUBMISSION_ID__",
+        "uuid": "884d545b-3396-49f1-8c07-05b8b2a78755",
+        "email": "direction@lsi.example.test",
+        "slug": "pAMimKcyrLjqVt",
+        "sent_at": null,
+        "opened_at": null,
+        "completed_at": null,
+        "declined_at": null,
+        "created_at": "2026-09-26T08:00:00.000Z",
+        "updated_at": "2026-09-26T08:00:00.000Z",
+        "name": "Marc D.",
+        "phone": null,
+        "external_id": "__LSI_SIGNER_ID__",
+        "metadata": {
+          "tenant_id": "__TENANT_ID__",
+          "customer_id": "__CUSTOMER_ID__",
+          "contract_id": "__CONTRACT_ID__",
+          "signature_request_id": "__SIGNATURE_REQUEST_ID__"
+        },
+        "status": "awaiting",
+        "values": [],
+        "preferences": {
+          "send_email": true,
+          "send_sms": false
+        },
+        "role": "LSI Maintenance",
+        "embed_src": "https://signe.example.test/s/pAMimKcyrLjqVt"
+      }
+    ],
+    "template": null,
+    "created_by_user": {
+      "id": 1,
+      "first_name": "API",
+      "last_name": "LSI",
+      "email": "api@lsi.example.test"
+    },
+    "submission_events": [
+      {
+        "id": 1,
+        "submitter_id": 7001,
+        "event_type": "view_form",
+        "event_timestamp": "2026-09-27T09:00:00.000Z",
+        "data": {}
+      },
+      {
+        "id": 2,
+        "submitter_id": 7001,
+        "event_type": "complete_form",
+        "event_timestamp": "2026-09-27T09:10:00.000Z",
+        "data": {}
+      },
+      {
+        "id": 3,
+        "submitter_id": 7002,
+        "event_type": "complete_form",
+        "event_timestamp": "2026-09-27T10:05:00.000Z",
+        "data": {}
+      }
+    ],
+    "documents": [],
+    "status": "expired"
+  }
+}

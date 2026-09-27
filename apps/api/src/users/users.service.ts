@@ -19,11 +19,13 @@ const ROLE_LABEL: Record<string, string> = {
   MSP_ADMIN: 'Administrateur',
   ACCOUNT_MANAGER: 'Chargé de compte',
   LEGAL_REVIEWER: 'Relecteur juridique',
+  INTERNAL_SIGNATORY: 'Signataire interne',
+  READER: 'Lecteur',
   TECHNICIAN: 'Technicien',
   CLIENT_SIGNER: 'Signataire client',
   CLIENT_VIEWER: 'Lecteur client',
 };
-const INTERNAL_ROLES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'TECHNICIAN'];
+const INTERNAL_ROLES = ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER', 'TECHNICIAN'];
 const CLIENT_ROLES = ['CLIENT_SIGNER', 'CLIENT_VIEWER'];
 
 @Injectable()
@@ -71,23 +73,17 @@ export class UsersService {
   }
 
   // find-or-create sur (tenant, code) : les rôles ne sont pas seedés par
-  // tenant (catalogue vide au départ). Le catch P2002 couvre la course entre
-  // deux créations concurrentes du même rôle sur le même tenant.
+  // tenant (catalogue vide au départ). `upsert` natif (INSERT … ON CONFLICT)
+  // couvre la course entre deux créations concurrentes du même rôle — un
+  // try/catch P2002 ne le pourrait pas : dans une transaction PostgreSQL, la
+  // violation d'unicité AVORTE la transaction (25P02), relire est impossible.
   private async findOrCreateRole(tx: TxClient, tenantId: string, code: string): Promise<string> {
-    const existing = await tx.role.findFirst({ where: { code: code as never } });
-    if (existing) return existing.id;
-    try {
-      const created = await tx.role.create({
-        data: { id: uuidv7(), tenantId, code: code as never, label: ROLE_LABEL[code] ?? code },
-      });
-      return created.id;
-    } catch (e: any) {
-      if (e?.code === 'P2002') {
-        const refound = await tx.role.findFirst({ where: { code: code as never } });
-        if (refound) return refound.id;
-      }
-      throw e;
-    }
+    const role = await tx.role.upsert({
+      where: { tenantId_code: { tenantId, code: code as never } },
+      create: { id: uuidv7(), tenantId, code: code as never, label: ROLE_LABEL[code] ?? code },
+      update: {},
+    });
+    return role.id;
   }
 
   async create(scope: Scope, dto: CreateUserDto) {

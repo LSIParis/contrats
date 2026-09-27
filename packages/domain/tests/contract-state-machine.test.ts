@@ -168,12 +168,15 @@ describe('EC-10 — un signataire refuse', () => {
     expect(r.status).toBe('DECLINED');
   });
 
-  test('un contrat DECLINED est terminal — pas de réouverture silencieuse', () => {
+  test('un contrat DECLINED ne se renvoie pas en signature tel quel : il faut rouvrir la négociation (v2)', () => {
+    // Avant v2, DECLINED était terminal. Le brief (§2) autorise désormais le
+    // retour en négociation — mais JAMAIS un renvoi silencieux de la même
+    // version en signature.
     const c = draft({ status: 'DECLINED' });
     expect(() => applyEvent(c, { type: 'SEND_FOR_SIGNATURE', actorUserId: 'u1' }, TODAY)).toThrow(
       InvalidTransitionError,
     );
-    expect(allowedEvents(c)).toEqual([]);
+    expect(allowedEvents(c).sort()).toEqual(['CANCEL', 'REOPEN_NEGOTIATION']);
   });
 });
 
@@ -205,7 +208,8 @@ describe('RM-20 — résiliation et préavis', () => {
       { type: 'TERMINATE', actorUserId: 'u1', reason: 'fin', effectiveDate: new Date('2026-11-01'), isAdmin: false },
       TODAY,
     );
-    expect(r.status).toBe('TERMINATED');
+    // v2 : date d'effet future → « en résiliation » jusqu'à la date d'effet.
+    expect(r.status).toBe('TERMINATION_PENDING');
   });
 
   test('résilier sans respecter le préavis est REFUSÉ à un account manager', () => {
@@ -230,7 +234,7 @@ describe('RM-20 — résiliation et préavis', () => {
       { type: 'TERMINATE', actorUserId: 'u1', reason: 'fin', effectiveDate: new Date('2026-10-14'), isAdmin: false },
       TODAY,
     );
-    expect(r.status).toBe('TERMINATED');
+    expect(r.status).toBe('TERMINATION_PENDING');
   });
 
   test('un MSP_ADMIN peut déroger, mais seulement avec une justification', () => {
@@ -255,7 +259,7 @@ describe('RM-20 — résiliation et préavis', () => {
       },
       TODAY,
     );
-    expect(r.status).toBe('TERMINATED');
+    expect(r.status).toBe('TERMINATION_PENDING');
   });
 });
 
@@ -315,7 +319,7 @@ describe('allowedEvents', () => {
   });
 
   test('les états terminaux ne proposent rien', () => {
-    for (const status of ['CANCELLED', 'DECLINED', 'RENEWED', 'TERMINATED'] as const) {
+    for (const status of ['CANCELLED', 'RENEWED', 'TERMINATED'] as const) {
       expect(allowedEvents(draft({ status })), status).toEqual([]);
     }
   });

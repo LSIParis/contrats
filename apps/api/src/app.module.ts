@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { LoggerModule } from 'nestjs-pino';
 import { LOG_REDACT_PATHS, logReqSerializer } from './observability/logging.js';
-import { fileURLToPath } from 'node:url';
 import { uuidv7 } from '@lsi/persistence';
 import { BigIntInterceptor } from './common/bigint.interceptor.js';
 import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
@@ -24,6 +22,40 @@ import { RemindersReadService } from './read/reminders.service.js';
 import { OIDC_PROVIDER } from './auth/oidc.port.js';
 import { EntraOidcProvider } from './auth/oidc-entra.adapter.js';
 import { HealthController } from './health/health.controller.js';
+import { TenantConfigController } from './tenant/tenant-config.controller.js';
+import { TenantConfigService } from './tenant/tenant-config.service.js';
+import { ImportsController } from './imports/imports.controller.js';
+import { RenewalController } from './renewal/renewal.controller.js';
+import { ContractDocumentsController } from './documents/contract-documents.controller.js';
+import { ApiClientGuard } from './public-api/api-client.guard.js';
+import { ApiClientsController } from './public-api/api-clients.controller.js';
+import { ApiClientsService } from './public-api/api-clients.service.js';
+import { OpenApiController } from './public-api/openapi.controller.js';
+import { PublicApiController } from './public-api/public-api.controller.js';
+import { PublicReadService } from './public-api/public-read.service.js';
+import { PublicProposalsService } from './public-api/public-proposals.service.js';
+import { RenewalService } from './renewal/renewal.service.js';
+import { ImportsService } from './imports/imports.service.js';
+import { HttpOcrClient, OCR_CLIENT } from './imports/ocr.client.js';
+import { DeadlinesController } from './deadlines/deadlines.controller.js';
+import { DeadlinesService } from './deadlines/deadlines.service.js';
+import { StructureController } from './structure/structure.controller.js';
+import { StructureService } from './structure/structure.service.js';
+import { ClauseLibraryService } from './structure/clause-library.service.js';
+import { NegotiationController } from './negotiation/negotiation.controller.js';
+import { AcceptanceService } from './negotiation/acceptance.service.js';
+import { SignatureAvailabilityService } from './signature/signature-availability.service.js';
+import { SigningController } from './signature/signing.controller.js';
+import { PricingController } from './pricing/pricing.controller.js';
+import { PricingCatalogController } from './pricing/catalog.controller.js';
+import { PricingService } from './pricing/pricing.service.js';
+import { PricingSchedulesService } from './pricing/schedules.service.js';
+import { PriceOverridesService } from './pricing/overrides.service.js';
+import { PriceIndexesService } from './pricing/indexes.service.js';
+import { PricingRulesService } from './pricing/rules.service.js';
+import { PricingEvents } from './pricing/pricing-events.js';
+import { ManualQuantityProvider, QUANTITY_PROVIDER } from './pricing/quantity-provider.js';
+import { CsvIndexConnector, INDEX_CONNECTORS } from './pricing/index-connector.js';
 import { ContractsController } from './contracts/contracts.controller.js';
 import { ContractsService } from './contracts/contracts.service.js';
 import { ContentController } from './contracts/content.controller.js';
@@ -41,6 +73,9 @@ import { CommentsController } from './comments/comments.controller.js';
 import { CommentsService } from './comments/comments.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
 import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
+import { WebhooksAdminController } from './webhooks-out/webhooks-admin.controller.js';
+import { WebhooksAdminService } from './webhooks-out/webhooks-admin.service.js';
+import { WebhookDeliveryService } from './webhooks-out/webhook-delivery.service.js';
 import { DocusealAdapter } from './signature/docuseal.adapter.js';
 import { SendForSignatureService } from './signature/send-for-signature.service.js';
 import { SignatureActionsController } from './signature/signature-actions.controller.js';
@@ -54,6 +89,7 @@ import { DOCUMENT_STORAGE } from './documents/document-storage.port.js';
 import { S3Storage } from './documents/s3-storage.js';
 import { InMemoryStorage } from './documents/in-memory-storage.js';
 import { ProofCaptureService } from './signature/proof-capture.service.js';
+import { DocusealReadiness } from './signature/docuseal-readiness.service.js';
 import { JOB_QUEUE } from './jobs/job-queue.port.js';
 import { BullMqJobQueue } from './jobs/bullmq-job-queue.js';
 import { NoOpJobQueue } from './jobs/noop-job-queue.js';
@@ -72,9 +108,32 @@ import { TemplatesController } from './templates/templates.controller.js';
 import { TemplatesService } from './templates/templates.service.js';
 import { AiDraftingController } from './ai-drafting/ai-drafting.controller.js';
 import { AiDraftingService } from './ai-drafting/ai-drafting.service.js';
+import { AiGateway, DRAFTING_REGISTRY } from './ai-drafting/ai-gateway.service.js';
+import { ContractAiController } from './ai-drafting/contract-ai.controller.js';
+import { ContractAiService } from './ai-drafting/contract-ai.service.js';
+import { DraftingProviderRegistry } from './ai-drafting/drafting-provider-registry.js';
 import { CONTRACT_DRAFTER } from './ai-drafting/contract-drafter.port.js';
 import { ClaudeContractDrafter } from './ai-drafting/claude-contract-drafter.js';
 import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-drafter.js';
+// Lot 9 — propositions commerciales (docs/contrats/11-propositions.md).
+import { ProposalsController } from './proposals/proposals.controller.js';
+import { ProposalReportsController } from './proposals/proposal-reports.controller.js';
+import { ProposalAiController } from './proposals/proposal-ai.controller.js';
+import { ProposalAiService } from './proposals/proposal-ai.service.js';
+import { ProposalReportingService } from './proposals/proposal-reporting.service.js';
+import { ProposalAdminController } from './proposals/proposal-admin.controller.js';
+import { ProposalPublicController } from './proposals/proposal-public.controller.js';
+import { ProposalsService } from './proposals/proposals.service.js';
+import { ProposalSendService } from './proposals/proposal-send.service.js';
+import { ProposalPublicService } from './proposals/proposal-public.service.js';
+import { ProposalAdminService } from './proposals/proposal-admin.service.js';
+import { ProposalDocumentsService } from './proposals/proposal-documents.service.js';
+import { ProposalSignatureService } from './proposals/proposal-signature.service.js';
+import { ProposalConversionService } from './proposals/proposal-conversion.service.js';
+import { ProposalNotifier } from './proposals/proposal-notifier.service.js';
+import { ProposalJobsService } from './proposals/proposal-jobs.service.js';
+import { PublicRateLimiter } from './proposals/public-rate-limit.js';
+import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from './proposals/proposal-jobs.port.js';
 
 @Module({
   imports: [
@@ -87,42 +146,10 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
         // le loguer en clair = fuite d'auth dans stdout → Portainer → backups).
         redact: LOG_REDACT_PATHS,
         serializers: { req: logReqSerializer },
-        genReqId: (req: any, res: any) => {
-          const incoming = typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined;
-          const id = incoming ?? uuidv7();
-          res.setHeader('x-request-id', id);
-          return id;
-        },
+        // L'id est attribué par Fastify (bootstrap.ts, requestIdFor) et posé
+        // sur la requête brute : pino-http le reprend, sans en générer un autre.
+        genReqId: (req: any) => req.id ?? uuidv7(),
       },
-    }),
-    ServeStaticModule.forRoot({
-      // Le bundle Vite ; en dev il peut être absent (Vite sert lui-même) —
-      // ServeStatic renvoie alors 404 sur les routes SPA, ce qui est sans effet
-      // puisque le dev passe par le serveur Vite (proxy /v1 → 3001).
-      //
-      // ATTENTION : résolu depuis `import.meta.url` (l'emplacement RÉEL de ce
-      // fichier), JAMAIS depuis `process.cwd()`. En production, le CMD du
-      // Dockerfile est `pnpm --filter @lsi/api exec node ... src/main.ts` —
-      // `pnpm --filter <pkg> exec` lance le process avec cwd = le dossier du
-      // package (`/app/apps/api`), PAS la racine du repo. Un `join(cwd(),
-      // 'apps/web/dist')` visait donc `/app/apps/api/apps/web/dist`, qui
-      // n'existe pas : le build réel est le dossier frère `/app/apps/web/dist`.
-      // Résultat en prod : le SPA n'était JAMAIS servi (chaque route non-/v1
-      // tombait sur un sendFile d'un chemin absent). `import.meta.url` pointe
-      // sur ce fichier source (`.../apps/api/src/app.module.ts`, exécuté via
-      // SWC) et sa résolution relative est indépendante du cwd du process.
-      rootPath: fileURLToPath(new URL('../../web/dist', import.meta.url)),
-      // JAMAIS capturer l'API ni le healthcheck avec le repli index.html.
-      //
-      // ATTENTION : `@nestjs/serve-static@4.0.2` compile `exclude` avec
-      // `path-to-regexp@0.2.5` (Express 4). Dans CETTE version, un `*` nu
-      // (pas rattaché à un `:nom` ou `(...)`) est un ASTÉRISQUE LITTÉRAL,
-      // pas un joker — `/v1*` ne matche donc RIEN (ni `/v1`, ni `/v1/x`) et
-      // ne fait JAMAIS ce qu'on croit lire. C'est un piège classé « looks
-      // right, does nothing » : ne JAMAIS « simplifier » en `/v1*`.
-      // `/v1/:path*` (paramètre nommé + `*`) matche bien `/v1`, `/v1/x` et
-      // `/v1/x/y/z` — vérifié avec `pathToRegexp('/v1/:path*').exec(...)`.
-      exclude: ['/v1/:path*', '/health'],
     }),
   ],
   controllers: [
@@ -143,10 +170,77 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     NotificationsController,
     AuditController,
     HealthController,
+    TenantConfigController,
+    ImportsController,
+    RenewalController,
+    ContractDocumentsController,
+    PublicApiController,
+    OpenApiController,
+    ApiClientsController,
+    DeadlinesController,
+    StructureController,
+    NegotiationController,
+    SigningController,
+    PricingController,
+    PricingCatalogController,
     TemplatesController,
     AiDraftingController,
+    ContractAiController,
+    WebhooksAdminController,
+    ProposalsController,
+    ProposalReportsController,
+    ProposalAiController,
+    ProposalAdminController,
+    ProposalPublicController,
   ],
   providers: [
+    TenantConfigService,
+    // Lot 9 — propositions commerciales. File de jobs propre (capture des
+    // preuves, conversion) : BullMQ si JOBS_ENABLED, sinon no-op (tests).
+    ProposalsService,
+    ProposalReportingService,
+    ProposalAiService,
+    ProposalSendService,
+    ProposalPublicService,
+    ProposalAdminService,
+    ProposalDocumentsService,
+    ProposalSignatureService,
+    ProposalConversionService,
+    ProposalNotifier,
+    ProposalJobsService,
+    PublicRateLimiter,
+    {
+      provide: PROPOSAL_JOB_QUEUE,
+      useClass: process.env.JOBS_ENABLED === 'true' ? BullMqProposalJobQueue : NoOpProposalJobQueue,
+    },
+    // Webhooks sortants (lot 5) : administration + livraison (job minute).
+    WebhooksAdminService,
+    WebhookDeliveryService,
+    ImportsService,
+    RenewalService,
+    ApiClientsService,
+    ApiClientGuard,
+    PublicReadService,
+    PublicProposalsService,
+    DeadlinesService,
+    StructureService,
+    ClauseLibraryService,
+    AcceptanceService,
+    SignatureAvailabilityService,
+    // Tarification (lot 3, 04-tarification.md §17). Le QuantityProvider est un
+    // PORT : quantités manuelles par défaut ; un connecteur réel (RMM de
+    // Client Help) le remplacera ici, sans toucher au service.
+    PricingService,
+    PricingSchedulesService,
+    PriceOverridesService,
+    PriceIndexesService,
+    PricingRulesService,
+    PricingEvents,
+    { provide: QUANTITY_PROVIDER, useClass: ManualQuantityProvider },
+    // Connecteurs d'import d'indices : aucun n'ouvre le réseau.
+    { provide: INDEX_CONNECTORS, useFactory: () => [new CsvIndexConnector()] },
+    // Service OCR interne (réseau de la stack) ; remplacé par un faux en test.
+    { provide: OCR_CLIENT, useFactory: () => new HttpOcrClient() },
     ContractsService,
     ContentService,
     CustomersService,
@@ -161,6 +255,11 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     AuditReadService,
     TemplatesService,
     AiDraftingService,
+    AiGateway,
+    ContractAiService,
+    // Registre unique des fournisseurs structurés (Perplexity, Claude) : vit
+    // aussi longtemps que le processus (schémas préparés côté fournisseur).
+    { provide: DRAFTING_REGISTRY, useFactory: () => new DraftingProviderRegistry(process.env) },
     {
       // Claude si la clé est fournie (prod), sinon un adaptateur qui renvoie 503.
       // Le service dépend du PORT, pas de l'adaptateur : en test, le port est
@@ -180,6 +279,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     SendForSignatureService,
     SignatureActionsService,
     ProofCaptureService,
+    DocusealReadiness,
     ReconciliationService,
     LifecycleService,
     ReminderDispatchService,

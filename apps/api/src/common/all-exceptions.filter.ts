@@ -1,8 +1,11 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  constructor(private readonly adapterHost: HttpAdapterHost) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -22,8 +25,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error({ err: exception, requestId, method: req.method, path: req.url, status }, 'Erreur non gérée');
     }
     // Filtre global : une réponse déjà (partiellement) envoyée ferait planter
-    // `res.status().json()`. On ne fait que loguer dans ce cas rare.
-    if (res.headersSent) return;
-    res.status(status).json(body);
+    // la réponse. On ne fait que loguer dans ce cas rare. (`sent` : Fastify,
+    // `headersSent` : réponse Node brute.)
+    if (res.sent || res.raw?.headersSent || res.headersSent) return;
+    this.adapterHost.httpAdapter.reply(res, body, status);
   }
 }

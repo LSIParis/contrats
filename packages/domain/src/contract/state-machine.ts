@@ -45,24 +45,42 @@ export class BusinessRuleError extends Error {
   }
 }
 
-/** Matrice §7.2 : quels événements sont structurellement possibles par état. */
+/**
+ * Matrice : quels événements sont structurellement possibles par état.
+ * Source : docs/contrats/02-cycle-de-vie.md §3 (testée exhaustivement).
+ */
+const SIGNING: readonly ContractEventType[] = [
+  'SIGNER_SIGNED', 'SIGNER_DECLINED', 'SIGNATURE_EXPIRE', 'REVOKE_SIGNATURE', 'CANCEL',
+];
 const TRANSITIONS: Record<ContractStatus, readonly ContractEventType[]> = {
   DRAFT: ['EDIT_CONTENT', 'SUBMIT_FOR_REVIEW', 'CANCEL'],
   IN_REVIEW: ['APPROVE', 'REQUEST_CHANGES', 'CANCEL'],
   CHANGES_REQUESTED: ['EDIT_CONTENT', 'SUBMIT_FOR_REVIEW', 'CANCEL'],
   // RM-11 : éditer un APPROVED le renvoie en DRAFT et invalide la validation.
-  APPROVED: ['EDIT_CONTENT', 'SEND_FOR_SIGNATURE', 'CANCEL'],
-  PENDING_SIGNATURE: ['SIGNER_SIGNED', 'SIGNER_DECLINED', 'REVOKE_SIGNATURE', 'CANCEL'],
-  PARTIALLY_SIGNED: ['SIGNER_SIGNED', 'SIGNER_DECLINED', 'REVOKE_SIGNATURE', 'CANCEL'],
+  // SEND_FOR_SIGNATURE direct = acceptation implicite (l'acceptation est
+  // une faculté du client, pas une étape obligatoire — brief §2 « peut »).
+  APPROVED: ['EDIT_CONTENT', 'SEND_TO_CLIENT', 'SEND_FOR_SIGNATURE', 'CANCEL'],
+  SENT_TO_CLIENT: ['CLIENT_ACCEPT', 'OPEN_NEGOTIATION', 'CANCEL'],
+  IN_NEGOTIATION: ['EDIT_CONTENT', 'SUBMIT_FOR_REVIEW', 'SEND_TO_CLIENT', 'CANCEL'],
+  ACCEPTED: ['SEND_FOR_SIGNATURE', 'OPEN_NEGOTIATION', 'CANCEL'],
+  // V2-LOCK : aucune édition pendant la signature. Modifier exige de révoquer.
+  PENDING_SIGNATURE: SIGNING,
+  PARTIALLY_SIGNED: SIGNING,
+  // Plus terminal (brief §2) : un refus peut rouvrir la négociation.
+  DECLINED: ['REOPEN_NEGOTIATION', 'CANCEL'],
+  SIGNATURE_EXPIRED: ['REOPEN_NEGOTIATION', 'SEND_FOR_SIGNATURE', 'CANCEL'],
   // RM-05 : plus aucune édition. RM-22 : plus d'annulation, seule la résiliation.
   SIGNED: ['ACTIVATE', 'TERMINATE'],
-  ACTIVE: ['EXPIRE', 'TERMINATE', 'MARK_RENEWED'],
+  ACTIVE: ['EXPIRE', 'TERMINATE', 'OPEN_RENEWAL', 'MARK_RENEWED'],
+  RENEWAL_DUE: ['RENEW_PERIOD', 'CLOSE_RENEWAL', 'MARK_RENEWED', 'EXPIRE', 'TERMINATE'],
+  TERMINATION_PENDING: ['COMPLETE_TERMINATION', 'WITHDRAW_TERMINATION'],
   // Pas terminal : le renouvellement tardif rétroactif est un cas réel.
   EXPIRED: ['MARK_RENEWED'],
+  // Un contrat papier déjà signé : aucune signature redemandée (brief §3).
+  IMPORTED_PENDING_VALIDATION: ['VALIDATE_IMPORT', 'CANCEL'],
   TERMINATED: [],
   RENEWED: [],
   CANCELLED: [],
-  DECLINED: [],
 };
 
 const isEditable = (s: ContractStatus) => (EDITABLE_STATUSES as readonly string[]).includes(s);
@@ -108,15 +126,26 @@ export function isNoticeRespected(
  * pour que l'interface désactive les bons boutons sans réimplémenter la
  * machine — le domaine reste la seule source de vérité.
  */
-export function allowedEvents(c: ContractSnapshot): ContractEventType[] {
+export function allowedEvents(c: ContractSnapshot, now?: Date): ContractEventType[] {
+  const currentIsApproved = c.approvedVersionId !== null && c.approvedVersionId === c.currentVersionId;
   return TRANSITIONS[c.status].filter((e) => {
     switch (e) {
       case 'SUBMIT_FOR_REVIEW':
-        return c.hasLsiSigner && c.hasClientSigner && c.hasRequiredAttachments && !!c.startDate && !!c.currentVersionId;
+        return c.hasLsiSigner && c.hasClientSigner && c.hasRequiredAttachments && !!c.startDate && !!c.currentVersionId
+          && !c.hasUnreviewedAiClauses && !c.hasMissingVariables;
+      case 'SEND_TO_CLIENT':
+        return currentIsApproved;
       case 'SEND_FOR_SIGNATURE':
-        return c.approvedVersionId !== null && c.approvedVersionId === c.currentVersionId;
+        return c.status === 'ACCEPTED'
+          ? currentIsApproved && c.acceptedVersionId === c.currentVersionId
+          : currentIsApproved;
       case 'EXPIRE':
+      case 'OPEN_RENEWAL':
         return c.endDate !== null;
+      case 'VALIDATE_IMPORT':
+        return !!c.startDate;
+      case 'COMPLETE_TERMINATION':
+        return !!c.terminationEffectiveDate && (!now || c.terminationEffectiveDate <= now);
       default:
         return true;
     }
@@ -125,7 +154,7 @@ export function allowedEvents(c: ContractSnapshot): ContractEventType[] {
 
 /** RM-19 / EC-07 : garde d'avenant. N'est pas une transition du parent. */
 export function assertCanAmend(parent: ContractSnapshot): void {
-  if (parent.status !== 'ACTIVE' && parent.status !== 'SIGNED') {
+  if (parent.status !== 'ACTIVE' && parent.status !== 'SIGNED' && parent.status !== 'RENEWAL_DUE') {
     throw new BusinessRuleError(
       `Un avenant ne peut porter que sur un contrat signé ou actif (statut actuel : ${parent.status}). ` +
         `Un contrat non signé n'engage encore personne : il suffit de l'éditer.`,
@@ -142,7 +171,7 @@ export function assertCanAmend(parent: ContractSnapshot): void {
 
 /** RM-16 : un renouvellement ne porte que sur un contrat actif ou expiré. */
 export function assertCanRenew(parent: ContractSnapshot): void {
-  if (parent.status !== 'ACTIVE' && parent.status !== 'EXPIRED') {
+  if (parent.status !== 'ACTIVE' && parent.status !== 'EXPIRED' && parent.status !== 'RENEWAL_DUE') {
     throw new BusinessRuleError(
       `Un renouvellement ne peut porter que sur un contrat actif ou expiré (statut actuel : ${parent.status}).`,
       'RM-16',
@@ -185,6 +214,18 @@ export function applyEvent(
           'RM-11',
         );
       }
+      if (c.hasUnreviewedAiClauses) {
+        throw new BusinessRuleError(
+          'Projet généré par IA : chaque clause doit être validée par un humain avant la revue interne.',
+          'V2-AI',
+        );
+      }
+      if (c.hasMissingVariables) {
+        throw new BusinessRuleError(
+          'Des variables du contrat type restent à compléter (marquées « à compléter » dans le texte).',
+          'V2-VAR',
+        );
+      }
       return { ...c, status: 'IN_REVIEW', submittedByUserId: event.actorUserId };
     }
 
@@ -219,6 +260,12 @@ export function applyEvent(
       if (c.status === 'APPROVED') {
         return { ...c, status: 'DRAFT', approvedVersionId: null };
       }
+      // En négociation, le contrat RESTE en négociation, mais la validation
+      // interne tombe : la nouvelle version devra être revalidée avant d'être
+      // renvoyée au client.
+      if (c.status === 'IN_NEGOTIATION') {
+        return { ...c, approvedVersionId: null };
+      }
       if (!isEditable(c.status)) {
         throw new InvalidTransitionError(c.status, event.type, allowedEvents(c));
       }
@@ -236,6 +283,12 @@ export function applyEvent(
           'RM-11',
         );
       }
+      if (c.status === 'ACCEPTED' && c.acceptedVersionId !== c.currentVersionId) {
+        throw new BusinessRuleError(
+          "La version à signer n'est pas celle que le client a acceptée.",
+          'V2-ACC',
+        );
+      }
       // Le passage effectif n'est acté qu'après acquittement du provider
       // (EC-04) : la couche applicative n'appelle applyEvent qu'ensuite.
       return { ...c, status: 'PENDING_SIGNATURE' };
@@ -243,9 +296,47 @@ export function applyEvent(
 
     // -----------------------------------------------------------------
     case 'REVOKE_SIGNATURE': {
-      // Révoquer DÉFAIT l'envoi : le contrat redevient approuvé (envoyable),
-      // sa validation reste valable. Ce n'est PAS annuler le contrat (§6.13).
-      return { ...c, status: 'APPROVED' };
+      // Révoquer DÉFAIT l'envoi : le contrat revient à l'état qui précédait —
+      // ACCEPTED si le client avait accepté cette version, APPROVED sinon.
+      // Sa validation reste valable. Ce n'est PAS annuler le contrat (§6.13).
+      const accepted = !!c.acceptedVersionId && c.acceptedVersionId === c.currentVersionId;
+      return { ...c, status: accepted ? 'ACCEPTED' : 'APPROVED' };
+    }
+
+    // -----------------------------------------------------------------
+    case 'SEND_TO_CLIENT': {
+      if (c.approvedVersionId === null || c.approvedVersionId !== c.currentVersionId) {
+        throw new BusinessRuleError(
+          'Seule une version validée en revue interne peut être présentée au client.',
+          'RM-11',
+        );
+      }
+      return { ...c, status: 'SENT_TO_CLIENT', acceptedVersionId: null };
+    }
+
+    case 'CLIENT_ACCEPT': {
+      // L'acceptation porte sur une VERSION précise : celle que le client a
+      // eue sous les yeux. Accepter « le contrat » en général ne prouve rien.
+      if (event.versionId !== c.currentVersionId || c.approvedVersionId !== c.currentVersionId) {
+        throw new BusinessRuleError(
+          "La version acceptée n'est pas la version présentée au client.",
+          'V2-ACC',
+        );
+      }
+      return { ...c, status: 'ACCEPTED', acceptedVersionId: event.versionId };
+    }
+
+    case 'OPEN_NEGOTIATION':
+    case 'REOPEN_NEGOTIATION': {
+      if (!event.reason.trim()) {
+        throw new BusinessRuleError('Le motif de la négociation est obligatoire.', 'V2-NEG');
+      }
+      // Une acceptation antérieure ne vaut plus : on renégocie.
+      return { ...c, status: 'IN_NEGOTIATION', acceptedVersionId: null };
+    }
+
+    case 'SIGNATURE_EXPIRE': {
+      return { ...c, status: 'SIGNATURE_EXPIRED' };
     }
 
     // -----------------------------------------------------------------
@@ -270,6 +361,58 @@ export function applyEvent(
         return c;
       }
       return { ...c, status: 'ACTIVE', activatedAt: now };
+    }
+
+    // -----------------------------------------------------------------
+    case 'VALIDATE_IMPORT': {
+      // L'état d'arrivée se DÉDUIT des dates : l'utilisateur valide les
+      // métadonnées, il ne choisit pas le statut (V2-IMP).
+      if (!c.startDate) {
+        throw new BusinessRuleError("La date d'effet est obligatoire pour valider un import.", 'V2-IMP');
+      }
+      if (c.endDate && c.endDate < startOfUtcDay(now)) return { ...c, status: 'EXPIRED' };
+      if (c.startDate > now) return { ...c, status: 'SIGNED' };
+      return { ...c, status: 'ACTIVE', activatedAt: now };
+    }
+
+    // -----------------------------------------------------------------
+    case 'OPEN_RENEWAL': {
+      if (!c.endDate) {
+        throw new BusinessRuleError(
+          "Un contrat à durée indéterminée ne se renouvelle pas : il se poursuit jusqu'à résiliation.",
+          'EC-13',
+        );
+      }
+      return { ...c, status: 'RENEWAL_DUE' };
+    }
+
+    case 'RENEW_PERIOD': {
+      if (!c.endDate || event.newEndDate <= c.endDate) {
+        throw new BusinessRuleError('La nouvelle période doit prolonger le terme actuel.', 'V2-REN');
+      }
+      return { ...c, status: 'ACTIVE', endDate: event.newEndDate };
+    }
+
+    case 'CLOSE_RENEWAL': {
+      if (!event.reason.trim()) {
+        throw new BusinessRuleError('Un motif est obligatoire.', 'V2-REN');
+      }
+      return { ...c, status: 'ACTIVE' };
+    }
+
+    // -----------------------------------------------------------------
+    case 'COMPLETE_TERMINATION': {
+      if (!c.terminationEffectiveDate || c.terminationEffectiveDate > now) {
+        throw new BusinessRuleError("La date d'effet de la résiliation n'est pas atteinte.", 'RM-20');
+      }
+      return { ...c, status: 'TERMINATED', terminatedAt: now };
+    }
+
+    case 'WITHDRAW_TERMINATION': {
+      if (!event.reason.trim()) {
+        throw new BusinessRuleError('Le motif du retrait de la résiliation est obligatoire.', 'RM-20');
+      }
+      return { ...c, status: 'ACTIVE', terminationEffectiveDate: null };
     }
 
     // -----------------------------------------------------------------
@@ -305,13 +448,17 @@ export function applyEvent(
         throw new BusinessRuleError('Un motif de résiliation est obligatoire.', 'RM-20');
       }
 
-      const respectsNotice = isNoticeRespected(c.noticePeriodDays, event.effectiveDate, now);
+      const respectsNotice = event.minEffectiveDate
+        ? startOfUtcDay(event.effectiveDate) >= startOfUtcDay(event.minEffectiveDate)
+        : isNoticeRespected(c.noticePeriodDays, event.effectiveDate, now);
 
       if (!respectsNotice) {
         if (!event.isAdmin) {
-          const minDate = addDays(startOfUtcDay(now), c.noticePeriodDays ?? 0);
+          const minDate = event.minEffectiveDate
+            ? startOfUtcDay(event.minEffectiveDate)
+            : addDays(startOfUtcDay(now), c.noticePeriodDays ?? 0);
           throw new BusinessRuleError(
-            `Le préavis de ${c.noticePeriodDays} jours n'est pas respecté : ` +
+            `Le préavis n'est pas respecté : ` +
               `la date d'effet ne peut pas précéder le ${minDate.toISOString().slice(0, 10)}. ` +
               `Seul un administrateur peut y déroger.`,
             'RM-20',
@@ -325,7 +472,14 @@ export function applyEvent(
         }
       }
 
-      return { ...c, status: 'TERMINATED', terminatedAt: now };
+      // Brief §2 : ACTIVE → EN_RÉSILIATION → RÉSILIÉ. Tant que la date
+      // d'effet n'est pas atteinte, le contrat produit ses effets : il est
+      // « en résiliation », pas résilié. Le job quotidien achève la
+      // résiliation (COMPLETE_TERMINATION) à la date d'effet.
+      if (event.effectiveDate > now) {
+        return { ...c, status: 'TERMINATION_PENDING', terminationEffectiveDate: event.effectiveDate };
+      }
+      return { ...c, status: 'TERMINATED', terminatedAt: now, terminationEffectiveDate: event.effectiveDate };
     }
   }
 }

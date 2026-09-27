@@ -38,3 +38,43 @@ export async function findContractsToExpire(limit = 500): Promise<ScopeRef[]> {
   >`SELECT * FROM app_find_contracts_to_expire(${limit}::int)`;
   return rows.map(toRef);
 }
+
+/** Résiliations programmées dont la date d'effet est atteinte (02-cycle-de-vie §3). */
+export async function findTerminationsDue(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_terminations_due(${limit}::int)`;
+  return rows.map(toRef);
+}
+
+/** Contrats engagés (MAIN) dont l'échéancier est recalculé chaque jour (02-cycle-de-vie §6). */
+export async function findContractsForDeadlines(limit = 5000): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_contracts_for_deadlines(${limit}::int)`;
+  return rows.map(toRef);
+}
+
+/** Imports dont l'OCR reste à faire — filet si un job a été perdu (03-import-existant §3). */
+export async function findPendingOcrImports(limit = 100): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_pending_ocr_imports(${limit}::int)`;
+  return rows.map(toRef);
+}
+
+/** Reconduction TACITE due : période échue sans dénonciation (02-cycle-de-vie §5). */
+export async function findTacitRenewalsDue(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_tacit_renewals_due(${limit}::int)`;
+  return rows.map(toRef);
+}
+
+/** Renouvellement EXPRÈS à ouvrir : date limite de dénonciation atteinte. */
+export async function findExpressRenewalsToOpen(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_express_renewals_to_open(${limit}::int)`;
+  return rows.map(toRef);
+}

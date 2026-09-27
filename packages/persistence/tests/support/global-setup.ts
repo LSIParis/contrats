@@ -10,7 +10,7 @@ let container: StartedPostgreSqlContainer;
  * ne prouverait que notre compréhension de PostgreSQL, pas PostgreSQL.
  */
 export async function setup() {
-  container = await new PostgreSqlContainer('postgres:16-alpine')
+  container = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('lsi_test')
     .withUsername('postgres')
     .withPassword('postgres')

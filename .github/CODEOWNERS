@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# PROPRIÉTAIRES DU CODE — À ADAPTER
+#
+# ⚠ `@LSIParis` est un PLACEHOLDER. Remplacer par l'équipe GitHub réelle
+#   (ex. `@LSIParis/contrats-maintainers`) ou par un utilisateur nommé avant
+#   d'activer « Require review from Code Owners » dans la protection de la
+#   branche main (voir docs/contrats/09-exploitation.md).
+#   Une équipe référencée ici doit avoir au moins l'accès « write » au dépôt,
+#   sinon GitHub ignore la règle.
+# ---------------------------------------------------------------------------
+
+# Par défaut : tout le dépôt.
+*                                   @LSIParis
+
+# Zones sensibles : revue obligatoire par un propriétaire.
+# - chaîne de publication et de déploiement (secrets, SSH, Portainer)
+/.github/                           @LSIParis
+/deploy/                            @LSIParis
+/Dockerfile                         @LSIParis
+/.dockerignore                      @LSIParis
+# - schéma et migrations (règle : migrations additives uniquement)
+/packages/persistence/prisma/       @LSIParis
+# - authentification, rôles, isolation multi-tenante
+/apps/api/src/auth/                 @LSIParis
+/packages/persistence/src/          @LSIParis

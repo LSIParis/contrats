@@ -1,0 +1,14 @@
+{
+  "prestataireRaisonSociale": "EPSILON INFOGÉRANCE",
+  "prestataireSiren": "222333444",
+  "clientRaisonSociale": "ZÊTA ENTRAIDE",
+  "clientSiren": null,
+  "dateSignature": "2022-01-03",
+  "dateEffet": "2022-01-15",
+  "dureeMois": 12,
+  "reconduction": "AUCUNE",
+  "preavis": null,
+  "montantMensuelHtCentimes": 4900,
+  "montantAnnuelHtCentimes": null,
+  "indiceRevision": null
+}

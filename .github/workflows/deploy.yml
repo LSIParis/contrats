@@ -1,0 +1,145 @@
+# Déploiement réutilisable — application « Contrats »
+# Ouvre un tunnel SSH vers le VPS (clé dédiée, restreinte au seul transfert vers Portainer),
+# redéploie la stack Portainer, vérifie /healthz, et revient en arrière si besoin.
+# Écart à l'annexe A (Portainer Community Edition, sans webhook de stack) : le redéploiement
+# passe par deploy/portainer/redeploy-stack.sh — webhook si PORTAINER_WEBHOOK_ID est défini
+# (Business Edition, comportement d'origine), sinon API Portainer avec PORTAINER_API_TOKEN.
+# Voir docs/contrats/09-exploitation.md §4.7 et RESTITUTION.md §3.
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Environnement GitHub (staging ou production)
+        type: string
+        required: true
+      tag:
+        description: Tag d'image à déployer (main, X.Y.Z)
+        type: string
+        required: true
+      expected-version:
+        description: Version attendue dans /healthz (vide = contrôle du SHA seul)
+        type: string
+        default: ""
+      rollback-tag:
+        description: Tag de repli en cas d'échec du test de fumée (vide = pas de retour arrière)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Déploiement ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.APP_URL }}
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      VPS_HOST: ${{ vars.VPS_HOST }}                  # 51.178.30.81
+      VPS_USER: ${{ vars.VPS_USER }}                  # lsi
+      PORTAINER_LOCAL: ${{ vars.PORTAINER_LOCAL_ADDR || '127.0.0.1:9443' }}
+      APP_URL: ${{ vars.APP_URL }}                    # https://contrats.lsi-maintenance.fr
+      PORTAINER_WEBHOOK_ID: ${{ secrets.PORTAINER_WEBHOOK_ID }}
+      PORTAINER_API_TOKEN: ${{ secrets.PORTAINER_API_TOKEN }}   # Community Edition
+      PORTAINER_STACK_ID: ${{ vars.PORTAINER_STACK_ID }}        # Community Edition (ex. 116)
+      TAG: ${{ inputs.tag }}
+      EXPECTED_VERSION: ${{ inputs.expected-version }}
+      TUNNEL_PORT: "19443"
+      SSH_SOCKET: /tmp/portainer-tunnel.sock
+    steps:
+      - name: Vérification de la configuration
+        id: config
+        run: |
+          if [ -z "${PORTAINER_WEBHOOK_ID}" ] && { [ -z "${PORTAINER_API_TOKEN}" ] || [ -z "${PORTAINER_STACK_ID}" ]; }; then
+            echo "::warning::Ni PORTAINER_WEBHOOK_ID ni PORTAINER_API_TOKEN + PORTAINER_STACK_ID : dans Portainer, passer CONTRATS_TAG=${TAG} puis Pull and redeploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for v in VPS_HOST VPS_USER APP_URL; do
+            if [ -z "${!v}" ]; then echo "::error::Variable d'environnement GitHub ${v} manquante."; exit 1; fi
+          done
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      # Seul le script de redéploiement est extrait (pas de code applicatif sur le runner).
+      - name: Récupération du script de redéploiement
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: deploy/portainer/redeploy-stack.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Préparation de la clé SSH de déploiement
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${VPS_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${VPS_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Ouverture du tunnel SSH vers Portainer
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              -o ExitOnForwardFailure=yes \
+              -o ServerAliveInterval=15 \
+              -M -S "${SSH_SOCKET}" -fNT \
+              -L "127.0.0.1:${TUNNEL_PORT}:${PORTAINER_LOCAL}" \
+              "${VPS_USER}@${VPS_HOST}"
+          for i in $(seq 1 10); do
+            if curl --silent --insecure --max-time 3 -o /dev/null "https://127.0.0.1:${TUNNEL_PORT}/api/system/status"; then
+              echo "Tunnel opérationnel."; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Portainer injoignable à travers le tunnel."; exit 1
+
+      - name: Redéploiement de la stack (tag ${{ inputs.tag }})
+        if: steps.config.outputs.enabled == 'true'
+        run: bash deploy/portainer/redeploy-stack.sh "${TAG}"
+
+      - name: Test de fumée (/healthz)
+        id: smoke
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          for i in $(seq 1 36); do
+            body=$(curl --silent --max-time 5 "${APP_URL}/healthz" || true)
+            rev=$(echo "${body}" | jq -r '.revision // empty' 2>/dev/null || true)
+            ver=$(echo "${body}" | jq -r '.version // empty' 2>/dev/null || true)
+            if [ "${rev}" = "${GITHUB_SHA}" ] && { [ -z "${EXPECTED_VERSION}" ] || [ "${ver}" = "${EXPECTED_VERSION}" ]; }; then
+              echo "Version ${ver} (${rev}) en ligne sur ${APP_URL}."
+              exit 0
+            fi
+            echo "Tentative ${i}/36 : version '${ver:-?}', révision '${rev:-?}'"
+            sleep 10
+          done
+          echo "::error::${APP_URL} ne sert pas la révision ${GITHUB_SHA} après 6 minutes."
+          exit 1
+
+      - name: Retour arrière automatique
+        if: failure() && steps.smoke.conclusion == 'failure' && inputs.rollback-tag != ''
+        env:
+          PREVIOUS: ${{ inputs.rollback-tag }}
+        run: |
+          echo "::warning::Retour arrière vers ${PREVIOUS}"
+          bash deploy/portainer/redeploy-stack.sh "${PREVIOUS}"
+
+      - name: Fermeture du tunnel et suppression de la clé
+        if: always()
+        run: |
+          if [ -S "${SSH_SOCKET}" ]; then ssh -S "${SSH_SOCKET}" -O exit "${VPS_USER}@${VPS_HOST}" || true; fi
+          rm -f ~/.ssh/deploy_key

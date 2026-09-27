@@ -12,6 +12,10 @@ export class InMemoryStorage implements DocumentStorage {
   private readonly log = new Logger(InMemoryStorage.name);
   private readonly objects = new Map<string, { data: Buffer; scope: ObjectScope }>();
 
+  async ping(): Promise<boolean> {
+    return true;
+  }
+
   async put(key: string, data: Buffer, scope: ObjectScope): Promise<void> {
     assertKeyMatchesScope(key, scope);
     this.objects.set(key, { data, scope });

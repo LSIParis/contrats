@@ -13,7 +13,7 @@ const persistenceDir = path.resolve(
 );
 
 export async function setup() {
-  container = await new PostgreSqlContainer('postgres:16-alpine')
+  container = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('lsi_test')
     .withUsername('postgres')
     .withPassword('postgres')

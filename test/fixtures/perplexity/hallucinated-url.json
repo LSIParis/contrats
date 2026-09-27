@@ -1,0 +1,128 @@
+{
+  "_comment": "Réponse 200 valide dont le texte généré contient des URL (dont une inventée) et un marqueur de citation : elles doivent être retirées du texte et signalées, jamais promues en sources.",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "id": "resp_0f5e2c1a-7b39-4c61-9d7e-3a2b1c0d9e8f",
+    "object": "response",
+    "created_at": 1790431200,
+    "completed_at": 1790431247,
+    "model": "openai/gpt-5.6-terra",
+    "status": "completed",
+    "error": null,
+    "output": [
+      {
+        "type": "search_results",
+        "queries": [
+          "article 28 RGPD sous-traitant clauses obligatoires",
+          "reconduction tacite contrat entre professionnels"
+        ],
+        "results": [
+          {
+            "id": 1,
+            "url": "https://www.cnil.fr/fr/sous-traitance-exemple-de-clauses",
+            "title": "Sous-traitance : exemple de clauses | CNIL",
+            "snippet": "Les clauses contractuelles ci-dessous sont un exemple de rédaction pour répondre aux exigences de l'article 28 du RGPD.",
+            "date": "2023-06-12",
+            "last_updated": "2026-03-02",
+            "source": "web"
+          },
+          {
+            "id": 2,
+            "url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000032041559",
+            "title": "Article 1231-5 - Code civil - Légifrance",
+            "snippet": "Lorsque le contrat stipule que celui qui manquera de l'exécuter paiera une certaine somme à titre de dommages et intérêts…",
+            "date": null,
+            "last_updated": "2026-01-01",
+            "source": "web"
+          },
+          {
+            "id": 3,
+            "url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000032226842",
+            "title": "Article L215-1 - Code de la consommation - Légifrance",
+            "snippet": "Pour les contrats de prestations de services conclus pour une durée déterminée avec une clause de reconduction tacite…",
+            "date": null,
+            "last_updated": "2025-11-20",
+            "source": "web"
+          }
+        ]
+      },
+      {
+        "type": "fetch_url_results",
+        "contents": [
+          {
+            "url": "https://cyber.gouv.fr/publications/guide-dhygiene-informatique",
+            "title": "Guide d'hygiène informatique | ANSSI",
+            "snippet": "Ce guide présente 42 mesures d'hygiène informatique essentielles pour assurer la sécurité d'un système d'information."
+          }
+        ]
+      },
+      {
+        "id": "msg_5c1d9a3e-2f47-4b8a-8e61-0a9b7c6d5e4f",
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{\"clauses\":[{\"title\":\"Objet\",\"text\":\"Le présent contrat a pour objet de définir les conditions dans lesquelles le Prestataire assure, pour le compte de [CLIENT], l'infogérance du système d'information décrit en annexe 1.\",\"category\":\"OBJET\",\"riskLevel\":\"LOW\",\"justification\":\"Clause d'objet usuelle ; la détermination de l'objet est une condition de validité du contrat (articles 1162 et 1163 du Code civil).\"},{\"title\":\"Durée et renouvellement\",\"text\":\"Le contrat est conclu pour une durée initiale de trente-six (36) mois à compter de sa date d'effet. Il se renouvelle ensuite par tacite reconduction pour des périodes successives de douze (12) mois, sauf dénonciation par l'une des parties notifiée par lettre recommandée avec avis de réception au moins trois (3) mois avant l'échéance. Voir https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI999999999999 pour le texte applicable [web:3].\",\"category\":\"DUREE\",\"riskLevel\":\"MEDIUM\",\"justification\":\"La reconduction tacite est admise entre professionnels ; si [CLIENT] était un consommateur ou un non-professionnel, l'obligation d'information de l'article L215-1 du Code de la consommation s'appliquerait.\"},{\"title\":\"Prix et révision\",\"text\":\"En contrepartie des prestations, [CLIENT] verse une redevance mensuelle de [MONTANT_1] HT. Le prix est révisé chaque année selon la formule P1 = P0 × (0,15 + 0,85 × S1/S0), où S est la dernière valeur publiée de l’indice Syntec.\",\"category\":\"REVISION\",\"riskLevel\":\"LOW\",\"justification\":\"Une clause d'indexation doit reposer sur un indice en relation directe avec l'objet du contrat (article L112-2 du Code monétaire et financier) ; l'indice Syntec est d'usage pour les prestations informatiques.\"},{\"title\":\"Données personnelles\",\"text\":\"Dans la mesure où le Prestataire traite des données à caractère personnel pour le compte de [CLIENT], il agit en qualité de sous-traitant au sens de l'article 28 du RGPD et s'engage à ne les traiter que sur instruction documentée de [CLIENT]. Les stipulations détaillées figurent dans l'accord de traitement annexé.\",\"category\":\"DONNEES_PERSONNELLES\",\"riskLevel\":\"HIGH\",\"justification\":\"L'article 28 du RGPD impose un contrat écrit comportant des mentions obligatoires ; la CNIL publie un modèle de clauses de sous-traitance. Modèle disponible sur www.cnil-modeles-clauses.fr/rgpd (voir cnil.fr/fr/modele).\"}],\"suggestedAnnexes\":[{\"title\":\"Description des services\",\"description\":\"Périmètre technique, horaires de service et exclusions.\"},{\"title\":\"Accord de traitement des données\",\"description\":\"Mentions de l'article 28 du RGPD : objet, durée, finalité, catégories de données, mesures de sécurité.\"}]}",
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.cnil.fr/fr/sous-traitance-exemple-de-clauses",
+                "title": "Sous-traitance : exemple de clauses | CNIL",
+                "start_index": 0,
+                "end_index": 10
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.economie.gouv.fr/dgccrf/Publications/Vie-pratique/Fiches-pratiques/Delais-de-paiement",
+                "title": "Délais de paiement | DGCCRF",
+                "start_index": 11,
+                "end_index": 20
+              }
+            ],
+            "logprobs": []
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 9120,
+      "output_tokens": 1874,
+      "total_tokens": 10994,
+      "cost": {
+        "currency": "USD",
+        "input_cost": 0.01824,
+        "output_cost": 0.03748,
+        "total_cost": 0.06072,
+        "cache_creation_cost": null,
+        "cache_read_cost": 0,
+        "tool_calls_cost": 0.005
+      },
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "tool_calls_details": {
+        "search_web": {
+          "invocation": 2
+        },
+        "fetch_url": {
+          "invocation": 1
+        }
+      }
+    },
+    "store": false,
+    "tools": [
+      {
+        "type": "web_search"
+      },
+      {
+        "type": "fetch_url"
+      }
+    ]
+  }
+}

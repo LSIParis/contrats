@@ -1,0 +1,17 @@
+{
+  "name": "@lsi/contrats-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Client TypeScript de l'API publique Contrats (/api/v1), généré depuis openapi.yaml.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}

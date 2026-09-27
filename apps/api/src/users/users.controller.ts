@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { type Scope } from '@lsi/persistence';
-import { CurrentScope, CurrentSession, assertRole } from '../auth/current-scope.decorator.js';
+import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
+import { assertCan } from '../auth/permissions.js';
 import type { Session } from '../auth/session.service.js';
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -12,13 +13,13 @@ export class UsersController {
 
   @Get()
   list(@CurrentScope() scope: Scope, @CurrentSession() session: Session) {
-    assertRole(session, ['MSP_ADMIN']);
+    assertCan(session, 'users.manage');
     return this.users.list(scope);
   }
 
   @Post()
   create(@CurrentScope() scope: Scope, @CurrentSession() session: Session, @Body() dto: CreateUserDto) {
-    assertRole(session, ['MSP_ADMIN']);
+    assertCan(session, 'users.manage');
     return this.users.create(scope, dto);
   }
 
@@ -29,7 +30,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserDto,
   ) {
-    assertRole(session, ['MSP_ADMIN']);
+    assertCan(session, 'users.manage');
     return this.users.update(scope, id, dto);
   }
 }

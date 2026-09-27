@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach } from 'vitest';
+import { createTestApp } from '../support/app.js';
 import { Test } from '@nestjs/testing';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
@@ -52,9 +53,7 @@ beforeAll(async () => {
   provider = new FakeProvider();
   const mod = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ESIGNATURE_PROVIDER).useValue(provider).compile();
-  app = mod.createNestApplication();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  await app.init();
+  app = await createTestApp(mod);
   fx = await seedTwoCustomers();
   const sessions = app.get(SessionService);
   await sessions.put({ sessionId: 'sess-am', userId: fx.amUserId, tenantId: fx.tenantId, roles: ['ACCOUNT_MANAGER'], scope: internalScope(fx.tenantId, [fx.customerA.id], fx.amUserId) });

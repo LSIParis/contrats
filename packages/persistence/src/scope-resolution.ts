@@ -26,7 +26,9 @@ export type ResolvedRole =
   | 'LEGAL_REVIEWER'
   | 'TECHNICIAN'
   | 'CLIENT_SIGNER'
-  | 'CLIENT_VIEWER';
+  | 'CLIENT_VIEWER'
+  | 'INTERNAL_SIGNATORY'
+  | 'READER';
 
 export interface ResolvedUserScope {
   readonly scope: Scope;

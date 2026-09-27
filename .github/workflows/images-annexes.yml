@@ -1,0 +1,107 @@
+# Images annexes de la stack — application « Contrats »
+#
+# Complément aux workflows de l'annexe A (non modifiés) : release.yml ne publie
+# que l'image applicative. La stack Portainer a aussi besoin de :
+#   ghcr.io/<owner>/contrats-ocr     (deploy/ocr)
+#   ghcr.io/<owner>/contrats-backup  (deploy/backup, réutilisée par minio-init)
+# publiées avec le MÊME schéma de tags (sha-xxxxxxx, main, X.Y.Z, X.Y) pour que
+# CONTRATS_TAG désigne un ensemble cohérent.
+#
+# Actions épinglées par SHA (mêmes versions que l'annexe A).
+name: Images annexes
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    paths:
+      - "deploy/ocr/**"
+      - "deploy/backup/**"
+      - ".github/workflows/images-annexes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-annexes-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ocr-tests:
+    name: Tests du service OCR (unittest, subprocess simulé)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Python 3 est préinstallé sur ubuntu-latest ; aucune dépendance tierce.
+      - name: python -m unittest
+        working-directory: deploy/ocr
+        run: python3 -m unittest -v
+
+  images:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: ocr-tests
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: contrats-ocr
+            context: deploy/ocr
+          - image: contrats-backup
+            context: deploy/backup
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # GHCR exige un nom d'image en minuscules.
+      - name: Nom de l'image
+        id: name
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Connexion à ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags et labels OCI
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.name.outputs.image }}
+          flavor: |
+            latest=false
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.vendor=LSI-Maintenance
+
+      - name: Construction (et publication hors PR)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

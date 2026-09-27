@@ -12,19 +12,29 @@
     "test": "vitest run",
     "test:isolation": "vitest run tests/isolation",
     "test:watch": "vitest",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/persistence",
+    "seed": "tsx prisma/seed.ts",
+    "seed:propositions": "tsx prisma/seed.ts --only=propositions",
+    "test:seed": "vitest run --config vitest.seed.config.ts",
+    "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('prisma/schema.prisma')){require('child_process').execSync('prisma generate',{stdio:'inherit'})}else{console.log('postinstall @lsi/persistence : schéma Prisma absent (étape dépendances du Dockerfile), génération différée.')}\""
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
     "@types/node": "^22.9.0",
     "eslint": "^9",
-    "prisma": "^5.22.0",
     "testcontainers": "^10.13.2",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.5",
+    "@lsi/pricing": "workspace:*"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
