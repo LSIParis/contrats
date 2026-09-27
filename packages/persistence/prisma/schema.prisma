@@ -88,6 +88,8 @@ enum ContractOrigin {
   IMPORTED
   /// Projet rédigé par IA (brief §6) : revue humaine clause par clause.
   AI
+  /// Né d'une proposition signée (lot 9, brief §12.7).
+  PROPOSAL
 }
 
 /// §7.1. EXPIRING_SOON et ARCHIVED n'en font PAS partie :
@@ -346,6 +348,10 @@ enum StoredDocumentKind {
   SIGNATURE_AUDIT_TRAIL
   TERMINATION_LETTER
   ATTACHMENT
+  // Lot 9 (migration 30)
+  PROPOSAL_PDF
+  PROPOSAL_SIGNED_PDF
+  PROPOSAL_AUDIT_TRAIL
 }
 
 enum StoredDocumentOrigin {
@@ -378,6 +384,12 @@ model Tenant {
   priceIndexes PriceIndex[]
   aiUsage      AiUsage[]
   pricingRules PricingRule[]
+
+  // Lot 9 — propositions (classe « tenant »)
+  contentLibraryItems ContentLibraryItem[]
+  proposalTerms       ProposalTerms[]
+  proposalTemplates   ProposalTemplate[]
+  proposalSequences   ProposalSequence[]
 
   webhookSubscriptions WebhookSubscription[]
   webhookEvents        WebhookEvent[]
@@ -413,6 +425,7 @@ model User {
   grantedAccess  CustomerAccess[] @relation("AccessGrantedBy")
   notifications  Notification[]
   comments       Comment[]
+  ownedProposals Proposal[]       @relation("ProposalOwner")
 
   @@unique([tenantId, email])
   @@unique([id, tenantId])
@@ -489,6 +502,8 @@ model Customer {
   isConsumer   Boolean        @default(false) @map("is_consumer")
   /// Référence du client dans Client Help (ou saisie locale).
   externalRef  String?        @map("external_ref")
+  /// Lot 9 : PROSPECT → CLIENT à la signature de la première proposition.
+  commercialStatus CustomerCommercialStatus @default(CLIENT) @map("commercial_status")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -497,6 +512,7 @@ model Customer {
   clientUsers   User[]            @relation("ClientUsers")
   access        CustomerAccess[]
   documents     StoredDocument[]
+  proposals     Proposal[]
 
   /// Clé candidate composite : cible des FK porteuses de scope (§8.4).
   @@unique([id, tenantId])
@@ -524,6 +540,7 @@ model CustomerContact {
 
   customer Customer         @relation(fields: [customerId, tenantId], references: [id, tenantId], onDelete: Cascade)
   signers  ContractSigner[]
+  proposalRecipients ProposalRecipient[]
 
   @@unique([customerId, email])
   @@unique([id, tenantId, customerId])
@@ -544,11 +561,14 @@ model ContractTemplate {
   updatedAt        DateTime         @map("updated_at")
   /// Exemple fourni avec l'application : affiché « DÉMONSTRATION » (brief §4).
   isDemo           Boolean          @default(false) @map("is_demo")
+  /// Lot 9 : identifiant stable, cible de `proposal_templates.contract_template_slug`.
+  slug             String?
 
   tenant   Tenant                    @relation(fields: [tenantId], references: [id])
   versions ContractTemplateVersion[]
 
   @@unique([id, tenantId])
+  @@unique([tenantId, slug], map: "contract_templates_slug_key")
   @@index([tenantId, status])
   @@map("contract_templates")
 }
@@ -651,6 +671,10 @@ model Contract {
   unreviewedAiClauses      Int         @default(0) @map("unreviewed_ai_clauses")
   /// Variables du contrat type encore sans valeur (V2-VAR, migration 22).
   missingVariables         Int         @default(0) @map("missing_variables")
+  /// Lot 9 : proposition signée dont ce contrat est issu (UNIQUE : conversion idempotente).
+  proposalId               String?     @unique(map: "contracts_proposal_key") @map("proposal_id") @db.Uuid
+  /// Proposition signée valant contrat (signedProposalIsContract) : signatureMode dérivé PROPOSAL_SIGNED.
+  signedViaProposal        Boolean     @default(false) @map("signed_via_proposal")
 
   signedAt     DateTime? @map("signed_at")
   activatedAt  DateTime? @map("activated_at")
@@ -696,6 +720,9 @@ model Contract {
   annexes           Annex[]
   pricingSchedules  PricingSchedule[]
   priceOverrides    PriceOverride[]
+
+  proposal           Proposal?  @relation("ContractFromProposal", fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "contracts_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
+  proposalsConverted Proposal[] @relation("ProposalGeneratedContract")
 
   /// Clé candidate composite portant le scope complet : cible de TOUTES
   /// les FK des tables filles (§8.4).
@@ -985,6 +1012,8 @@ model Notification {
 
   relatedContractId String? @map("related_contract_id") @db.Uuid
   relatedReminderId String? @map("related_reminder_id") @db.Uuid
+  /// Lot 9 : notification liée à une proposition (suivi temps réel du commercial).
+  relatedProposalId String? @map("related_proposal_id") @db.Uuid
 
   status  NotificationStatus @default(QUEUED)
   sentAt  DateTime?          @map("sent_at")
@@ -1150,8 +1179,11 @@ model StoredDocument {
   derivedFromId    String?              @map("derived_from_id") @db.Uuid
   uploadedByUserId String?              @map("uploaded_by_user_id") @db.Uuid
   createdAt        DateTime             @map("created_at")
+  /// Lot 9 : document d'une proposition (PDF de version, PDF signé, journal DocuSeal).
+  proposalId       String?              @map("proposal_id") @db.Uuid
 
   customer    Customer         @relation(fields: [customerId, tenantId], references: [id, tenantId], map: "stored_documents_customer_fk", onDelete: NoAction, onUpdate: NoAction)
+  proposal    Proposal?        @relation(fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "stored_documents_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
   contract    Contract?        @relation(fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "stored_documents_contract_fk", onDelete: NoAction, onUpdate: NoAction)
   derivedFrom StoredDocument?  @relation("Derivation", fields: [derivedFromId, tenantId, customerId], references: [id, tenantId, customerId], map: "stored_documents_derived_fk", onDelete: NoAction, onUpdate: NoAction)
   derivatives StoredDocument[] @relation("Derivation")
@@ -1163,6 +1195,7 @@ model StoredDocument {
   @@unique([id, tenantId, customerId], map: "stored_documents_scope_key")
   @@index([tenantId, customerId, contractId], map: "stored_documents_contract_idx")
   @@index([tenantId, sha256], map: "stored_documents_sha_idx")
+  @@index([tenantId, customerId, proposalId], map: "stored_documents_proposal_idx")
   @@map("stored_documents")
 }
 
@@ -1477,6 +1510,8 @@ enum PricingRecurrence {
   MONTHLY
   YEARLY
   ONE_OFF
+  /// Lot 9 (migration 30) : prestations trimestrielles.
+  QUARTERLY
 }
 
 enum PricingQuantitySource {
@@ -1803,4 +1838,800 @@ model AiUsage {
 
   @@index([tenantId, createdAt], map: "ai_usage_tenant_month_idx")
   @@map("ai_usage")
+}
+
+
+// ===========================================================================
+// Lot 9 — propositions commerciales (migrations 30-31) — docs/contrats/11-propositions.md
+// ===========================================================================
+// Classe « tenant » : bibliothèque de contenus, CGV versionnées, modèles de
+// proposition (cible du seed de l'annexe C, prisma/seed/proposal-templates/).
+// Classe « customer » : tout le reste, tenant + client, FK composites.
+
+enum ProposalStatus {
+  DRAFT
+  IN_INTERNAL_REVIEW
+  READY
+  SENT
+  VIEWED
+  IN_DISCUSSION
+  ACCEPTED
+  PENDING_SIGNATURE
+  SIGNED
+  CONVERTED
+  EXPIRED
+  DECLINED
+  WITHDRAWN
+}
+
+enum ProposalAcceptanceMode {
+  DOCUSEAL_SIGNATURE
+  CLICK_ACCEPT
+}
+
+enum ProposalSectionKind {
+  COVER
+  LIBRARY
+  TEXT
+  CLIENT_INPUT
+  PRICING
+  TERMS
+  SIGNATURE
+}
+
+enum ProposalLineKind {
+  REQUIRED
+  OPTIONAL
+  SETUP
+  INFO
+}
+
+enum ProposalRecurrence {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  INFO
+}
+
+enum ProposalLineGroup {
+  RECURRING
+  SETUP
+  OPTIONS
+  YEARLY
+  OUT_OF_SCOPE
+}
+
+enum ProposalPriceStatus {
+  VALIDATED
+  TO_VALIDATE
+}
+
+enum ProposalRecipientRole {
+  DECISION_MAKER
+  SIGNER
+  READER
+}
+
+enum ProposalBlockType {
+  RICH_TEXT
+  IMAGE
+  VIDEO
+  PRICING_TABLE
+  TIMELINE
+  TEAM
+  REFERENCES
+  FAQ
+  TERMS
+  SIGNATURE
+}
+
+enum ProposalViewEventKind {
+  OPENED
+  SECTION_VIEWED
+  PDF_DOWNLOADED
+  NEW_VIEWER
+}
+
+enum ProposalFollowUpKind {
+  NO_OPEN
+  NO_DECISION
+  BEFORE_EXPIRY
+}
+
+enum ProposalFollowUpStatus {
+  PLANNED
+  SENT
+  SKIPPED
+  CANCELLED
+}
+
+enum ProposalDeliveryKind {
+  INITIAL
+  RESEND
+  NEW_VERSION
+  FOLLOW_UP
+  OTP
+  REVISION_NOTICE
+}
+
+enum ProposalCommentAuthor {
+  CLIENT
+  INTERNAL
+}
+
+/// Brief §12.1 : PROSPECT | CLIENT | ANCIEN_CLIENT. CLIENT pour l'existant.
+enum CustomerCommercialStatus {
+  PROSPECT
+  CLIENT
+  FORMER_CLIENT
+}
+
+/// Contenu réutilisable. `userModifiedAt` : modifié dans l'interface → le seed ne le réécrit plus.
+model ContentLibraryItem {
+  id                  String    @id @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  key                 String
+  title               String
+  folder              String
+  body                String
+  requiresLegalReview Boolean   @default(false) @map("requires_legal_review")
+  /// Incrémenté à chaque modification ; le texte est figé dans chaque version envoyée.
+  version             Int       @default(1)
+  seedVersion         Int?      @map("seed_version")
+  seedChecksum        String?   @map("seed_checksum") @db.Char(64)
+  userModifiedAt      DateTime? @map("user_modified_at")
+  archivedAt          DateTime? @map("archived_at")
+  createdAt           DateTime  @map("created_at")
+  updatedAt           DateTime  @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], map: "content_library_items_tenant_id_fkey", onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([tenantId, key], map: "content_library_items_key_key")
+  @@unique([id, tenantId], map: "content_library_items_scope_key")
+  @@index([tenantId, folder], map: "content_library_items_folder_idx")
+  @@map("content_library_items")
+}
+
+/// CGV versionnées, IMMUABLES (UPDATE/DELETE révoqués). Chaque version de proposition en référence une.
+model ProposalTerms {
+  id              String   @id @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  versionNumber   Int      @map("version_number")
+  title           String
+  body            String
+  sha256          String   @db.Char(64)
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @map("created_at")
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], map: "proposal_terms_tenant_id_fkey", onDelete: NoAction, onUpdate: NoAction)
+  versions ProposalVersion[]
+
+  @@unique([tenantId, versionNumber], map: "proposal_terms_version_key")
+  @@unique([id, tenantId], map: "proposal_terms_scope_key")
+  @@map("proposal_terms")
+}
+
+/// Modèle de proposition (annexe C). `signedProposalIsContract` : désactivé par défaut, à valider par un juriste.
+model ProposalTemplate {
+  id                       String                 @id @db.Uuid
+  tenantId                 String                 @map("tenant_id") @db.Uuid
+  slug                     String
+  name                     String
+  description              String
+  target                   String
+  contractTemplateSlug     String                 @map("contract_template_slug")
+  acceptanceMode           ProposalAcceptanceMode @map("acceptance_mode")
+  providerCountersign      Boolean                @default(true) @map("provider_countersign")
+  validityDays             Int                    @default(30) @map("validity_days")
+  /// { noOpenAfterDays, noDecisionAfterDays, beforeExpiryDays }
+  followUps                Json                   @map("follow_ups")
+  vatRatePercent           Decimal                @map("vat_rate_percent") @db.Decimal(5, 2)
+  currency                 String                 @default("EUR") @db.Char(3)
+  tags                     String[]               @default([])
+  /// Choice[] (schema.ts de l'annexe C)
+  pricingChoices           Json                   @map("pricing_choices")
+  /// Rule[] — évaluées par le moteur de tarification, jamais par l'interface.
+  pricingRules             Json                   @map("pricing_rules")
+  controlCases             Json?                  @map("control_cases")
+  signedProposalIsContract Boolean                @default(false) @map("signed_proposal_is_contract")
+  seedVersion              Int?                   @map("seed_version")
+  seedChecksum             String?                @map("seed_checksum") @db.Char(64)
+  userModifiedAt           DateTime?              @map("user_modified_at")
+  archivedAt               DateTime?              @map("archived_at")
+  createdAt                DateTime               @map("created_at")
+  updatedAt                DateTime               @map("updated_at")
+
+  tenant    Tenant                        @relation(fields: [tenantId], references: [id], map: "proposal_templates_tenant_id_fkey", onDelete: NoAction, onUpdate: NoAction)
+  sections  ProposalTemplateSection[]
+  lines     ProposalTemplatePricingLine[]
+  proposals Proposal[]
+
+  @@unique([tenantId, slug], map: "proposal_templates_slug_key")
+  @@unique([id, tenantId], map: "proposal_templates_scope_key")
+  @@map("proposal_templates")
+}
+
+model ProposalTemplateSection {
+  id               String              @id @db.Uuid
+  tenantId         String              @map("tenant_id") @db.Uuid
+  templateId       String              @map("template_id") @db.Uuid
+  position         Int
+  key              String
+  title            String
+  kind             ProposalSectionKind
+  /// Markdown avec balises {{…}}.
+  body             String?
+  libraryItemKey   String?             @map("library_item_key")
+  guidance         String?
+  aiAssist         Boolean             @default(false) @map("ai_assist")
+  optional         Boolean             @default(false)
+  validationStatus ProposalPriceStatus @default(VALIDATED) @map("validation_status")
+
+  template ProposalTemplate @relation(fields: [templateId, tenantId], references: [id, tenantId], map: "proposal_template_sections_template_fk", onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([templateId, key], map: "proposal_template_sections_key_key")
+  @@index([templateId, position], map: "proposal_template_sections_position_idx")
+  @@map("proposal_template_sections")
+}
+
+model ProposalTemplatePricingLine {
+  id                  String              @id @db.Uuid
+  tenantId            String              @map("tenant_id") @db.Uuid
+  templateId          String              @map("template_id") @db.Uuid
+  position            Int
+  key                 String
+  label               String
+  description         String?
+  kind                ProposalLineKind
+  unit                String
+  recurrence          ProposalRecurrence
+  group               ProposalLineGroup   @map("group")
+  /// { default, min, max?, maxFrom?, linkedTo?, editableByClient }
+  quantity            Json?
+  /// { unitPriceCents } | { dependsOn, byChoice }
+  pricing             Json
+  priceFrom           Boolean             @default(false) @map("price_from")
+  priceStatus         ProposalPriceStatus @map("price_status")
+  priceStatusByChoice Json?               @map("price_status_by_choice")
+  priceSource         String              @map("price_source")
+  setupLineKey        String?             @map("setup_line_key")
+  /// { index: "SYNTEC", a, b }
+  indexation          Json?
+
+  template ProposalTemplate @relation(fields: [templateId, tenantId], references: [id, tenantId], map: "proposal_template_pricing_lines_template_fk", onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([templateId, key], map: "proposal_template_pricing_lines_key_key")
+  @@index([templateId, position], map: "proposal_template_pricing_lines_position_idx")
+  @@map("proposal_template_pricing_lines")
+}
+
+/// Compteur PROP-AAAA-NNNN par tenant et par année (incrément atomique).
+model ProposalSequence {
+  tenantId  String @map("tenant_id") @db.Uuid
+  year      Int
+  lastValue Int    @map("last_value")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], map: "proposal_sequences_tenant_id_fkey", onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([tenantId, year], map: "proposal_sequences_pkey")
+  @@map("proposal_sequences")
+}
+
+/// Proposition commerciale. Statut écrit EXCLUSIVEMENT via persistProposalTransition
+/// (journal proposal_lifecycle_events + audit chaîné par trigger).
+model Proposal {
+  id                       String                 @id @db.Uuid
+  tenantId                 String                 @map("tenant_id") @db.Uuid
+  customerId               String                 @map("customer_id") @db.Uuid
+  number                   String
+  title                    String
+  templateId               String?                @map("template_id") @db.Uuid
+  ownerUserId              String                 @map("owner_user_id") @db.Uuid
+  status                   ProposalStatus         @default(DRAFT)
+  acceptanceMode           ProposalAcceptanceMode @default(DOCUSEAL_SIGNATURE) @map("acceptance_mode")
+  currentVersionId         String?                @map("current_version_id") @db.Uuid
+  validityDays             Int                    @default(30) @map("validity_days")
+  fixedExpiryDate          DateTime?              @map("fixed_expiry_date") @db.Date
+  expiresAt                DateTime?              @map("expires_at")
+  sensitive                Boolean                @default(false)
+  reviewRequired           Boolean                @default(false) @map("review_required")
+  reviewSubmittedByUserId  String?                @map("review_submitted_by_user_id") @db.Uuid
+  reviewApprovedVersionId  String?                @map("review_approved_version_id") @db.Uuid
+  reviewDecidedByUserId    String?                @map("review_decided_by_user_id") @db.Uuid
+  reviewReason             String?                @map("review_reason")
+  acceptedVersionId        String?                @map("accepted_version_id") @db.Uuid
+  acceptedSnapshotId       String?                @map("accepted_snapshot_id") @db.Uuid
+  followUpsEnabled         Boolean                @default(true) @map("follow_ups_enabled")
+  followUpConfig           Json?                  @map("follow_up_config")
+  mergeContext             Json                   @default("{}") @map("merge_context")
+  winProbability           Int?                   @map("win_probability")
+  oneTimeCents             BigInt?                @map("one_time_cents")
+  monthlyCents             BigInt?                @map("monthly_cents")
+  commitmentTotalCents     BigInt?                @map("commitment_total_cents")
+  commitmentMonths         Int?                   @map("commitment_months")
+  signedProposalIsContract Boolean                @default(false) @map("signed_proposal_is_contract")
+  declineReasonCode        String?                @map("decline_reason_code")
+  declineReason            String?                @map("decline_reason")
+  withdrawReason           String?                @map("withdraw_reason")
+  /// Contrat généré (traçabilité proposition → contrat).
+  contractId               String?                @map("contract_id") @db.Uuid
+  sentAt                   DateTime?              @map("sent_at")
+  firstViewedAt            DateTime?              @map("first_viewed_at")
+  lastActivityAt           DateTime?              @map("last_activity_at")
+  clientRespondedAt        DateTime?              @map("client_responded_at")
+  acceptedAt               DateTime?              @map("accepted_at")
+  signedAt                 DateTime?              @map("signed_at")
+  convertedAt              DateTime?              @map("converted_at")
+  declinedAt               DateTime?              @map("declined_at")
+  expiredAt                DateTime?              @map("expired_at")
+  withdrawnAt              DateTime?              @map("withdrawn_at")
+  createdAt                DateTime               @map("created_at")
+  updatedAt                DateTime               @map("updated_at")
+  createdByUserId          String                 @map("created_by_user_id") @db.Uuid
+  updatedByUserId          String                 @map("updated_by_user_id") @db.Uuid
+
+  customer Customer          @relation(fields: [customerId, tenantId], references: [id, tenantId], map: "proposals_customer_fk", onDelete: NoAction, onUpdate: NoAction)
+  template ProposalTemplate? @relation(fields: [templateId, tenantId], references: [id, tenantId], map: "proposals_template_fk", onDelete: NoAction, onUpdate: NoAction)
+  owner    User              @relation("ProposalOwner", fields: [ownerUserId, tenantId], references: [id, tenantId], map: "proposals_owner_fk", onDelete: NoAction, onUpdate: NoAction)
+  contract Contract?         @relation("ProposalGeneratedContract", fields: [contractId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposals_contract_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  contractsFromProposal Contract[]               @relation("ContractFromProposal")
+  lifecycleEvents       ProposalLifecycleEvent[]
+  versions              ProposalVersion[]
+  recipients            ProposalRecipient[]
+  viewStats             ProposalViewStat[]
+  followUps             ProposalFollowUp[]
+  storedDocuments       StoredDocument[]
+
+  @@unique([id, tenantId, customerId], map: "proposals_scope_key")
+  @@unique([tenantId, number], map: "proposals_number_key")
+  @@index([tenantId, status], map: "proposals_status_idx")
+  @@index([tenantId, customerId], map: "proposals_customer_idx")
+  @@index([tenantId, ownerUserId, status], map: "proposals_owner_idx")
+  @@index([status, expiresAt], map: "proposals_expiry_idx")
+  @@map("proposals")
+}
+
+/// Écrit EXCLUSIVEMENT par le trigger `proposals_status_transition` (INSERT/UPDATE/DELETE révoqués).
+model ProposalLifecycleEvent {
+  id          String          @id @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  customerId  String          @map("customer_id") @db.Uuid
+  proposalId  String          @map("proposal_id") @db.Uuid
+  fromStatus  ProposalStatus? @map("from_status")
+  toStatus    ProposalStatus  @map("to_status")
+  event       String?
+  reason      String?
+  actorUserId String?         @map("actor_user_id") @db.Uuid
+  actorKind   ActorKind       @map("actor_kind")
+  occurredAt  DateTime        @map("occurred_at")
+  seq         BigInt          @default(autoincrement())
+
+  proposal Proposal @relation(fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_lifecycle_events_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, proposalId, seq], map: "proposal_lifecycle_events_proposal_idx")
+  @@map("proposal_lifecycle_events")
+}
+
+/// Version : IMMUABLE dès l'envoi (`lockedAt`, trigger). Toute modification crée une nouvelle version.
+model ProposalVersion {
+  id                String    @id @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  customerId        String    @map("customer_id") @db.Uuid
+  proposalId        String    @map("proposal_id") @db.Uuid
+  versionNumber     Int       @map("version_number")
+  title             String
+  cover             Json      @default("{}")
+  /// Tableau de prix proposé : { choices, lines, rules, vatRatePercent } (forme de l'annexe C).
+  pricingDefinition Json      @map("pricing_definition")
+  pricingSettings   Json      @default("{}") @map("pricing_settings")
+  termsId           String?   @map("terms_id") @db.Uuid
+  /// Valeurs de fusion FIGÉES à l'envoi.
+  mergeValues       Json      @default("{}") @map("merge_values")
+  contentSha256     String?   @map("content_sha256") @db.Char(64)
+  pdfObjectKey      String?   @map("pdf_object_key")
+  pdfSha256         String?   @map("pdf_sha256") @db.Char(64)
+  changeSummary     String?   @map("change_summary")
+  lockedAt          DateTime? @map("locked_at")
+  supersededAt      DateTime? @map("superseded_at")
+  createdAt         DateTime  @map("created_at")
+  createdByUserId   String    @map("created_by_user_id") @db.Uuid
+
+  proposal Proposal       @relation(fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_versions_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
+  terms    ProposalTerms? @relation(fields: [termsId, tenantId], references: [id, tenantId], map: "proposal_versions_terms_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  sections          ProposalSection[]
+  accessLinks       ProposalAccessLink[]
+  viewEvents        ProposalViewEvent[]
+  comments          ProposalComment[]
+  deliveries        ProposalDelivery[]
+  selections        ProposalSelection[]
+  snapshots         PricingSnapshot[]
+  acceptances       ProposalAcceptance[]
+  signatureRequests ProposalSignatureRequest[]
+
+  @@unique([id, tenantId, customerId], map: "proposal_versions_scope_key")
+  @@unique([proposalId, versionNumber], map: "proposal_versions_number_key")
+  @@index([tenantId, customerId, proposalId], map: "proposal_versions_proposal_idx")
+  @@map("proposal_versions")
+}
+
+model ProposalSection {
+  id               String              @id @db.Uuid
+  tenantId         String              @map("tenant_id") @db.Uuid
+  customerId       String              @map("customer_id") @db.Uuid
+  proposalId       String              @map("proposal_id") @db.Uuid
+  versionId        String              @map("version_id") @db.Uuid
+  position         Int
+  key              String
+  title            String
+  kind             ProposalSectionKind
+  libraryItemKey   String?             @map("library_item_key")
+  guidance         String?
+  optional         Boolean             @default(false)
+  excluded         Boolean             @default(false)
+  validationStatus ProposalPriceStatus @default(VALIDATED) @map("validation_status")
+  aiPendingReview  Boolean             @default(false) @map("ai_pending_review")
+
+  version ProposalVersion @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_sections_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  blocks  ProposalBlock[]
+
+  @@unique([id, tenantId, customerId], map: "proposal_sections_scope_key")
+  @@unique([versionId, key], map: "proposal_sections_key_key")
+  @@unique([versionId, position], map: "proposal_sections_position_key")
+  @@index([tenantId, customerId, proposalId], map: "proposal_sections_proposal_idx")
+  @@map("proposal_sections")
+}
+
+model ProposalBlock {
+  id         String            @id @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  customerId String            @map("customer_id") @db.Uuid
+  proposalId String            @map("proposal_id") @db.Uuid
+  sectionId  String            @map("section_id") @db.Uuid
+  position   Int
+  type       ProposalBlockType
+  content    Json
+
+  section ProposalSection @relation(fields: [sectionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_blocks_section_fk", onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([sectionId, position], map: "proposal_blocks_position_key")
+  @@index([tenantId, customerId, proposalId], map: "proposal_blocks_proposal_idx")
+  @@map("proposal_blocks")
+}
+
+model ProposalRecipient {
+  id           String                @id @db.Uuid
+  tenantId     String                @map("tenant_id") @db.Uuid
+  customerId   String                @map("customer_id") @db.Uuid
+  proposalId   String                @map("proposal_id") @db.Uuid
+  contactId    String?               @map("contact_id") @db.Uuid
+  fullName     String                @map("full_name")
+  email        String
+  jobTitle     String?               @map("job_title")
+  role         ProposalRecipientRole
+  signingOrder Int                   @default(0) @map("signing_order")
+  createdAt    DateTime              @map("created_at")
+  updatedAt    DateTime              @map("updated_at")
+
+  proposal Proposal         @relation(fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_recipients_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
+  contact  CustomerContact? @relation(fields: [contactId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_recipients_contact_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  accessLinks ProposalAccessLink[]
+  deliveries  ProposalDelivery[]
+
+  @@unique([id, tenantId, customerId], map: "proposal_recipients_scope_key")
+  @@unique([proposalId, email], map: "proposal_recipients_email_key")
+  @@map("proposal_recipients")
+}
+
+/// Lien personnel : SEUL le SHA-256 du jeton est stocké (idem code à usage unique et session OTP).
+model ProposalAccessLink {
+  id                  String    @id @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  customerId          String    @map("customer_id") @db.Uuid
+  proposalId          String    @map("proposal_id") @db.Uuid
+  versionId           String    @map("version_id") @db.Uuid
+  recipientId         String    @map("recipient_id") @db.Uuid
+  tokenHash           String    @unique(map: "proposal_access_links_token_key") @map("token_hash") @db.Char(64)
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  revokedReason       String?   @map("revoked_reason")
+  otpHash             String?   @map("otp_hash") @db.Char(64)
+  otpExpiresAt        DateTime? @map("otp_expires_at")
+  otpAttempts         Int       @default(0) @map("otp_attempts")
+  otpSessionHash      String?   @map("otp_session_hash") @db.Char(64)
+  otpSessionExpiresAt DateTime? @map("otp_session_expires_at")
+  otpVerifiedAt       DateTime? @map("otp_verified_at")
+  knownViewers        String[]  @default([]) @map("known_viewers")
+  firstUsedAt         DateTime? @map("first_used_at")
+  lastUsedAt          DateTime? @map("last_used_at")
+  createdAt           DateTime  @map("created_at")
+
+  version   ProposalVersion   @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_access_links_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  recipient ProposalRecipient @relation(fields: [recipientId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_access_links_recipient_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([id, tenantId, customerId], map: "proposal_access_links_scope_key")
+  @@index([tenantId, customerId, proposalId], map: "proposal_access_links_proposal_idx")
+  @@map("proposal_access_links")
+}
+
+/// Suivi DÉTAILLÉ, purgé après décision ou expiration ; IP tronquée.
+model ProposalViewEvent {
+  id          String                @id @db.Uuid
+  tenantId    String                @map("tenant_id") @db.Uuid
+  customerId  String                @map("customer_id") @db.Uuid
+  proposalId  String                @map("proposal_id") @db.Uuid
+  versionId   String                @map("version_id") @db.Uuid
+  recipientId String?               @map("recipient_id") @db.Uuid
+  linkId      String?               @map("link_id") @db.Uuid
+  kind        ProposalViewEventKind
+  sectionKey  String?               @map("section_key")
+  durationMs  Int?                  @map("duration_ms")
+  ipTruncated String?               @map("ip_truncated")
+  userAgent   String?               @map("user_agent")
+  occurredAt  DateTime              @map("occurred_at")
+
+  version ProposalVersion @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_view_events_version_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, proposalId, occurredAt], map: "proposal_view_events_proposal_idx")
+  @@map("proposal_view_events")
+}
+
+/// Agrégats de lecture, CONSERVÉS après la purge du détail. sectionKey '' = total.
+model ProposalViewStat {
+  tenantId        String    @map("tenant_id") @db.Uuid
+  customerId      String    @map("customer_id") @db.Uuid
+  proposalId      String    @map("proposal_id") @db.Uuid
+  sectionKey      String    @default("") @map("section_key")
+  opens           Int       @default(0)
+  totalDurationMs BigInt    @default(0) @map("total_duration_ms")
+  pdfDownloads    Int       @default(0) @map("pdf_downloads")
+  newViewers      Int       @default(0) @map("new_viewers")
+  lastViewedAt    DateTime? @map("last_viewed_at")
+
+  proposal Proposal @relation(fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_view_stats_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([proposalId, sectionKey], map: "proposal_view_stats_pkey")
+  @@index([tenantId, customerId], map: "proposal_view_stats_scope_idx")
+  @@map("proposal_view_stats")
+}
+
+model ProposalComment {
+  id           String                @id @db.Uuid
+  tenantId     String                @map("tenant_id") @db.Uuid
+  customerId   String                @map("customer_id") @db.Uuid
+  proposalId   String                @map("proposal_id") @db.Uuid
+  versionId    String                @map("version_id") @db.Uuid
+  sectionKey   String?               @map("section_key")
+  parentId     String?               @map("parent_id") @db.Uuid
+  authorKind   ProposalCommentAuthor @map("author_kind")
+  recipientId  String?               @map("recipient_id") @db.Uuid
+  authorUserId String?               @map("author_user_id") @db.Uuid
+  authorName   String                @map("author_name")
+  body         String
+  createdAt    DateTime              @map("created_at")
+
+  version ProposalVersion   @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_comments_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  parent  ProposalComment?  @relation("ProposalCommentReplies", fields: [parentId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_comments_parent_fk", onDelete: NoAction, onUpdate: NoAction)
+  replies ProposalComment[] @relation("ProposalCommentReplies")
+
+  @@unique([id, tenantId, customerId], map: "proposal_comments_scope_key")
+  @@index([tenantId, customerId, proposalId], map: "proposal_comments_proposal_idx")
+  @@map("proposal_comments")
+}
+
+model ProposalFollowUp {
+  id         String                 @id @db.Uuid
+  tenantId   String                 @map("tenant_id") @db.Uuid
+  customerId String                 @map("customer_id") @db.Uuid
+  proposalId String                 @map("proposal_id") @db.Uuid
+  kind       ProposalFollowUpKind
+  dueAt      DateTime               @map("due_at")
+  status     ProposalFollowUpStatus @default(PLANNED)
+  sentAt     DateTime?              @map("sent_at")
+  skipReason String?                @map("skip_reason")
+  createdAt  DateTime               @map("created_at")
+  updatedAt  DateTime               @map("updated_at")
+
+  proposal Proposal @relation(fields: [proposalId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_follow_ups_proposal_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([proposalId, kind, dueAt], map: "proposal_follow_ups_plan_key")
+  @@index([status, dueAt], map: "proposal_follow_ups_due_idx")
+  @@map("proposal_follow_ups")
+}
+
+/// Historique des envois (append-only).
+model ProposalDelivery {
+  id           String               @id @db.Uuid
+  tenantId     String               @map("tenant_id") @db.Uuid
+  customerId   String               @map("customer_id") @db.Uuid
+  proposalId   String               @map("proposal_id") @db.Uuid
+  versionId    String               @map("version_id") @db.Uuid
+  recipientId  String               @map("recipient_id") @db.Uuid
+  kind         ProposalDeliveryKind
+  subject      String
+  sentByUserId String?              @map("sent_by_user_id") @db.Uuid
+  error        String?
+  sentAt       DateTime             @map("sent_at")
+
+  version   ProposalVersion   @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_deliveries_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  recipient ProposalRecipient @relation(fields: [recipientId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_deliveries_recipient_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, proposalId], map: "proposal_deliveries_proposal_idx")
+  @@map("proposal_deliveries")
+}
+
+/// Configuration du client recalculée par le moteur (append-only ; la dernière fait foi).
+model ProposalSelection {
+  id                   String    @id @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  customerId           String    @map("customer_id") @db.Uuid
+  proposalId           String    @map("proposal_id") @db.Uuid
+  versionId            String    @map("version_id") @db.Uuid
+  choices              Json
+  quantities           Json
+  selectedOptions      Json      @map("selected_options")
+  oneTimeCents         BigInt    @map("one_time_cents")
+  monthlyCents         BigInt    @map("monthly_cents")
+  quarterlyCents       BigInt    @map("quarterly_cents")
+  yearlyCents          BigInt    @map("yearly_cents")
+  commitmentTotalCents BigInt    @map("commitment_total_cents")
+  commitmentMonths     Int       @map("commitment_months")
+  errors               Json      @default("[]")
+  actorKind            ActorKind @map("actor_kind")
+  recipientId          String?   @map("recipient_id") @db.Uuid
+  userId               String?   @map("user_id") @db.Uuid
+  createdAt            DateTime  @map("created_at")
+
+  version   ProposalVersion   @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_selections_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  snapshots PricingSnapshot[]
+
+  @@unique([id, tenantId, customerId], map: "proposal_selections_scope_key")
+  @@index([tenantId, versionId, createdAt], map: "proposal_selections_version_idx")
+  @@map("proposal_selections")
+}
+
+/// PricingSnapshot : configuration FIGÉE à l'acceptation, reprise comme barème initial du contrat. Immuable.
+model PricingSnapshot {
+  id                   String   @id @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  customerId           String   @map("customer_id") @db.Uuid
+  proposalId           String   @map("proposal_id") @db.Uuid
+  versionId            String   @map("version_id") @db.Uuid
+  selectionId          String   @map("selection_id") @db.Uuid
+  definition           Json
+  selection            Json
+  /// PricingSchedule du moteur (@lsi/pricing), exactement celui qui a été calculé.
+  engineSchedule       Json     @map("engine_schedule")
+  engineResult         Json     @map("engine_result")
+  oneTimeCents         BigInt   @map("one_time_cents")
+  monthlyCents         BigInt   @map("monthly_cents")
+  commitmentTotalCents BigInt   @map("commitment_total_cents")
+  commitmentMonths     Int      @map("commitment_months")
+  sha256               String   @db.Char(64)
+  createdAt            DateTime @map("created_at")
+
+  version           ProposalVersion            @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "pricing_snapshots_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  selectionRow      ProposalSelection          @relation(fields: [selectionId, tenantId, customerId], references: [id, tenantId, customerId], map: "pricing_snapshots_selection_fk", onDelete: NoAction, onUpdate: NoAction)
+  acceptances       ProposalAcceptance[]
+  signatureRequests ProposalSignatureRequest[]
+
+  @@unique([id, tenantId, customerId], map: "pricing_snapshots_scope_key")
+  @@index([tenantId, customerId, proposalId], map: "pricing_snapshots_proposal_idx")
+  @@map("pricing_snapshots")
+}
+
+/// Preuve d'acceptation (append-only) ; CLICK_ACCEPT exige un e-mail vérifié par code (CHECK).
+model ProposalAcceptance {
+  id                 String                 @id @db.Uuid
+  tenantId           String                 @map("tenant_id") @db.Uuid
+  customerId         String                 @map("customer_id") @db.Uuid
+  proposalId         String                 @map("proposal_id") @db.Uuid
+  versionId          String                 @map("version_id") @db.Uuid
+  snapshotId         String                 @map("snapshot_id") @db.Uuid
+  recipientId        String?                @map("recipient_id") @db.Uuid
+  mode               ProposalAcceptanceMode
+  acceptedByName     String                 @map("accepted_by_name")
+  acceptedByFunction String?                @map("accepted_by_function")
+  acceptedByEmail    String                 @map("accepted_by_email")
+  emailVerifiedAt    DateTime?              @map("email_verified_at")
+  ip                 String?
+  userAgent          String?                @map("user_agent")
+  versionPdfSha256   String?                @map("version_pdf_sha256") @db.Char(64)
+  acceptedAt         DateTime               @map("accepted_at")
+
+  version  ProposalVersion @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_acceptances_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  snapshot PricingSnapshot @relation(fields: [snapshotId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_acceptances_snapshot_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, proposalId], map: "proposal_acceptances_proposal_idx")
+  @@map("proposal_acceptances")
+}
+
+/// Soumission DocuSeal d'une proposition (même adaptateur, même pipeline de webhooks).
+model ProposalSignatureRequest {
+  id                   String                 @id @db.Uuid
+  tenantId             String                 @map("tenant_id") @db.Uuid
+  customerId           String                 @map("customer_id") @db.Uuid
+  proposalId           String                 @map("proposal_id") @db.Uuid
+  versionId            String                 @map("version_id") @db.Uuid
+  snapshotId           String                 @map("snapshot_id") @db.Uuid
+  provider             SignatureProvider      @default(DOCUSEAL)
+  providerSubmissionId String?                @map("provider_submission_id")
+  status               SignatureRequestStatus @default(CREATING)
+  idempotencyKey       String                 @unique(map: "proposal_signature_requests_idempotency_key") @map("idempotency_key")
+  expireAt             DateTime?              @map("expire_at")
+  delivery             SignatureDelivery      @default(EMBEDDED)
+  signingOrder         String?                @map("signing_order")
+  sentPdfObjectKey     String?                @map("sent_pdf_object_key")
+  sentPdfSha256        String?                @map("sent_pdf_sha256") @db.Char(64)
+  signedPdfObjectKey   String?                @map("signed_pdf_object_key")
+  signedPdfSha256      String?                @map("signed_pdf_sha256") @db.Char(64)
+  auditTrailObjectKey  String?                @map("audit_trail_object_key")
+  auditTrailSha256     String?                @map("audit_trail_sha256") @db.Char(64)
+  hashRelation         HashRelation?          @map("hash_relation")
+  lastSyncedAt         DateTime?              @map("last_synced_at")
+  errorMessage         String?                @map("error_message")
+  createdAt            DateTime               @map("created_at")
+  updatedAt            DateTime               @map("updated_at")
+  createdByUserId      String?                @map("created_by_user_id") @db.Uuid
+
+  version  ProposalVersion          @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_signature_requests_version_fk", onDelete: NoAction, onUpdate: NoAction)
+  snapshot PricingSnapshot          @relation(fields: [snapshotId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_signature_requests_snapshot_fk", onDelete: NoAction, onUpdate: NoAction)
+  signers  ProposalSigner[]
+  events   ProposalSignatureEvent[]
+
+  @@unique([id, tenantId, customerId], map: "proposal_signature_requests_scope_key")
+  @@unique([provider, providerSubmissionId], map: "proposal_signature_requests_submission_key")
+  @@index([tenantId, customerId, proposalId], map: "proposal_signature_requests_proposal_idx")
+  @@map("proposal_signature_requests")
+}
+
+model ProposalSigner {
+  id                    String       @id @db.Uuid
+  tenantId              String       @map("tenant_id") @db.Uuid
+  customerId            String       @map("customer_id") @db.Uuid
+  proposalId            String       @map("proposal_id") @db.Uuid
+  signatureRequestId    String       @map("signature_request_id") @db.Uuid
+  party                 SignerParty
+  recipientId           String?      @map("recipient_id") @db.Uuid
+  userId                String?      @map("user_id") @db.Uuid
+  fullName              String       @map("full_name")
+  email                 String
+  signingOrder          Int          @default(0) @map("signing_order")
+  status                SignerStatus @default(PENDING)
+  providerSubmitterId   String?      @unique(map: "proposal_signers_submitter_key") @map("provider_submitter_id")
+  providerSubmitterSlug String?      @map("provider_submitter_slug")
+  embedSrc              String?      @map("embed_src")
+  signedAt              DateTime?    @map("signed_at")
+  declinedAt            DateTime?    @map("declined_at")
+  declineReason         String?      @map("decline_reason")
+  createdAt             DateTime     @map("created_at")
+  updatedAt             DateTime     @map("updated_at")
+
+  signatureRequest ProposalSignatureRequest @relation(fields: [signatureRequestId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_signers_request_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, signatureRequestId], map: "proposal_signers_request_idx")
+  @@map("proposal_signers")
+}
+
+model ProposalSignatureEvent {
+  id                 String             @id @db.Uuid
+  tenantId           String             @map("tenant_id") @db.Uuid
+  customerId         String             @map("customer_id") @db.Uuid
+  proposalId         String             @map("proposal_id") @db.Uuid
+  signatureRequestId String             @map("signature_request_id") @db.Uuid
+  providerEventId    String             @unique(map: "proposal_signature_events_event_key") @map("provider_event_id")
+  eventType          SignatureEventType @map("event_type")
+  submitterEmail     String?            @map("submitter_email")
+  occurredAt         DateTime           @map("occurred_at")
+  receivedAt         DateTime           @map("received_at")
+  rawPayload         Json               @map("raw_payload")
+  processedAt        DateTime?          @map("processed_at")
+
+  signatureRequest ProposalSignatureRequest @relation(fields: [signatureRequestId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_signature_events_request_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, customerId, signatureRequestId], map: "proposal_signature_events_request_idx")
+  @@map("proposal_signature_events")
 }
