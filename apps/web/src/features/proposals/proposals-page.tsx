@@ -17,6 +17,7 @@ import { NewProposalDialog, type CustomerOption } from './new-proposal-dialog.js
 import { PROPOSAL_STATUSES, proposalsApi } from './proposal-api.js';
 import { COMMERCIAL_STATUS_LABELS, formatDateTime, formatDay, PROPOSAL_STATUS_LABELS, ProposalStatusBadge } from './proposal-labels.js';
 import { useProposalStream } from './use-proposal-stream.js';
+import { ProposalViewsNav } from './reports/proposal-reports-pages.js';
 
 /**
  * Liste des propositions commerciales (brief §12, §11) : filtres statut /
@@ -49,6 +50,7 @@ export function ProposalsPage() {
         <h1 className="text-22">Propositions commerciales</h1>
         {canCreate && <Button onClick={() => setCreating(true)}>Nouvelle proposition</Button>}
       </div>
+      <ProposalViewsNav />
 
       <Card>
         <div className="grid gap-3 sm:grid-cols-[repeat(3,minmax(0,220px))] sm:items-end">

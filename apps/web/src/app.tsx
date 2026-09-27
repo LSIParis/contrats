@@ -28,6 +28,7 @@ import { ProposalPublicPage } from './features/proposals/public/proposal-public-
 import { PendingValidationsPage } from './features/proposals/pending-validations-page.js';
 import { ProposalsPage } from './features/proposals/proposals-page.js';
 import { ProposalWorkspacePage } from './features/proposals/proposal-workspace-page.js';
+import { ProposalDashboardPage, ProposalPipelinePage } from './features/proposals/reports/proposal-reports-pages.js';
 import {
   ContentLibraryPage, ContractTemplateSlugsPage, ProposalTemplateDetailPage, ProposalTemplatesPage, TermsPage,
 } from './features/proposals/admin/proposal-admin-pages.js';
@@ -62,6 +63,8 @@ function InternalRoutes() {
         <Route path="/proposal-admin/pending" element={<PendingValidationsPage />} />
         {/* Lot 9 : propositions commerciales (interface interne). */}
         <Route path="/proposals" element={<ProposalsPage />} />
+        <Route path="/proposals/pipeline" element={<ProposalPipelinePage />} />
+        <Route path="/proposals/dashboard" element={<ProposalDashboardPage />} />
         <Route path="/proposals/:id" element={<ProposalWorkspacePage />} />
         <Route path="/proposal-admin" element={<Navigate to="/proposal-admin/templates" replace />} />
         <Route path="/proposal-admin/templates" element={<ProposalTemplatesPage />} />
