@@ -136,16 +136,17 @@ try {
 | Type | Émis quand | Producteur |
 |---|---|---|
 | `contract.signed` | le contrat passe à `SIGNED` | `persistTransition` (webhook DocuSeal) |
-| `contract.activated` | le contrat passe à `ACTIVE` | idem (job quotidien à la date de début, validation d'un import) |
-| `contract.renewal_due` | le contrat passe à `RENEWAL_DUE` | idem |
-| `contract.renewed` | le contrat passe à `RENEWED` | idem |
+| `contract.activated` | le contrat devient `ACTIVE` (job quotidien à la date de début, validation d'un import) — **pas** un retour à `ACTIVE` depuis `RENEWAL_DUE` (non-renouvellement décidé) ou `TERMINATION_PENDING` (résiliation retirée), qui ne publie rien | idem |
+| `contract.renewal_due` | le contrat passe à `RENEWAL_DUE` (ouverture d'une reconduction ou d'un renouvellement exprès) | idem |
+| `contract.renewed` | nouvelle période (`RENEW_PERIOD` : reconduction tacite ou renouvellement décidé), ou le contrat passe à `RENEWED` (remplacé par un successeur signé) | idem |
 | `contract.terminated` | le contrat passe à `TERMINATED` | idem (job quotidien à la date d'effet de la résiliation) |
-| `pricing.revised` | un barème est révisé | lot 3 (tarification) — schéma publié, producteur à brancher |
+| `pricing.revised` | un barème est activé ou révisé, une dérogation approuvée | lot 3 (`schedules.service`, `overrides.service`) |
 | `ping` | bouton « tester » d'un abonnement | administration |
 
 `apps/api/src/contracts/snapshot.ts` → `persistTransition` est l'**unique**
 endroit où un statut de contrat est écrit ; la table statut → événement est
-`CONTRACT_STATUS_EVENTS` (`apps/api/src/webhooks-out/contract-producers.ts`).
+`CONTRACT_STATUS_EVENTS` (`apps/api/src/webhooks-out/contract-producers.ts`), corrigée par
+`contractEventFor` selon l'événement (`RENEW_PERIOD`) et le statut de départ (reprise).
 Ajouter un événement : une entrée dans `WEBHOOK_EVENT_SCHEMAS`
 (`webhooks-out/events.ts`) et un appel à `OutboundEvents.publish`.
 
