@@ -36,6 +36,7 @@ import { InternalSigning } from '../signature/internal-signing.js';
 import { RenewalDecision } from '../lifecycle/renewal-decision.js';
 import { TerminationPanel } from '../lifecycle/termination-panel.js';
 import { LifecycleTimeline } from '../lifecycle/lifecycle-timeline.js';
+import { ContractPricing } from '../pricing/contract-pricing.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
@@ -395,11 +396,7 @@ export function ContractDetailPage() {
               editable={allowedActions.includes('EDIT_CONTENT') && allows(me.data, 'contracts.write')}
             />
           ),
-          tarification: (
-            <Placeholder title="Tarification" lot="lot 3">
-              Le barème, les révisions et le simulateur tarifaire arriveront avec le moteur de tarification.
-            </Placeholder>
-          ),
+          tarification: <ContractPricing contractId={contract.id} />,
           signature,
           avenants,
           echeances,

@@ -17,6 +17,14 @@ const PERMISSIONS = {
   'contracts.signInternal': ['MSP_ADMIN', 'INTERNAL_SIGNATORY'],
   'clauses.manage': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
   'clauses.validateAi': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
+  // Tarification (lot 3) et administration (lots 6-7).
+  'pricing.write': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'pricing.simulate': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER'],
+  'pricing.override.approve': ['MSP_ADMIN'],
+  'pricing.rules.manage': ['MSP_ADMIN'],
+  'pricing.indexes.manage': ['MSP_ADMIN'],
+  'apiClients.manage': ['MSP_ADMIN'],
+  'webhooks.manage': ['MSP_ADMIN'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UiAction = keyof typeof PERMISSIONS;
@@ -38,4 +46,9 @@ export function allows(
   if (!me) return false;
   if (Array.isArray(me.permissions)) return me.permissions.includes(action);
   return can(me.roles, action);
+}
+
+/** Alias de `allows` (écrans de tarification et d'administration). */
+export function canDo(me: { roles?: readonly string[]; permissions?: readonly string[] } | undefined, action: UiAction): boolean {
+  return allows(me, action);
 }

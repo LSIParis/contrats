@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { useMe } from '../lib/queries.js';
+import { canDo } from '../lib/permissions.js';
 import { roleLabel } from '../lib/labels.js';
 import { NotificationBell } from '../features/notifications/notification-bell.js';
 import { AccountChip, NavItem, NavSection, Shell, Sidebar, Topbar } from '../ui/layout.js';
@@ -16,6 +17,7 @@ const SECTION_TITLES: Array<[prefix: string, title: string]> = [
   ['/templates', 'Modèles de contrat'],
   ['/library', 'Bibliothèque de clauses'],
   ['/settings', 'Paramètres'],
+  ['/pricing', 'Tarification'],
 ];
 
 function sectionTitle(pathname: string): string {
@@ -40,6 +42,7 @@ export function AppShell() {
           {(allows(me.data, 'contracts.write') || allows(me.data, 'clauses.manage')) && (
             <NavItem to="/library" icon="book">Bibliothèque de clauses</NavItem>
           )}
+          {canDo(me.data, 'pricing.simulate') && <NavItem to="/pricing" icon="tag">Tarification</NavItem>}
           {(isAdmin || canTemplates) && (
             <NavSection label="Administration">
               {canTemplates && <NavItem to="/templates" icon="book">Modèles</NavItem>}

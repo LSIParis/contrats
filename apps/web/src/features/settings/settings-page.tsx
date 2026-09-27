@@ -11,6 +11,10 @@ import { Input } from '../../ui/input.js';
 import { Select } from '../../ui/select.js';
 import { Spinner } from '../../ui/spinner.js';
 import { useToast } from '../../ui/toast.js';
+import { SettingsNav } from './settings-nav.js';
+import { AiUsageCard } from './ai-usage-card.js';
+
+export { AiUsageCard };
 
 /**
  * Paramètres du tenant (MSP_ADMIN, action `tenant.configure`) :
@@ -108,6 +112,14 @@ export const SETTING_DEFS: SettingDef[] = [
     kind: { type: 'select', options: [['HALF_AWAY_FROM_ZERO', 'Au plus proche, demi vers l’extérieur'], ['HALF_EVEN', 'Au plus proche, demi au pair (bancaire)']] },
   },
   { key: 'pricing.overrideApprovalThresholdPercent', label: 'Seuil de seconde validation d’une dérogation tarifaire (%)', kind: { type: 'number' } },
+  {
+    key: 'pricing.unitPriceScale', label: 'Décimales du prix unitaire calculé',
+    hint: 'De 0 à 6 (révision, formule, règles). Les totaux restent arrondis au centime.', kind: { type: 'number', integer: true },
+  },
+  {
+    key: 'pricing.indexLookup', label: 'Recherche des valeurs d’indice par défaut',
+    kind: { type: 'select', options: [['LATEST_PUBLISHED', 'Dernière valeur publiée à la date'], ['EXACT_PERIOD', 'Valeur de la période exacte']] },
+  },
   {
     key: 'signature.defaultOrder', label: 'Ordre de signature par défaut',
     kind: { type: 'select', options: [['CLIENT_FIRST', 'Client puis LSI'], ['LSI_FIRST', 'LSI puis client']] },
@@ -235,8 +247,10 @@ export function SettingsPage() {
     <div className="flex flex-col gap-4">
       <Breadcrumb items={[{ label: 'Administration' }, { label: 'Paramètres' }]} />
       <h1>Paramètres</h1>
+      <SettingsNav />
       <FeatureFlagsCard />
       <TenantSettingsCard />
+      <AiUsageCard />
     </div>
   );
 }

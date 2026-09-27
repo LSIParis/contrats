@@ -36,6 +36,8 @@ function setup(body: unknown, initial = '/contracts/k1') {
     if (url.endsWith('/structure')) {
       return json({ versionId: null, clauses: [], annexes: [], variables: { values: {}, missing: 0, definitions: {} }, diff: null });
     }
+    if (url.endsWith('/pricing/schedules')) return json({ items: [], nextRevisionDate: null });
+    if (url.endsWith('/pricing/overrides')) return json({ items: [] });
     if (url.endsWith('/v1/contracts/k1')) return json(body);
     return new Response('', { status: 404 });
   }));
@@ -70,13 +72,14 @@ test('contrat importé à valider : pastille « Importé », statut, lien « Val
   expect(screen.getByRole('link', { name: 'Valider l’import' })).toHaveAttribute('href', '/contracts/k1/import');
 });
 
-test('Annexes (contenu structuré) et Tarification : emplacement explicite, sans données fictives', async () => {
+test('Annexes (contenu structuré) et Tarification (barème du contrat)', async () => {
   const user = userEvent.setup();
   setup(detail());
   await user.click(await screen.findByRole('tab', { name: 'Annexes' }));
   expect(await screen.findByText('Aucune annexe.')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: 'Tarification' }));
-  expect(screen.getByText('Disponible au lot 3.')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Barème — versions' })).toBeInTheDocument();
+  expect(await screen.findByText('Aucun barème pour ce contrat.')).toBeInTheDocument();
 });
 
 test('navigation clavier entre onglets (flèches)', async () => {

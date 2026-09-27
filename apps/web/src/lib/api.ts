@@ -104,3 +104,57 @@ export async function apiDelete(path: string): Promise<void> {
 export function login(): void {
   window.location.href = '/v1/auth/login';
 }
+
+/**
+ * Erreur d'une requête `apiRequest` : message = `detail` (RFC 9457) ou
+ * `message` du serveur ; `body` = corps complet (codes stables, erreurs
+ * numérotées d'un import…).
+ */
+export class ApiRequestError extends ApiError {
+  constructor(status: number, message: string, public readonly body: unknown) {
+    super(status, message);
+  }
+}
+
+/**
+ * Requête JSON générique (tarification, administration). `form` : envoi
+ * multipart, le navigateur pose lui-même le boundary. Réponse vide → null.
+ */
+export async function apiRequest<T>(
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body?: unknown,
+  opts?: { form?: FormData },
+): Promise<T> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  let payload: BodyInit | undefined;
+  if (opts?.form) payload = opts.form;
+  else if (body !== undefined) {
+    headers['content-type'] = 'application/json';
+    payload = JSON.stringify(body);
+  }
+  const res = await fetch(path, { method, credentials: 'same-origin', headers, body: payload });
+  if (res.status === 401) throw new Unauthorized();
+  if (!res.ok) {
+    let parsed: unknown = null;
+    let message = `Erreur ${res.status}`;
+    try {
+      parsed = await res.json();
+      const b = parsed as { detail?: unknown; message?: unknown } | null;
+      const m = b?.detail ?? b?.message;
+      if (Array.isArray(m)) message = m.join(', ');
+      else if (typeof m === 'string' && m) message = m;
+    } catch {
+      /* corps non-JSON : on garde le message par défaut */
+    }
+    throw new ApiRequestError(res.status, message, parsed);
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
+/** Message affichable d'une erreur (le `detail` serveur quand il existe). */
+export function errorText(e: unknown, fallback = 'Erreur inattendue.'): string | undefined {
+  if (!e) return undefined;
+  return e instanceof ApiError ? e.message : fallback;
+}
