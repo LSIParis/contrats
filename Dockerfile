@@ -70,6 +70,14 @@ COPY . .
 RUN pnpm --filter @lsi/persistence exec prisma generate
 # Build du SPA : servi même origine par NestJS (ServeStaticModule, app.module.ts).
 RUN pnpm --filter @lsi/web build
+# Dépendances de PRODUCTION seulement : outils de développement et de test
+# (vitest, esbuild, tsx, eslint…) absents de l'image — surface d'attaque et
+# alertes de sécurité en moins. Le CLI Prisma reste (dépendance de production
+# de @lsi/persistence) : le job `migrate` l'utilise. Le client Prisma est
+# régénéré par le postinstall de @lsi/persistence.
+# (Réinstallation à partir de zéro : `install --prod` seul laisse les paquets de
+# développement dans node_modules/.pnpm, où les scanners les voient encore.)
+RUN find . -name node_modules -type d -prune -exec rm -rf {} +  && pnpm install --frozen-lockfile --prod --offline
 # Le runtime n'a besoin ni des sources ni des deps du front (seulement dist/).
 RUN rm -rf apps/web/node_modules apps/web/src
 
