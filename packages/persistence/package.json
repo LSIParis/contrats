@@ -16,7 +16,8 @@
     "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/persistence",
     "seed": "tsx prisma/seed.ts",
     "seed:propositions": "tsx prisma/seed.ts --only=propositions",
-    "test:seed": "vitest run --config vitest.seed.config.ts"
+    "test:seed": "vitest run --config vitest.seed.config.ts",
+    "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
