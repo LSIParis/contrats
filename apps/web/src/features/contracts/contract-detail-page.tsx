@@ -25,6 +25,17 @@ import { TerminateContract } from './terminate-contract.js';
 import { RenewContract } from './renew-contract.js';
 import { AmendContract } from './amend-contract.js';
 import { ContractDeadlines } from '../deadlines/deadlines.js';
+import { ContractContentPanel } from '../structure/contract-content-panel.js';
+import { AnnexesPanel } from '../structure/annexes-panel.js';
+import { AiReviewBanner } from '../structure/ai-review.js';
+import { allows } from '../../lib/permissions.js';
+import { NegotiationActions } from '../negotiation/negotiation-actions.js';
+import { AcceptancesBlock } from '../negotiation/acceptances-block.js';
+import { SignatureAvailabilityBanner, useSignatureAvailability } from '../signature/signature-availability.js';
+import { InternalSigning } from '../signature/internal-signing.js';
+import { RenewalDecision } from '../lifecycle/renewal-decision.js';
+import { TerminationPanel } from '../lifecycle/termination-panel.js';
+import { LifecycleTimeline } from '../lifecycle/lifecycle-timeline.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
@@ -59,7 +70,12 @@ interface Detail {
     billingFrequency?: string | null;
     category?: string | null;
     archivedAt: string | null;
-    origin: 'NATIVE' | 'IMPORTED';
+    origin: 'NATIVE' | 'IMPORTED' | 'AI';
+    unreviewedAiClauses?: number;
+    missingVariables?: number;
+    terminationEffectiveDate?: string | null;
+    acceptedVersionId?: string | null;
+    approvedVersionId?: string | null;
   };
   customer: { id?: string; name: string };
   importedDocument: { name: string } | null;
@@ -114,6 +130,7 @@ export function ContractDetailPage() {
     queryFn: () => apiGet<{ allowedActions: string[] }>(`/v1/contracts/${id}/allowed-actions`),
   });
   const me = useMe();
+  const signatureAvailability = useSignatureAvailability();
   const qc = useQueryClient();
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const requested = params.get('onglet');
@@ -175,10 +192,30 @@ export function ContractDetailPage() {
         currentUserId={me.data?.userId ?? ''}
         approval={d.approval}
       />
+      <NegotiationActions
+        contractId={contract.id}
+        currentVersionId={contract.currentVersionId}
+        allowedActions={allowedActions}
+        me={me.data}
+      />
+      <RenewalDecision
+        contractId={contract.id}
+        status={contract.status}
+        endDate={contract.endDate}
+        renewalPeriodMonths={contract.renewalPeriodMonths}
+        allowedActions={allowedActions}
+        me={me.data}
+      />
+      <TerminationPanel
+        contractId={contract.id}
+        status={contract.status}
+        terminationEffectiveDate={contract.terminationEffectiveDate}
+        allowedActions={allowedActions}
+        me={me.data}
+      />
       <TerminateContract
         contractId={contract.id}
         customerName={customer.name}
-        noticePeriodDays={contract.noticePeriodDays}
         roles={roles}
         allowedActions={allowedActions}
       />
@@ -189,32 +226,18 @@ export function ContractDetailPage() {
         renewal={d.renewal}
         predecessor={d.predecessor}
       />
+      {!imported && <AcceptancesBlock contractId={contract.id} currentVersionId={contract.currentVersionId} />}
     </div>
   );
 
   const contenu = (
-    <Card title="Contenu">
-      <div className="flex flex-wrap gap-3 text-sm">
-        {['DRAFT', 'CHANGES_REQUESTED'].includes(contract.status) && (
-          <Link to={`/contracts/${contract.id}/edit`} className="text-primary hover:underline">Éditer le contenu</Link>
-        )}
-        {contract.currentVersionId && (
-          <a href={`/v1/contracts/${contract.id}/preview.pdf`} target="_blank" rel="noopener" className="text-primary hover:underline">Aperçu PDF</a>
-        )}
-        {contract.currentVersionId && (
-          <a href={`/v1/contracts/${contract.id}/export.pdf`} className="text-primary hover:underline">Télécharger PDF</a>
-        )}
-        {contract.currentVersionId && (
-          <a href={`/v1/contracts/${contract.id}/export.docx`} className="text-primary hover:underline">Télécharger DOCX</a>
-        )}
-        <Link to={`/contracts/${contract.id}/versions`} className="text-primary hover:underline">Versions du contenu</Link>
-        {!contract.currentVersionId && (
-          <span className="text-ink-faint">
-            {imported ? 'Contrat importé : son contenu est le document signé (onglet Documents).' : 'Aucun contenu rédigé.'}
-          </span>
-        )}
-      </div>
-    </Card>
+    <ContractContentPanel
+      contractId={contract.id}
+      currentVersionId={contract.currentVersionId}
+      imported={imported}
+      allowedActions={allowedActions}
+      me={me.data}
+    />
   );
 
   const signature = (
@@ -231,7 +254,15 @@ export function ContractDetailPage() {
           {downloadError && <p role="alert" className="text-sm text-danger">{downloadError}</p>}
         </div>
       )}
-      <SendForSignature contractId={contract.id} signers={d.signers} allowedActions={allowedActions} roles={roles} />
+      {!imported && <SignatureAvailabilityBanner availability={signatureAvailability.data} />}
+      <InternalSigning contractId={contract.id} reference={contract.reference} status={contract.status} signers={d.signers} me={me.data} />
+      <SendForSignature
+        contractId={contract.id}
+        signers={d.signers}
+        allowedActions={allowedActions}
+        roles={roles}
+        availability={signatureAvailability.data}
+      />
       <SignersBlock
         contractId={contract.id}
         signers={d.signers}
@@ -305,6 +336,7 @@ export function ContractDetailPage() {
 
   const historique = (
     <div className="flex flex-col gap-4">
+      <LifecycleTimeline contractId={contract.id} />
       <Timeline events={d.timeline} />
       <CommentsBlock contractId={contract.id} />
     </div>
@@ -333,6 +365,13 @@ export function ContractDetailPage() {
           )}
         </div>
       </div>
+      <AiReviewBanner count={contract.unreviewedAiClauses ?? 0} />
+      {(contract.missingVariables ?? 0) > 0 && (
+        <p className="flex items-center gap-2 rounded-lg border border-warn bg-warn-bg px-4 py-3 text-sm text-warn">
+          <Icon name="alert" />
+          {contract.missingVariables} variable(s) du contrat restent à compléter (onglet Contenu) : la soumission en revue interne est bloquée.
+        </p>
+      )}
       {pendingImport && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warn bg-warn-bg px-4 py-3 text-sm text-warn">
           <Icon name="alert" />
@@ -351,9 +390,10 @@ export function ContractDetailPage() {
           synthese,
           contenu,
           annexes: (
-            <Placeholder title="Annexes" lot="lot 2">
-              Les annexes (conditions particulières, périmètre, SLA) seront gérées ici.
-            </Placeholder>
+            <AnnexesPanel
+              contractId={contract.id}
+              editable={allowedActions.includes('EDIT_CONTENT') && allows(me.data, 'contracts.write')}
+            />
           ),
           tarification: (
             <Placeholder title="Tarification" lot="lot 3">

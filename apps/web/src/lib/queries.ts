@@ -5,6 +5,8 @@ import type { ExpiringData } from '../features/dashboard/expiring.js';
 export interface Me {
   userId: string; fullName: string | null; email: string | null;
   kind: 'INTERNAL' | 'CLIENT' | null; roles: string[]; customerId: string | null;
+  /** Actions autorisées, calculées par l'API (auth/permissions.ts). */
+  permissions?: string[];
 }
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => apiGet<Me>('/v1/auth/me'), retry: false });

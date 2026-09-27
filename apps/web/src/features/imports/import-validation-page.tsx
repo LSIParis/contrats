@@ -19,6 +19,8 @@ import { Spinner } from '../../ui/spinner.js';
 import { Icon } from '../../ui/icons.js';
 import { useToast } from '../../ui/toast.js';
 import { PdfFrame } from './pdf-viewer.js';
+import { ImportAiExtract } from '../ai/import-ai-extract.js';
+import { allows } from '../../lib/permissions.js';
 import {
   confidenceLevel, prefill, toPayload,
   type FieldSource, type FormErrors, type FormKey, type ImportView, type ProposedField, type ValidationForm,
@@ -71,6 +73,7 @@ function SourceInfo({ source }: { source?: FieldSource }) {
     <div className="mt-1 flex flex-col gap-1 text-xs text-ink-muted">
       <div className="flex flex-wrap items-center gap-2">
         <ConfidenceBadge field={field} />
+        {field?.method === 'LLM' && <Badge tone="warn">Proposé par l’IA</Badge>}
         {source?.derived && <span>{source.derived}</span>}
       </div>
       {field?.evidence?.excerpt && (
@@ -469,6 +472,9 @@ export function ImportValidationPage() {
         retrying={retry.isPending}
         retryError={errMsg(retry.error)}
       />
+      {view.contract.status === 'IMPORTED_PENDING_VALIDATION' && allows(me.data, 'contracts.import') && (
+        <ImportAiExtract contractId={view.contract.id} ocrReady={view.ocr.status === 'DONE' || view.ocr.status === 'SKIPPED'} />
+      )}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <DocumentPane view={view} />
         <ImportValidationForm

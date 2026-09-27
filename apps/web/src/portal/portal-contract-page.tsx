@@ -6,6 +6,8 @@ import { Spinner } from '../ui/spinner.js';
 import { Card } from '../ui/card.js';
 import { StatusBadge } from '../ui/badge.js';
 import { contractCategoryLabel, partyLabel, signerStatusLabel, commentAuthorLabel } from '../lib/labels.js';
+import { PortalProposal, PROPOSAL_STATUSES } from './portal-proposal.js';
+import { EmbeddedSigning, type SigningSession } from '../features/signature/embedded-signing.js';
 
 interface PortalSigner {
   party: string;
@@ -112,9 +114,15 @@ function formatDate(date: string | null): string {
 export function PortalContractPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const query = useQuery({
     queryKey: ['portal-contract', id],
     queryFn: () => portalGet<PortalContractDetail>(`/v1/portal/contracts/${id}`),
+    retry: false,
+  });
+  const identity = useQuery({
+    queryKey: ['portal-me'],
+    queryFn: () => portalGet<{ email?: string; customerName?: string | null }>('/v1/portal/me'),
     retry: false,
   });
 
@@ -138,14 +146,23 @@ export function PortalContractPage() {
         </p>
         <p className="text-sm text-gray-400">{formatAmount(c.amountCents, c.currency)}</p>
       </div>
+      {PROPOSAL_STATUSES.includes(c.status) && <PortalProposal contractId={id!} status={c.status} identity={identity.data} />}
       <Card title="Signataires">
         {c.mySignature && PENDING_SIGNER_STATUSES.includes(c.mySignature.status) && (
-          <a
-            href={`/v1/portal/contracts/${id}/sign`}
-            className="mb-3 inline-block rounded bg-lsi px-4 py-2 text-sm text-white hover:bg-lsi-dark"
-          >
-            Signer le document
-          </a>
+          <div className="mb-3 flex flex-col gap-2">
+            <EmbeddedSigning
+              load={() => portalGet<SigningSession>(`/v1/portal/contracts/${id}/signing`)}
+              buttonLabel="Signer ici, sans quitter l’espace client"
+              frameTitle={`Signature électronique du contrat ${c.reference}`}
+              onDone={() => void qc.invalidateQueries({ queryKey: ['portal-contract', id] })}
+            />
+            <a
+              href={`/v1/portal/contracts/${id}/sign`}
+              className="self-start text-sm text-primary hover:underline"
+            >
+              Signer le document (page DocuSeal)
+            </a>
+          </div>
         )}
         {c.signers.length === 0 ? (
           <p className="text-sm text-gray-400">Aucun signataire.</p>
