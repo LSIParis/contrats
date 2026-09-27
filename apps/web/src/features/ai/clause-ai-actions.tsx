@@ -78,7 +78,15 @@ export function ClauseAiActions({ contractId, clause, structure, canReplace, pro
               {canReplace ? (
                 <div className="flex gap-2">
                   <Button type="button" disabled={save.isPending} onClick={() => save.mutate(
-                    replaceClausePayload(structure, clause.clauseKey, { title: r.suggestion.title, bodyHtml: r.suggestion.bodyHtml },
+                    replaceClausePayload(structure, clause.clauseKey, {
+                        title: r.suggestion.title,
+                        bodyHtml: r.suggestion.bodyHtml,
+                        ai: {
+                          risk: r.suggestion.riskLevel,
+                          justification: r.suggestion.justification,
+                          sources: r.sources.map((s) => ({ url: s.url, title: s.title ?? s.url })),
+                        },
+                      },
                       `Clause « ${clause.title} » remplacée par la suggestion IA (${r.action === 'harden' ? 'durcie' : 'reformulée'})`),
                     { onSuccess: close },
                   )}>

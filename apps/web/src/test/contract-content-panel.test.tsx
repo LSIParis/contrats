@@ -95,7 +95,7 @@ test('« Durcir » affiche la suggestion ; « Remplacer la clause » enregistre 
   await userEvent.click(within(dialog).getByRole('button', { name: 'Remplacer la clause' }));
   await waitFor(() => expect(api.find('PUT', '/v1/contracts/k1/structure')).toHaveLength(1));
   const body = api.find('PUT', '/v1/contracts/k1/structure')[0]!.body as { clauses: unknown[]; changeSummary: string };
-  expect(body.clauses[0]).toEqual({ clauseKey: 'OBJET', title: 'Objet (durci)', category: 'OBJET', bodyHtml: '<p>Objet strict</p>', origin: 'AI', sourceClauseVersionId: null });
+  expect(body.clauses[0]).toEqual({ clauseKey: 'OBJET', title: 'Objet (durci)', category: 'OBJET', bodyHtml: '<p>Objet strict</p>', origin: 'AI', sourceClauseVersionId: null, ai: expect.objectContaining({ risk: expect.any(String) }) });
   expect(body.clauses[1]).toMatchObject({ clauseKey: 'AI-1', origin: 'AI' });
   expect(body.changeSummary).toMatch(/suggestion IA/);
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

@@ -80,6 +80,13 @@ export interface SaveClause {
   sourceClauseVersionId?: string | null;
 }
 
+/** Métadonnées d'une clause reprise d'une suggestion IA (sinon conservées par le serveur). */
+export interface AiSaveMeta {
+  risk: string;
+  justification: string;
+  sources: { url: string; title: string }[];
+}
+
 export interface SaveAnnex {
   kind: string;
   title: string;
@@ -88,7 +95,7 @@ export interface SaveAnnex {
 }
 
 export interface SaveStructurePayload {
-  clauses: SaveClause[];
+  clauses: (SaveClause & { ai?: AiSaveMeta })[];
   annexes: SaveAnnex[];
   variables: Record<string, unknown>;
   changeSummary?: string;
@@ -143,13 +150,13 @@ export function toSaveAnnex(a: StructureAnnex): SaveAnnex {
 export function replaceClausePayload(
   s: Structure,
   clauseKey: string,
-  next: { title: string; bodyHtml: string },
+  next: { title: string; bodyHtml: string; ai?: AiSaveMeta },
   changeSummary: string,
 ): SaveStructurePayload {
   return {
     clauses: s.clauses.map((c) =>
       c.clauseKey === clauseKey
-        ? { ...toSaveClause(c), title: next.title, bodyHtml: next.bodyHtml, origin: 'AI', sourceClauseVersionId: null }
+        ? { ...toSaveClause(c), title: next.title, bodyHtml: next.bodyHtml, origin: 'AI', sourceClauseVersionId: null, ...(next.ai ? { ai: next.ai } : {}) }
         : toSaveClause(c),
     ),
     annexes: s.annexes.map(toSaveAnnex),

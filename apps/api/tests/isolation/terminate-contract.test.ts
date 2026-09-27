@@ -12,7 +12,7 @@ import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/test
 let app: INestApplication;
 let fx: TwoCustomerFixture;
 
-/** Un contrat ACTIVE (résiliable) chez customerA, préavis 30 j. */
+/** Un contrat ACTIVE (résiliable) à durée indéterminée chez customerA, préavis 30 j. */
 async function seedActive(over: Record<string, unknown> = {}, customer = { id: '' }) {
   const id = uuidv7();
   const vId = uuidv7();
@@ -24,7 +24,8 @@ async function seedActive(over: Record<string, unknown> = {}, customer = { id: '
       title: 'Contrat actif', type: 'MAIN', status: 'ACTIVE', category: 'MAINTENANCE',
       currency: 'EUR', billingFrequency: 'MONTHLY', ownerUserId: fx.amUserId,
       currentVersionId: vId, approvedVersionId: vId, noticePeriodDays: 30,
-      startDate: new Date('2026-01-01'), endDate: new Date('2027-01-01'),
+      // Durée indéterminée : le préavis court depuis aujourd'hui (brief §2).
+      startDate: new Date('2026-01-01'), endDate: null,
       signedAt: now, activatedAt: now,
       createdAt: now, updatedAt: now, createdByUserId: fx.amUserId, updatedByUserId: fx.amUserId,
       ...over,
@@ -135,6 +136,25 @@ describe('POST /v1/contracts/:id/cancel — trace l\'annulation', () => {
     const canc = await cancellations(id);
     expect(canc).toHaveLength(1);
     expect(canc[0]).toMatchObject({ type: 'CANCELLATION', reason: 'Erreur de saisie' });
+  });
+});
+
+describe('contrat à terme : la date due est le terme de la période (brief §2)', () => {
+  test('une date antérieure au terme est une dérogation : refusée sans admin, tracée avec admin', async () => {
+    const end = plus(200);
+    const id = await seedActive({ endDate: new Date(`${end}T00:00:00Z`), noticePeriodDays: 30 });
+    const early = await term(id, { reason: 'Départ', effectiveDate: plus(40), initiatedBy: 'CLIENT' }).expect(409);
+    expect(early.body.detail).toContain(end);
+    await term(id, { reason: 'Départ', effectiveDate: plus(40), initiatedBy: 'CLIENT' }, 'sess-admin').expect(409);
+    const ok = await term(id, { reason: 'Départ', effectiveDate: plus(40), initiatedBy: 'CLIENT', overrideReason: 'Accord amiable signé' }, 'sess-admin').expect(201);
+    expect(ok.body.noticeRespected).toBe(false);
+  });
+
+  test('sans date : la date due (terme) est retenue, préavis respecté', async () => {
+    const end = plus(200);
+    const id = await seedActive({ endDate: new Date(`${end}T00:00:00Z`), noticePeriodDays: 30 });
+    const r = await term(id, { reason: 'Départ', initiatedBy: 'CLIENT' }).expect(201);
+    expect(r.body).toMatchObject({ effectiveDate: end, noticeRespected: true });
   });
 });
 

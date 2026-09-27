@@ -426,18 +426,20 @@ export class ContractsService {
       });
       if (!c) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
-      const effectiveDate = dto.effectiveDate
-        ? new Date(dto.effectiveDate)
-        : computeTerminationEffectiveDate({
-            today: now,
-            notice: { days: c.noticePeriodDays, months: c.noticePeriodMonths },
-            periodEnd: c.endDate,
-            renewalPeriodMonths: c.renewalMode === 'TACIT' ? c.renewalPeriodMonths : null,
-          }).effectiveDate;
+      // Date due selon le préavis et la période en cours (brief §2) : c'est la
+      // référence du respect du préavis, y compris quand une date est demandée.
+      const due = computeTerminationEffectiveDate({
+        today: now,
+        notice: { days: c.noticePeriodDays, months: c.noticePeriodMonths },
+        periodEnd: c.endDate,
+        renewalPeriodMonths: c.renewalMode === 'TACIT' ? c.renewalPeriodMonths : null,
+      }).effectiveDate;
+      const effectiveDate = dto.effectiveDate ? new Date(dto.effectiveDate) : due;
       const isAdmin = session.roles.includes('MSP_ADMIN');
       const snapshot = toContractSnapshot(c);
       const event: ContractEvent = {
         type: 'TERMINATE', actorUserId: session.userId, reason: dto.reason, effectiveDate, isAdmin, overrideReason: dto.overrideReason,
+        minEffectiveDate: due,
       };
       let next: ContractSnapshot;
       try {
@@ -452,7 +454,7 @@ export class ContractsService {
         throw e;
       }
 
-      const noticeRespected = isNoticeRespected(c.noticePeriodDays, effectiveDate, now);
+      const noticeRespected = effectiveDate.getTime() >= due.getTime();
 
       await tx.cancellation.create({
         data: {

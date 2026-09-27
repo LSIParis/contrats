@@ -36,6 +36,20 @@ export const SaveStructureSchema = z
             bodyHtml: z.string().max(100_000),
             origin: z.enum(['TEMPLATE', 'LIBRARY', 'CUSTOM', 'AI']).default('CUSTOM'),
             sourceClauseVersionId: z.uuid().nullable().optional(),
+            /**
+             * Métadonnées d'une clause IA reprise d'une suggestion (risque,
+             * justification, sources). Ignorées hors origine AI ; pour une
+             * clause IA déjà présente (même clauseKey), celles de la version
+             * précédente sont conservées si ce champ est absent.
+             */
+            ai: z
+              .object({
+                risk: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+                justification: z.string().trim().max(5_000),
+                sources: z.array(z.object({ url: z.url().max(2048), title: z.string().max(500) }).strict()).max(50).default([]),
+              })
+              .strict()
+              .optional(),
           })
           .strict(),
       )
@@ -217,8 +231,12 @@ export class StructureService {
       const { event, next } = editContent(c, scope.userId, now);
 
       const prev = c.currentVersionId
-        ? await tx.contractVersion.findUnique({ where: { id: c.currentVersionId }, select: { variables: true } })
+        ? await tx.contractVersion.findUnique({
+            where: { id: c.currentVersionId },
+            select: { variables: true, clauses: { select: { clauseKey: true, origin: true, aiRisk: true, aiJustification: true, aiSources: true } } },
+          })
         : null;
+      const prevAi = new Map((prev?.clauses ?? []).filter((cl) => cl.origin === 'AI').map((cl) => [cl.clauseKey, cl]));
       const prevVars = (prev?.variables ?? {}) as { values?: Record<string, unknown>; custom?: Record<string, VariableType> };
       const custom = prevVars.custom ?? {};
       // Les valeurs déjà saisies (ou pré-remplies) sont conservées ; l'appel
@@ -233,6 +251,7 @@ export class StructureService {
         bodyHtml: cl.bodyHtml,
         origin: cl.origin,
         sourceClauseVersionId: cl.sourceClauseVersionId ?? null,
+        ...aiMetadata(cl, prevAi),
       }));
       await this.writeVersion(
         tx, contractId, versionId, (max._max.versionNumber ?? 0) + 1, clauses,
@@ -493,4 +512,15 @@ function editContent(c: Parameters<typeof toContractSnapshot>[0], userId: string
     if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message });
     throw e;
   }
+}
+
+/** Métadonnées IA d'une clause enregistrée : fournies, sinon celles de la version précédente. */
+function aiMetadata(
+  cl: SaveStructure['clauses'][number],
+  prevAi: Map<string, { aiRisk: string | null; aiJustification: string | null; aiSources: unknown }>,
+) {
+  if (cl.origin !== 'AI') return {};
+  if (cl.ai) return { aiRisk: cl.ai.risk, aiJustification: cl.ai.justification, aiSources: cl.ai.sources };
+  const p = cl.clauseKey ? prevAi.get(cl.clauseKey) : undefined;
+  return p ? { aiRisk: p.aiRisk, aiJustification: p.aiJustification, aiSources: p.aiSources } : {};
 }

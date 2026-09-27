@@ -157,6 +157,18 @@ describe('assistance IA sur un contrat', () => {
     await http().post(`/v1/contracts/${contractId}/ai/missing-clauses`).set('x-lsi-session', 'ai-am').expect(201);
   });
 
+  test('enregistrer le contenu conserve les métadonnées IA ; une suggestion reprise porte les siennes', async () => {
+    const st = await http().get(`/v1/contracts/${contractId}/structure`).set('x-lsi-session', 'ai-am').expect(200);
+    const clauses = st.body.clauses.map((c: { clauseKey: string; title: string; category: string; bodyHtml: string; origin: string }) =>
+      ({ clauseKey: c.clauseKey, title: c.title, category: c.category, bodyHtml: c.bodyHtml, origin: c.origin }));
+    clauses[0] = { ...clauses[0], bodyHtml: '<p>Texte repris.</p>', ai: { risk: 'MEDIUM', justification: 'Reformulée', sources: [{ url: 'https://www.legifrance.gouv.fr/y', title: 'Code civil' }] } };
+    await http().put(`/v1/contracts/${contractId}/structure`).set('x-lsi-session', 'ai-am').send({ clauses }).expect(200);
+    const after = await http().get(`/v1/contracts/${contractId}/structure`).set('x-lsi-session', 'ai-am').expect(200);
+    expect(after.body.clauses[0].ai).toMatchObject({ risk: 'MEDIUM', justification: 'Reformulée' });
+    const kept = after.body.clauses.find((c: { title: string }) => c.title === 'Responsabilité');
+    expect(kept.ai).toMatchObject({ risk: 'HIGH', justification: 'À vérifier.' });
+  });
+
   test('budget mensuel atteint → 429 AI_BUDGET_EXCEEDED, aucun appel', async () => {
     await setBudget(0.001);
     const r = await draft().expect(429);

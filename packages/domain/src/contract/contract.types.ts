@@ -130,6 +130,13 @@ export type ContractEvent =
       effectiveDate: Date;
       isAdmin: boolean;
       overrideReason?: string;
+      /**
+       * Date d'effet due selon le préavis et la période en cours
+       * (computeTerminationEffectiveDate). Fournie, elle remplace le seul
+       * contrôle « aujourd'hui + préavis en jours » : une date antérieure est
+       * une dérogation (administrateur + justification).
+       */
+      minEffectiveDate?: Date;
     }
   | { type: 'COMPLETE_TERMINATION' }
   | { type: 'WITHDRAW_TERMINATION'; actorUserId: string; reason: string };

@@ -448,13 +448,17 @@ export function applyEvent(
         throw new BusinessRuleError('Un motif de résiliation est obligatoire.', 'RM-20');
       }
 
-      const respectsNotice = isNoticeRespected(c.noticePeriodDays, event.effectiveDate, now);
+      const respectsNotice = event.minEffectiveDate
+        ? startOfUtcDay(event.effectiveDate) >= startOfUtcDay(event.minEffectiveDate)
+        : isNoticeRespected(c.noticePeriodDays, event.effectiveDate, now);
 
       if (!respectsNotice) {
         if (!event.isAdmin) {
-          const minDate = addDays(startOfUtcDay(now), c.noticePeriodDays ?? 0);
+          const minDate = event.minEffectiveDate
+            ? startOfUtcDay(event.minEffectiveDate)
+            : addDays(startOfUtcDay(now), c.noticePeriodDays ?? 0);
           throw new BusinessRuleError(
-            `Le préavis de ${c.noticePeriodDays} jours n'est pas respecté : ` +
+            `Le préavis n'est pas respecté : ` +
               `la date d'effet ne peut pas précéder le ${minDate.toISOString().slice(0, 10)}. ` +
               `Seul un administrateur peut y déroger.`,
             'RM-20',

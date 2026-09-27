@@ -339,3 +339,21 @@ describe('allowedEvents reflète les gardes', () => {
       .toContain('COMPLETE_TERMINATION');
   });
 });
+
+describe('TERMINATE — date due fournie (minEffectiveDate)', () => {
+  const due = new Date('2026-12-31');
+  const ev = (effectiveDate: Date, isAdmin = false, overrideReason?: string) => ({
+    type: 'TERMINATE' as const, actorUserId: 'u', reason: 'fin', effectiveDate, isAdmin, minEffectiveDate: due,
+    ...(overrideReason ? { overrideReason } : {}),
+  });
+
+  test('à la date due ou après : accepté sans dérogation', () => {
+    expect(applyEvent(snap('ACTIVE', { noticePeriodDays: 30 }), ev(due), NOW).status).toBe('TERMINATION_PENDING');
+  });
+
+  test('avant la date due, même au-delà du préavis en jours : dérogation exigée', () => {
+    expect(() => applyEvent(snap('ACTIVE', { noticePeriodDays: 30 }), ev(new Date('2026-10-01')), NOW)).toThrow(/2026-12-31/);
+    expect(() => applyEvent(snap('ACTIVE', { noticePeriodDays: 30 }), ev(new Date('2026-10-01'), true), NOW)).toThrow(/justification/);
+    expect(applyEvent(snap('ACTIVE', { noticePeriodDays: 30 }), ev(new Date('2026-10-01'), true, 'accord'), NOW).status).toBe('TERMINATION_PENDING');
+  });
+});
