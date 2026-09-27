@@ -301,3 +301,12 @@ test('dérogation : l’auteur ne valide pas la sienne ; un commercial ne valide
   expect(within(table).queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
   expect(within(table).getByRole('button', { name: 'Annuler la dérogation' })).toBeInTheDocument();
 });
+
+test('dérogation active sans seconde validation : validable par un administrateur (règle de l’API), pas refusable', async () => {
+  const active = { ...OVERRIDES.items[0]!, status: 'ACTIVE', requiresSecondApproval: false, gapPercent: '4' };
+  mockApi([['GET', `${BASE}/overrides`, () => ({ items: [active] })], ...routes()]);
+  renderWithClient(<ContractPricing contractId={K} />);
+  const table = await screen.findByRole('table', { name: 'Dérogations tarifaires' });
+  expect(within(table).getByRole('button', { name: 'Valider' })).toBeInTheDocument();
+  expect(within(table).queryByRole('button', { name: 'Refuser' })).not.toBeInTheDocument();
+});

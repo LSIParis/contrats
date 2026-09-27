@@ -75,7 +75,8 @@ export function OverridesCard({ contractId, schedules, me }: { contractId: strin
           {items.map((o) => {
             const st = OVERRIDE_STATUS[o.status] ?? { label: o.status, tone: 'neutral' as const };
             const mine = o.authorUserId === me?.userId;
-            const approvable = o.status === 'PENDING_APPROVAL' || (o.status === 'ACTIVE' && o.approvedByUserId === null && o.requiresSecondApproval);
+            // Règle de l'API : en attente, ou active sans validateur (écart devenu supérieur au seuil après une révision).
+            const approvable = o.status === 'PENDING_APPROVAL' || (o.status === 'ACTIVE' && o.approvedByUserId === null);
             return (
               <tr key={o.id}>
                 <td>{o.lineKey}</td>
@@ -101,7 +102,7 @@ export function OverridesCard({ contractId, schedules, me }: { contractId: strin
                         )}
                       </>
                     )}
-                    {canApprove && approvable && mine && (
+                    {canApprove && o.status === 'PENDING_APPROVAL' && mine && (
                       <span className="text-xs text-ink-faint">Votre demande : validation par un autre administrateur.</span>
                     )}
                     {canWrite && (o.status === 'PENDING_APPROVAL' || o.status === 'ACTIVE') && (
@@ -130,6 +131,12 @@ export function OverridesCard({ contractId, schedules, me }: { contractId: strin
           <p>
             Seconde validation de la dérogation sur « {pending.o.lineKey} » : {formatDecimalEuros(pending.o.unitPrice)} au lieu de{' '}
             {formatDecimalEuros(pending.o.computedUnitPrice)}, du {fmtDay(pending.o.validFrom)} au {fmtDay(pending.o.validTo)}. Motif : « {pending.o.reason} ».
+          </p>
+        )}
+        {pending?.o.status === 'ACTIVE' && (
+          <p className="text-13 text-ink-muted">
+            Dérogation déjà active sans seconde validation : la valider la maintient si, après une révision, l’écart dépasse le seuil
+            (le calcul l’écarte sinon — trace « seconde validation requise »).
           </p>
         )}
       </ConfirmDialog>
