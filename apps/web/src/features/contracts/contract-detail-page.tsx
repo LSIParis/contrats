@@ -33,6 +33,9 @@ import { NegotiationActions } from '../negotiation/negotiation-actions.js';
 import { AcceptancesBlock } from '../negotiation/acceptances-block.js';
 import { SignatureAvailabilityBanner, useSignatureAvailability } from '../signature/signature-availability.js';
 import { InternalSigning } from '../signature/internal-signing.js';
+import { RenewalDecision } from '../lifecycle/renewal-decision.js';
+import { TerminationPanel } from '../lifecycle/termination-panel.js';
+import { LifecycleTimeline } from '../lifecycle/lifecycle-timeline.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
@@ -195,10 +198,24 @@ export function ContractDetailPage() {
         allowedActions={allowedActions}
         me={me.data}
       />
+      <RenewalDecision
+        contractId={contract.id}
+        status={contract.status}
+        endDate={contract.endDate}
+        renewalPeriodMonths={contract.renewalPeriodMonths}
+        allowedActions={allowedActions}
+        me={me.data}
+      />
+      <TerminationPanel
+        contractId={contract.id}
+        status={contract.status}
+        terminationEffectiveDate={contract.terminationEffectiveDate}
+        allowedActions={allowedActions}
+        me={me.data}
+      />
       <TerminateContract
         contractId={contract.id}
         customerName={customer.name}
-        noticePeriodDays={contract.noticePeriodDays}
         roles={roles}
         allowedActions={allowedActions}
       />
@@ -319,6 +336,7 @@ export function ContractDetailPage() {
 
   const historique = (
     <div className="flex flex-col gap-4">
+      <LifecycleTimeline contractId={contract.id} />
       <Timeline events={d.timeline} />
       <CommentsBlock contractId={contract.id} />
     </div>

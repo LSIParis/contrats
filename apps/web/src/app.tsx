@@ -20,6 +20,7 @@ import { TemplateDetailPage } from './features/templates/template-detail-page.js
 import { PortalApp } from './portal/portal-app.js';
 import { StructureEditorPage } from './features/structure/structure-editor-page.js';
 import { LibraryPage } from './features/library/library-page.js';
+import { RemindersPage } from './features/reminders/reminders-page.js';
 
 function InternalRoutes() {
   return (
@@ -38,7 +39,7 @@ function InternalRoutes() {
         <Route path="/contracts/:id/versions" element={<VersionsPage />} />
         <Route path="/contracts/:id/structure" element={<StructureEditorPage />} />
         <Route path="/contracts/:id" element={<ContractDetailPage />} />
-        <Route path="/reminders" element={<div>Rappels</div>} />
+        <Route path="/reminders" element={<RemindersPage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/audit" element={<AuditPage />} />
         <Route path="/settings" element={<SettingsPage />} />
