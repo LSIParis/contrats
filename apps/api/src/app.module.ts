@@ -118,6 +118,8 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
 // Lot 9 — propositions commerciales (docs/contrats/11-propositions.md).
 import { ProposalsController } from './proposals/proposals.controller.js';
 import { ProposalReportsController } from './proposals/proposal-reports.controller.js';
+import { ProposalAiController } from './proposals/proposal-ai.controller.js';
+import { ProposalAiService } from './proposals/proposal-ai.service.js';
 import { ProposalReportingService } from './proposals/proposal-reporting.service.js';
 import { ProposalAdminController } from './proposals/proposal-admin.controller.js';
 import { ProposalPublicController } from './proposals/proposal-public.controller.js';
@@ -187,6 +189,7 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     WebhooksAdminController,
     ProposalsController,
     ProposalReportsController,
+    ProposalAiController,
     ProposalAdminController,
     ProposalPublicController,
   ],
@@ -196,6 +199,7 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     // preuves, conversion) : BullMQ si JOBS_ENABLED, sinon no-op (tests).
     ProposalsService,
     ProposalReportingService,
+    ProposalAiService,
     ProposalSendService,
     ProposalPublicService,
     ProposalAdminService,

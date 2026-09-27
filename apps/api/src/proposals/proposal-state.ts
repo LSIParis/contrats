@@ -185,8 +185,17 @@ export function computeState(
   const sectionBlocking: PendingValidation[] = sections
     .filter((s) => s.validationStatus === 'TO_VALIDATE' && !s.excluded)
     .map((s) => ({ scope: 'SECTION', key: s.key, label: s.title }));
+  // Lot 9.9 : une section rédigée par IA part chez le client seulement après
+  // relecture humaine explicite (brief §12.3, « validation humaine obligatoire »).
+  const aiBlocking: PendingValidation[] = sections
+    .filter((s) => s.aiPendingReview && !s.excluded)
+    .map((s) => ({ scope: 'SECTION', key: s.key, label: s.title }));
   const blocking = [...quote.blockingValidations, ...sectionBlocking];
   for (const b of blocking) issues.push({ code: 'TO_VALIDATE', message: `« ${b.label} » est à valider (${b.scope}).` });
+  for (const b of aiBlocking) {
+    issues.push({ code: 'AI_PENDING', message: `Section « ${b.label} » générée par IA : à relire et valider avant envoi.`, sectionKey: b.key });
+  }
+  blocking.push(...aiBlocking);
 
   // Revue interne obligatoire (brief §12.2) : remise au-delà du seuil,
   // clause dérogatoire (contenu de bibliothèque ou de CGV modifié), montant.

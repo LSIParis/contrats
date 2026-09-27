@@ -159,7 +159,7 @@ export class ProposalsService {
         terms: version.terms ? { id: version.terms.id, versionNumber: version.terms.versionNumber, title: version.terms.title } : null,
         sections: version.sections.map((s: any) => ({
           key: s.key, title: s.title, kind: s.kind, position: s.position, optional: s.optional, excluded: s.excluded,
-          validationStatus: s.validationStatus, libraryItemKey: s.libraryItemKey, guidance: s.guidance, aiPendingReview: s.aiPendingReview,
+          validationStatus: s.validationStatus, libraryItemKey: s.libraryItemKey, guidance: s.guidance, aiPendingReview: s.aiPendingReview, aiSources: s.aiSources ?? null,
           blocks: s.blocks.map((b: any) => ({ type: b.type, content: b.content })),
         })),
         pricingDefinition: state.definition,
@@ -258,6 +258,8 @@ export class ProposalsService {
     ids: { tenantId: string; customerId: string; proposalId: string; versionId: string },
     sections: readonly SectionInput[],
     validation: ReadonlyMap<string, string>,
+    /** État IA à conserver (ou poser) par clé de section : jamais levé en réécrivant la section. */
+    ai: ReadonlyMap<string, { pending: boolean; sources: unknown }> = new Map(),
   ): Promise<void> {
     await tx.proposalBlock.deleteMany({ where: { section: { versionId: ids.versionId } } });
     await tx.proposalSection.deleteMany({ where: { versionId: ids.versionId } });
@@ -269,6 +271,8 @@ export class ProposalsService {
         optional: s.optional ?? false, excluded: s.excluded ?? false,
         // Le statut « à valider » ne se lève jamais en réécrivant la section.
         validationStatus: (validation.get(s.key) as 'VALIDATED' | 'TO_VALIDATE' | undefined) ?? 'VALIDATED',
+        aiPendingReview: ai.get(s.key)?.pending ?? false,
+        ...(ai.get(s.key)?.sources ? { aiSources: ai.get(s.key)!.sources as object } : {}),
       })),
     });
     const blocks = rows.flatMap(({ s, id }) =>
@@ -332,7 +336,10 @@ export class ProposalsService {
     return withScope(scope, async (tx) => {
       const loaded = await this.editable(tx, id);
       const validation = new Map<string, string>(loaded.version.sections.map((s: any) => [s.key, s.validationStatus]));
-      await this.writeSections(tx, { tenantId: loaded.proposal.tenantId, customerId: loaded.proposal.customerId, proposalId: id, versionId: loaded.version.id }, parsed.data.sections, validation);
+      await this.writeSections(
+        tx, { tenantId: loaded.proposal.tenantId, customerId: loaded.proposal.customerId, proposalId: id, versionId: loaded.version.id },
+        parsed.data.sections, validation, aiStateOf(loaded.version.sections),
+      );
       await tx.proposal.update({ where: { id }, data: { updatedAt: now } });
       return this.detail(tx, id, settings, now);
     });
@@ -443,6 +450,63 @@ export class ProposalsService {
   }
 
   /**
+   * Sections rédigées par IA (lot 9.9) : remplacent le texte d'une section
+   * existante de même clé, ou s'insèrent après la couverture ; marquées « à
+   * relire » (bloque l'envoi) avec leurs sources, jusqu'à validation humaine.
+   */
+  async applyAiSections(
+    scope: Scope, id: string,
+    drafted: readonly { key: string; title: string; markdown: string }[],
+    sources: readonly { url: string; title: string }[],
+    now: Date,
+  ) {
+    await this.assertEnabled(scope);
+    const settings = await this.settings(scope);
+    return withScope(scope, async (tx) => {
+      const loaded = await this.editable(tx, id);
+      const existing: SectionInput[] = loaded.version.sections.map((s: any) => ({
+        key: s.key, title: s.title, kind: s.kind, optional: s.optional, excluded: s.excluded,
+        libraryItemKey: s.libraryItemKey, guidance: s.guidance,
+        blocks: s.blocks.map((b: any) => ({ type: b.type, content: b.content })),
+      }));
+      const ai = aiStateOf(loaded.version.sections);
+      const next = [...existing];
+      const insertAt = next.reduce((at, s, i) => (s.kind === 'COVER' ? i + 1 : at), 0);
+      let offset = 0;
+      for (const d of drafted) {
+        const section: SectionInput = { key: d.key, title: d.title, kind: 'TEXT', blocks: [{ type: 'RICH_TEXT', content: { markdown: d.markdown } }] };
+        const i = next.findIndex((s) => s.key === d.key);
+        if (i >= 0) next[i] = { ...next[i]!, title: d.title, blocks: section.blocks, excluded: false };
+        else next.splice(insertAt + offset++, 0, section);
+        ai.set(d.key, { pending: true, sources: sources.length ? sources : null });
+      }
+      const validation = new Map<string, string>(loaded.version.sections.map((s: any) => [s.key, s.validationStatus]));
+      await this.writeSections(
+        tx, { tenantId: loaded.proposal.tenantId, customerId: loaded.proposal.customerId, proposalId: id, versionId: loaded.version.id },
+        next, validation, ai,
+      );
+      await tx.proposal.update({ where: { id }, data: { updatedAt: now } });
+      return this.detail(tx, id, settings, now);
+    });
+  }
+
+  /** Relecture humaine d'une section rédigée par IA : lève le blocage d'envoi (tracé au journal d'audit). */
+  async validateAiSection(scope: Scope, id: string, key: string, now: Date) {
+    await this.assertEnabled(scope);
+    const settings = await this.settings(scope);
+    return withScope(scope, async (tx) => {
+      const loaded = await this.editable(tx, id);
+      const n = await tx.proposalSection.updateMany({
+        where: { versionId: loaded.version.id, key, aiPendingReview: true },
+        data: { aiPendingReview: false },
+      });
+      if (n.count === 0) throw new NotFoundException('Aucune section générée par IA à valider sous cette clé');
+      await tx.proposal.update({ where: { id }, data: { updatedAt: now } });
+      return this.detail(tx, id, settings, now);
+    });
+  }
+
+  /**
    * Import d'un document Word comme point de départ (brief §12.3) : ses
    * sections remplacent les sections de texte libre du brouillon ; couverture,
    * contexte, bibliothèque, prix, CGV et signature sont conservés.
@@ -475,6 +539,7 @@ export class ProposalsService {
         { tenantId: loaded.proposal.tenantId, customerId: loaded.proposal.customerId, proposalId: id, versionId: loaded.version.id },
         [...cover, ...renamed, ...rest],
         validation,
+        aiStateOf(loaded.version.sections),
       );
       await tx.proposal.update({ where: { id }, data: { updatedAt: now } });
       return this.detail(tx, id, settings, now);
@@ -644,3 +709,8 @@ function fromTemplateSection(s: any, library: Map<string, any>): SectionInput {
 }
 
 export { domainError };
+
+/** État IA des sections d'une version (à conserver lors d'une réécriture). */
+function aiStateOf(sections: readonly any[]): Map<string, { pending: boolean; sources: unknown }> {
+  return new Map(sections.map((s) => [s.key as string, { pending: Boolean(s.aiPendingReview), sources: s.aiSources ?? null }]));
+}

@@ -1,6 +1,9 @@
 import { assertNoLeak, type KnownEntities } from '@lsi/domain';
 import type {
   ImportExtractInput,
+  CompanyResearchInput,
+  ProposalDraftInput,
+  ProposalRephraseInput,
   AiCallResult,
   CompareClauseInput,
   ContractDraftingProvider,
@@ -21,11 +24,17 @@ import {
   buildDraftTask,
   buildExplainTask,
   buildImportExtractTask,
+  buildCompanyResearchTask,
+  buildProposalDraftTask,
+  buildProposalRephraseTask,
   buildMissingClausesTask,
   buildRephraseTask,
   type StructuredTask,
 } from './drafting-prompts.js';
-import type { ClauseOutput, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput } from './drafting-schemas.js';
+import type {
+  ClauseOutput, CompanyResearchOutput, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput,
+  ProposalDraftOutput, ProposalRephraseOutput,
+} from './drafting-schemas.js';
 import { stripUrlsAndMarkers } from './drafting-sources.js';
 
 /** Ce que l'adaptateur rend pour UN appel structuré, avant post-traitement commun. */
@@ -142,5 +151,34 @@ export abstract class StructuredDraftingBase implements ContractDraftingProvider
   async extractImportMetadata(input: ImportExtractInput): Promise<AiCallResult<ImportExtractOutput>> {
     const r = await this.run(buildImportExtractTask(input), input.selection, input.knownEntities);
     return StructuredDraftingBase.envelope(this.name, r, r.data, [...r.warnings]);
+  }
+
+  async draftProposalSections(input: ProposalDraftInput): Promise<AiCallResult<ProposalDraftOutput>> {
+    const r = await this.run(buildProposalDraftTask(input), input.selection, input.knownEntities);
+    const warnings = [...r.warnings];
+    const sections = r.data.sections.map((s) => {
+      const t = stripUrlsAndMarkers(s.text);
+      if (t.removedUrls.length) warnings.push(`URL retirée du texte généré (section « ${s.title} »).`);
+      return { ...s, title: stripUrlsAndMarkers(s.title).text, text: t.text };
+    });
+    const data = { sections, pointsToVerify: r.data.pointsToVerify.map((p) => stripUrlsAndMarkers(p).text) };
+    return StructuredDraftingBase.envelope(this.name, r, data, warnings);
+  }
+
+  async rephraseProposalText(input: ProposalRephraseInput): Promise<AiCallResult<ProposalRephraseOutput>> {
+    const r = await this.run(buildProposalRephraseTask(input), input.selection, input.knownEntities);
+    return StructuredDraftingBase.envelope(this.name, r, { ...r.data, text: stripUrlsAndMarkers(r.data.text).text }, [...r.warnings]);
+  }
+
+  async researchCompany(input: CompanyResearchInput): Promise<AiCallResult<CompanyResearchOutput>> {
+    // Garde-fou sans entité connue : les motifs génériques (e-mail, téléphone,
+    // IBAN, montant…) sont refusés — seuls raison sociale et site web partent.
+    const r = await this.run(buildCompanyResearchTask(input), input.selection, undefined);
+    const data = {
+      ...r.data,
+      summary: stripUrlsAndMarkers(r.data.summary).text,
+      recentNews: r.data.recentNews.map((n) => ({ ...n, title: stripUrlsAndMarkers(n.title).text })),
+    };
+    return StructuredDraftingBase.envelope(this.name, r, data, [...r.warnings]);
   }
 }

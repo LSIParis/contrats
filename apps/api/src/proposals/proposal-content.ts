@@ -148,7 +148,7 @@ export function pricingContextOf(mergeContext: Readonly<Record<string, unknown>>
 // ---------------------------------------------------------------------------
 
 export interface ReadinessIssue {
-  readonly code: 'MERGE_TAG' | 'UNKNOWN_TAG' | 'TO_COMPLETE' | 'MISSING_TERMS' | 'TO_VALIDATE' | 'PRICING' | 'CLICK_ACCEPT_THRESHOLD';
+  readonly code: 'MERGE_TAG' | 'UNKNOWN_TAG' | 'TO_COMPLETE' | 'MISSING_TERMS' | 'TO_VALIDATE' | 'PRICING' | 'CLICK_ACCEPT_THRESHOLD' | 'AI_PENDING';
   readonly message: string;
   readonly sectionKey?: string;
 }

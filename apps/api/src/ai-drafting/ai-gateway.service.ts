@@ -8,7 +8,9 @@ import { DraftingProviderRegistry } from './drafting-provider-registry.js';
 
 export const DRAFTING_REGISTRY = Symbol('DRAFTING_REGISTRY');
 
-export type AiOperation = 'DRAFT' | 'REPHRASE' | 'HARDEN' | 'EXPLAIN' | 'COMPARE' | 'MISSING' | 'IMPORT_EXTRACT';
+export type AiOperation =
+  | 'DRAFT' | 'REPHRASE' | 'HARDEN' | 'EXPLAIN' | 'COMPARE' | 'MISSING' | 'IMPORT_EXTRACT'
+  | 'PROPOSAL_DRAFT' | 'PROPOSAL_REPHRASE' | 'PROSPECT_RESEARCH';
 
 export interface AiCallContext {
   readonly operation: AiOperation;

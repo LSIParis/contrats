@@ -1,5 +1,8 @@
 import type { KnownEntities } from '@lsi/domain';
-import type { ClauseCategory, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput, RiskLevel } from './drafting-schemas.js';
+import type {
+  ClauseCategory, CompanyResearchOutput, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput,
+  ProposalAiSection, ProposalDraftOutput, ProposalRephraseOutput, RiskLevel,
+} from './drafting-schemas.js';
 
 /**
  * Port de rédaction IA STRUCTURÉE (brief §6). Coexiste avec l'ancien port
@@ -92,6 +95,29 @@ export interface ImportExtractInput extends CommonInput {
   readonly text: string;
 }
 
+/** Rédaction de sections de proposition (lot 9.9) : notes et synthèse DÉJÀ pseudonymisées. */
+export interface ProposalDraftInput extends CommonInput {
+  readonly offer: string;
+  readonly sections: readonly ProposalAiSection[];
+  readonly notes: string;
+  readonly research?: string;
+}
+
+export interface ProposalRephraseInput extends CommonInput {
+  readonly text: string;
+  readonly mode: 'reformuler' | 'synthetiser';
+}
+
+/**
+ * Recherche publique sur un prospect : raison sociale et site web SEULEMENT
+ * (données publiques d'une personne morale) — aucune pseudonymisation n'a de
+ * sens ici, mais aucune autre donnée ne doit être ajoutée par l'appelant.
+ */
+export interface CompanyResearchInput extends CommonInput {
+  readonly companyName: string;
+  readonly website?: string;
+}
+
 export interface DraftedClause {
   readonly title: string;
   readonly text: string;
@@ -162,4 +188,7 @@ export interface ContractDraftingProvider {
   compareClause(input: CompareClauseInput): Promise<AiCallResult<CompareOutput>>;
   detectMissingClauses(input: DetectMissingClausesInput): Promise<AiCallResult<MissingClausesOutput>>;
   extractImportMetadata(input: ImportExtractInput): Promise<AiCallResult<ImportExtractOutput>>;
+  draftProposalSections(input: ProposalDraftInput): Promise<AiCallResult<ProposalDraftOutput>>;
+  rephraseProposalText(input: ProposalRephraseInput): Promise<AiCallResult<ProposalRephraseOutput>>;
+  researchCompany(input: CompanyResearchInput): Promise<AiCallResult<CompanyResearchOutput>>;
 }

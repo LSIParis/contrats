@@ -2,7 +2,9 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import type { ContractDrafter, DraftInput, DraftResult } from './contract-drafter.port.js';
 import type { AiCallResult, ContractDraftingProvider, RephraseResult, StructuredDraftResult } from './contract-drafting-provider.port.js';
 import { AiNotConfiguredError } from './drafting-errors.js';
-import type { CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput } from './drafting-schemas.js';
+import type {
+  CompanyResearchOutput, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput, ProposalDraftOutput, ProposalRephraseOutput,
+} from './drafting-schemas.js';
 
 /**
  * Utilisé quand ANTHROPIC_API_KEY est absente : l'app démarre normalement,
@@ -44,6 +46,15 @@ export class UnavailableDraftingProvider implements ContractDraftingProvider {
     return this.fail();
   }
   async extractImportMetadata(): Promise<AiCallResult<ImportExtractOutput>> {
+    return this.fail();
+  }
+  async draftProposalSections(): Promise<AiCallResult<ProposalDraftOutput>> {
+    return this.fail();
+  }
+  async rephraseProposalText(): Promise<AiCallResult<ProposalRephraseOutput>> {
+    return this.fail();
+  }
+  async researchCompany(): Promise<AiCallResult<CompanyResearchOutput>> {
     return this.fail();
   }
 }

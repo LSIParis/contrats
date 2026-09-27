@@ -131,6 +131,9 @@ export const SCHEMA_NAMES = {
   compare: 'clause_compare_v1',
   missing: 'missing_clauses_v1',
   importExtract: 'import_extract_v1',
+  proposalDraft: 'proposal_draft_v1',
+  proposalRephrase: 'proposal_rephrase_v1',
+  companyResearch: 'company_research_v1',
 } as const;
 
 /**
@@ -155,3 +158,36 @@ export const ImportExtractOutputSchema = z.object({
   indiceRevision: found('SYNTEC, ICHT, IPC, BT01, ILAT, ILC ou PSDC ; chaîne vide si aucun indice.'),
 });
 export type ImportExtractOutput = z.infer<typeof ImportExtractOutputSchema>;
+
+/** Sections de proposition rédigées par IA (lot 9.9, brief §12.3). */
+export const PROPOSAL_AI_SECTIONS = ['contexte', 'enjeux', 'solution'] as const;
+export type ProposalAiSection = (typeof PROPOSAL_AI_SECTIONS)[number];
+
+export const ProposalDraftOutputSchema = z.object({
+  sections: z
+    .array(
+      z.object({
+        key: z.enum(PROPOSAL_AI_SECTIONS),
+        title: text(200).describe('Intitulé de la section.'),
+        text: text(8_000).describe('Texte de la section en Markdown simple (paragraphes, listes à puces), sans URL.'),
+      }),
+    )
+    .min(1)
+    .max(3),
+  pointsToVerify: z.array(text(500)).max(10).describe('Affirmations à vérifier par le commercial avant envoi.'),
+});
+export type ProposalDraftOutput = z.infer<typeof ProposalDraftOutputSchema>;
+
+export const ProposalRephraseOutputSchema = z.object({
+  text: text(8_000).describe('Texte réécrit, en Markdown simple, sans URL.'),
+  changes: z.array(text(500)).max(20),
+});
+export type ProposalRephraseOutput = z.infer<typeof ProposalRephraseOutputSchema>;
+
+export const CompanyResearchOutputSchema = z.object({
+  sector: z.string().max(300).describe('Secteur d’activité ; chaîne vide si inconnu.'),
+  size: z.string().max(300).describe('Taille (effectif, chiffre d’affaires) telle que publiée ; chaîne vide si inconnue.'),
+  summary: text(3_000).describe('Synthèse factuelle de l’activité et des enjeux numériques plausibles, sans données personnelles.'),
+  recentNews: z.array(z.object({ title: text(300), date: z.string().max(20) })).max(5),
+});
+export type CompanyResearchOutput = z.infer<typeof CompanyResearchOutputSchema>;

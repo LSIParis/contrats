@@ -822,3 +822,24 @@ ramenées aux catégories du modèle de données (`DEFINITIONS → OBJET`, `PAIE
 `NIVEAUX_DE_SERVICE → SLA`, `DONNEES_PERSONNELLES → RGPD`, `REVERSIBILITE → RESILIATION`, autres →
 `DIVERS`). Le texte généré est échappé puis mis en paragraphes (`textToHtml`) : aucun HTML du
 fournisseur n'entre dans le contrat.
+
+## 17. Propositions commerciales (lot 9.9)
+
+Trois tâches structurées supplémentaires, sur le même socle (même garde-fou `assertNoLeak`, mêmes
+nettoyages d'URL, même passerelle `AiGateway` — drapeau, fournisseur du tenant, budget, journal
+`ai_usage` avec les opérations `PROPOSAL_DRAFT`, `PROPOSAL_REPHRASE`, `PROSPECT_RESEARCH`,
+migration 33). Socle d'instructions **commercial** distinct du socle juridique
+(`PROPOSAL_BASE_INSTRUCTIONS`, texte intégral dans `drafting-prompts.ts`) : ton clair, aucun
+chiffre, référence ou engagement inventé (« [à compléter] » sinon).
+
+| Schéma | Entrée envoyée | Recherche web |
+|---|---|---|
+| `proposal_draft_v1` | offre, sections demandées, prise de notes **pseudonymisée**, synthèse publique **pseudonymisée** | non |
+| `proposal_rephrase_v1` | texte **pseudonymisé** | non |
+| `company_research_v1` | **raison sociale et site web uniquement** | oui |
+
+La recherche publique porte sur une **personne morale** (données publiques) : la raison sociale est
+transmise en clair, c'est l'objet même de la recherche ; le garde-fou refuse tout motif de donnée
+personnelle (e-mail, téléphone, IBAN, montant) dans ce qui part. La consigne interdit toute mention
+de personne physique dans la réponse. Sources de la recherche et de la rédaction conservées avec la
+section (`proposal_sections.ai_sources`).
