@@ -13,7 +13,7 @@ import { allowPrivateTargets } from './ssrf.js';
  *
  * Déroulé d'une tentative :
  *   1. RÉSERVATION (transaction courte) : la livraison due voit son échéance
- *      repoussée d'un bail (`LEASE_MS`) par un UPDATE conditionnel. Deux
+ *      repoussée d'un bail (`LEASE_MS`) par un UPDATE conditionné à l'échéance lue (verrou optimiste). Deux
  *      workers (ou deux passages du job) qui la découvrent en même temps ne
  *      l'envoient donc qu'une fois : le second ne met à jour aucune ligne.
  *      Si le processus meurt pendant l'envoi, le bail expire et la livraison
@@ -44,7 +44,7 @@ export class WebhookDeliveryService {
     const out: Record<AttemptOutcome, number> = { DELIVERED: 0, FAILED: 0, DEAD: 0, SKIPPED: 0 };
     for (const ref of await findDueWebhookDeliveries(200)) {
       try {
-        out[await this.attempt(ref.tenantId, ref.id, now())]++;
+        out[await this.attempt(ref.tenantId, ref.id, now(), { force: true })]++;
       } catch (err) {
         // Une livraison en erreur inattendue ne bloque pas les suivantes ;
         // son bail expirera et elle sera reprise.
@@ -55,22 +55,26 @@ export class WebhookDeliveryService {
   }
 
   /**
-   * Une tentative de livraison. `force` (relivraison manuelle, test) ignore
-   * l'échéance mais pas l'état : seule une livraison réservée est envoyée.
+   * Une tentative de livraison. `force` ignore l'échéance (mais jamais l'état
+   * ni la réservation) : le job l'emploie pour les livraisons que la base a
+   * déjà jugées dues à SON horloge (pas de décalage d'horloge hôte ↔ base),
+   * l'administration pour « tester » et « relivrer » immédiatement.
    */
-  async attempt(tenantId: string, deliveryId: string, now: Date): Promise<AttemptOutcome> {
+  async attempt(tenantId: string, deliveryId: string, now: Date, opts: { force?: boolean } = {}): Promise<AttemptOutcome> {
     const scope = tenantSystemScope(tenantId);
 
-    // 1. Réservation.
+    // 1. Réservation, par verrou OPTIMISTE sur l'échéance observée : de deux
+    // réservations concurrentes, une seule trouve encore la valeur lue.
     const claimed = await withScope(scope, async (tx) => {
+      const seen = await tx.webhookDelivery.findFirst({
+        where: { id: deliveryId, status: { in: ['PENDING', 'FAILED'] }, subscription: { active: true } },
+        select: { nextAttemptAt: true },
+      });
+      if (!seen?.nextAttemptAt) return null;
+      if (!opts.force && seen.nextAttemptAt > now) return null;
       const r = await tx.webhookDelivery.updateMany({
-        where: {
-          id: deliveryId,
-          status: { in: ['PENDING', 'FAILED'] },
-          nextAttemptAt: { lte: now },
-          subscription: { active: true },
-        },
-        data: { nextAttemptAt: new Date(now.getTime() + LEASE_MS), updatedAt: now },
+        where: { id: deliveryId, status: { in: ['PENDING', 'FAILED'] }, nextAttemptAt: seen.nextAttemptAt },
+        data: { nextAttemptAt: new Date(Math.max(now.getTime(), seen.nextAttemptAt.getTime()) + LEASE_MS), updatedAt: now },
       });
       if (r.count !== 1) return null;
       return tx.webhookDelivery.findUniqueOrThrow({

@@ -126,7 +126,7 @@ export class WebhooksAdminService {
       const d = await tx.webhookDelivery.findFirstOrThrow({ where: { eventId, subscriptionId: id }, select: { id: true } });
       return d.id;
     });
-    return { deliveryId, outcome: await this.delivery.attempt(scope.tenantId, deliveryId, now) };
+    return { deliveryId, outcome: await this.delivery.attempt(scope.tenantId, deliveryId, now, { force: true }) };
   }
 
   /**
@@ -146,7 +146,7 @@ export class WebhooksAdminService {
         data: { status: 'PENDING', attempt: 0, nextAttemptAt: now, deliveredAt: null, updatedAt: now },
       });
     });
-    return { deliveryId, outcome: await this.delivery.attempt(scope.tenantId, deliveryId, now) };
+    return { deliveryId, outcome: await this.delivery.attempt(scope.tenantId, deliveryId, now, { force: true }) };
   }
 
   private async mustExist(tx: any, id: string): Promise<{ id: string; active: boolean }> {
