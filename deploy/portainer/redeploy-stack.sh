@@ -22,10 +22,26 @@ tag="${1:?usage: redeploy-stack.sh <tag>}"
 [[ "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::Tag d'image invalide : ${tag}"; exit 1; }
 base="${PORTAINER_API_BASE:-https://127.0.0.1:${TUNNEL_PORT:?}/api}"
 # --insecure : certificat auto-signé de Portainer, trafic confiné au tunnel SSH local.
-CURL=(curl --fail --silent --show-error --insecure)
+CURL=(curl --silent --show-error --insecure)
+
+# Appel nommé : en cas d'échec, dit QUEL appel a échoué et quoi vérifier.
+#   call "<libellé>" <options curl…>   (le corps de réponse va où -o l'indique)
+call() {
+  local what="$1"; shift
+  local code
+  code="$("${CURL[@]}" -w '%{http_code}' "$@")" || { echo "::error::${what} : Portainer injoignable (curl $?)."; return 1; }
+  [ "$code" -lt 400 ] && return 0
+  case "$code" in
+    401) echo "::error::${what} : jeton refusé (401) — jeton expiré, révoqué ou mal copié dans PORTAINER_API_TOKEN." ;;
+    403) echo "::error::${what} : accès refusé (403) — le compte du jeton n'a pas de droits sur la stack ${PORTAINER_STACK_ID:-?} ou sur son environnement (09-exploitation.md §4.8, étapes 2 et 3)." ;;
+    404) echo "::error::${what} : introuvable (404) — vérifier PORTAINER_STACK_ID (${PORTAINER_STACK_ID:-?}) ou l'identifiant du webhook." ;;
+    *)   echo "::error::${what} : échec (HTTP ${code})." ;;
+  esac
+  return 1
+}
 
 if [ -n "${PORTAINER_WEBHOOK_ID:-}" ]; then
-  "${CURL[@]}" --max-time 30 -X POST "${base}/stacks/webhooks/${PORTAINER_WEBHOOK_ID}?tag=${tag}"
+  call "Webhook de la stack" --max-time 30 -o /dev/null -X POST "${base}/stacks/webhooks/${PORTAINER_WEBHOOK_ID}?tag=${tag}"
   echo "Stack redéployée par webhook sur le tag ${tag}."
   exit 0
 fi
@@ -39,8 +55,8 @@ trap 'rm -rf "$work"' EXIT
 umask 077
 printf 'X-API-Key: %s\n' "$PORTAINER_API_TOKEN" > "$work/auth"
 
-"${CURL[@]}" --max-time 30 -H @"$work/auth" "${base}/stacks/${PORTAINER_STACK_ID}" -o "$work/stack.json"
-"${CURL[@]}" --max-time 30 -H @"$work/auth" "${base}/stacks/${PORTAINER_STACK_ID}/file" -o "$work/file.json"
+call "Lecture de la stack ${PORTAINER_STACK_ID}" --max-time 30 -H @"$work/auth" -o "$work/stack.json" "${base}/stacks/${PORTAINER_STACK_ID}"
+call "Lecture du fichier compose" --max-time 30 -H @"$work/auth" -o "$work/file.json" "${base}/stacks/${PORTAINER_STACK_ID}/file"
 
 endpoint="$(jq -r '.EndpointId' "$work/stack.json")"
 [[ "$endpoint" =~ ^[0-9]+$ ]] || { echo "::error::Stack ${PORTAINER_STACK_ID} : environnement introuvable."; exit 1; }
@@ -60,7 +76,7 @@ jq -n \
    }' > "$work/payload.json"
 
 # Tirage de l'image + recréation des conteneurs : peut prendre plusieurs minutes.
-"${CURL[@]}" --max-time 900 -X PUT -H @"$work/auth" -H 'Content-Type: application/json' \
+call "Mise à jour de la stack (tirage de l'image ${tag})" --max-time 900 -X PUT -H @"$work/auth" -H 'Content-Type: application/json' \
   --data-binary @"$work/payload.json" -o /dev/null \
   "${base}/stacks/${PORTAINER_STACK_ID}?endpointId=${endpoint}"
 echo "Stack ${PORTAINER_STACK_ID} redéployée par l'API : CONTRATS_TAG ${previous} → ${tag}."
