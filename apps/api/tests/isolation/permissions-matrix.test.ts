@@ -49,6 +49,7 @@ const PROBES: Partial<Record<Action, Probe>> = {
   'users.manage': { method: 'get', path: () => '/v1/users' },
   'audit.read': { method: 'get', path: () => '/v1/audit' },
   'tenant.configure': { method: 'get', path: () => '/v1/admin/settings' },
+  'webhooks.manage': { method: 'get', path: () => '/v1/admin/webhooks' },
   'templates.manage': { method: 'get', path: () => '/v1/templates' },
   'customers.write': {
     method: 'post', path: () => `/v1/customers/${ghost}/contacts`,
@@ -116,10 +117,11 @@ describe('invariants de sécurité de la matrice', () => {
     expect(can(['ACCOUNT_MANAGER'], 'clauses.validateAi')).toBe(false);
   });
 
-  test('seul l’admin paramètre le tenant et gère les clients API', () => {
+  test('seul l’admin paramètre le tenant, gère les clients API et les webhooks', () => {
     for (const role of ALL_ROLES.filter((r) => r !== 'MSP_ADMIN')) {
       expect(can([role], 'tenant.configure')).toBe(false);
       expect(can([role], 'apiClients.manage')).toBe(false);
+      expect(can([role], 'webhooks.manage')).toBe(false);
     }
   });
 });
