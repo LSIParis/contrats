@@ -166,7 +166,7 @@ describe('assistance IA sur un contrat', () => {
 
   test('défaillance du fournisseur → 504, aucun brouillon, échec journalisé', async () => {
     const st = await http().get(`/v1/contracts/${contractId}/structure`).set('x-lsi-session', 'ai-am').expect(200);
-    failNext = new AiTimeoutError('lent', 'perplexity');
+    failNext = new AiTimeoutError('lent', 'perplexity', 1000);
     await draft().expect(504);
     const after = await http().get(`/v1/contracts/${contractId}/structure`).set('x-lsi-session', 'ai-am').expect(200);
     expect(after.body.versionId).toBe(st.body.versionId);
