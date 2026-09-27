@@ -20,7 +20,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1090.0",
     "@fastify/cookie": "^9",
     "@fastify/multipart": "^8",
-    "@fastify/static": "^7",
+    "@fastify/static": "^10",
     "@lsi/domain": "workspace:*",
     "@lsi/persistence": "workspace:*",
     "@lsi/pricing": "workspace:*",
