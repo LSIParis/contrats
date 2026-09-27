@@ -15,6 +15,7 @@ export {
   adminScope,
   clientScope,
   systemScope,
+  tenantSystemScope,
   type Scope,
   type ActorKind,
 } from './scope.js';
@@ -43,4 +44,10 @@ export {
 export { createCustomer, CustomerSirenConflict, type NewCustomerInput } from './customer-write.js';
 export { appendAudit, verifyAuditChain, type AuditAppendInput } from './audit-write.js';
 export { pingDatabase } from './health.js';
+export {
+  publishWebhookEvent,
+  findDueWebhookDeliveries,
+  type WebhookEventInput,
+  type DueWebhookDeliveryRef,
+} from './webhook-outbox.js';
 export { setTransitionContext } from './transition.js';
