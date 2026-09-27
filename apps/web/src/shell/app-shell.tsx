@@ -19,6 +19,7 @@ const SECTION_TITLES: Array<[prefix: string, title: string]> = [
   ['/settings', 'Paramètres'],
   ['/pricing', 'Tarification'],
   ['/proposal-admin', 'Propositions'],
+  ['/proposals', 'Propositions'],
 ];
 
 function sectionTitle(pathname: string): string {
@@ -39,6 +40,7 @@ export function AppShell() {
           <NavItem to="/dashboard" icon="dash">Tableau de bord</NavItem>
           <NavItem to="/customers" icon="building">Clients</NavItem>
           <NavItem to="/contracts" icon="contract">Contrats</NavItem>
+          {allows(me.data, 'proposals.read') && <NavItem to="/proposals" icon="send">Propositions</NavItem>}
           <NavItem to="/reminders" icon="bell">Rappels</NavItem>
           {(allows(me.data, 'contracts.write') || allows(me.data, 'clauses.manage')) && (
             <NavItem to="/library" icon="book">Bibliothèque de clauses</NavItem>
@@ -51,6 +53,9 @@ export function AppShell() {
               {isAdmin && <NavItem to="/audit" icon="clipboard">Audit</NavItem>}
               {isAdmin && <NavItem to="/settings" icon="settings">Paramètres</NavItem>}
               {isAdmin && <NavItem to="/proposal-admin/pending" icon="fileCheck">Prix à valider</NavItem>}
+              {allows(me.data, 'proposals.library.manage') && (
+                <NavItem to="/proposal-admin/templates" icon="clipboard">Administration des propositions</NavItem>
+              )}
             </NavSection>
           )}
         </Sidebar>

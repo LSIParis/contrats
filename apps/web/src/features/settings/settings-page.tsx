@@ -95,9 +95,11 @@ export function FeatureFlagsCard() {
 
 type Kind =
   | { type: 'select'; options: Array<[string, string]> }
-  | { type: 'text'; nullable: true }
+  | { type: 'text'; nullable: boolean; multiline?: boolean }
   | { type: 'number'; nullable?: boolean; integer?: boolean }
-  | { type: 'list' };
+  | { type: 'list' }
+  /** Relances des propositions : « J+ sans ouverture, J+ sans décision, J- avant échéance ». */
+  | { type: 'followUps' };
 
 interface SettingDef { key: string; label: string; hint?: string; kind: Kind }
 
@@ -126,11 +128,44 @@ export const SETTING_DEFS: SettingDef[] = [
   },
   { key: 'signature.expireDays', label: 'Expiration d’une demande de signature (jours)', kind: { type: 'number', integer: true } },
   { key: 'retention.yearsAfterEnd', label: 'Conservation après la fin du contrat (années)', kind: { type: 'number', integer: true } },
+  // Lot 9 — propositions commerciales (11-propositions.md §11).
+  { key: 'proposals.reviewDiscountPercent', label: 'Propositions : revue interne au-delà de cette remise (%)', kind: { type: 'number' } },
+  {
+    key: 'proposals.reviewAmountCents', label: 'Propositions : revue interne au-delà de ce total HT sur la durée (centimes)',
+    hint: 'En centimes : 3000000 = 30 000 € HT. Vide : jamais.', kind: { type: 'number', nullable: true, integer: true },
+  },
+  {
+    key: 'proposals.clickAcceptMaxCents', label: 'Propositions : plafond de l’acceptation par clic (centimes HT)',
+    hint: 'En centimes : 500000 = 5 000 € HT sur la durée.', kind: { type: 'number', integer: true },
+  },
+  { key: 'proposals.defaultValidityDays', label: 'Propositions : validité par défaut après envoi (jours)', kind: { type: 'number', integer: true } },
+  {
+    key: 'proposals.followUps', label: 'Propositions : relances par défaut (jours)',
+    hint: 'Trois nombres : J+ sans ouverture, J+ sans décision, J- avant échéance (ex. 3, 7, 2).', kind: { type: 'followUps' },
+  },
+  {
+    key: 'proposals.trackingRetentionDays', label: 'Propositions : conservation du suivi détaillé (jours)',
+    hint: 'Après décision ou expiration ; les agrégats sont conservés (RGPD).', kind: { type: 'number', integer: true },
+  },
+  { key: 'proposals.linkGraceDays', label: 'Propositions : lien ouvrable après l’échéance (jours)', kind: { type: 'number', integer: true } },
+  { key: 'proposals.emailSubject', label: 'Propositions : objet de l’e-mail d’envoi', kind: { type: 'text', nullable: false } },
+  {
+    key: 'proposals.emailBody', label: 'Propositions : corps de l’e-mail d’envoi',
+    hint: 'Doit contenir {{lien}} ; balises : proposition.*, client.*, commercial.nom, destinataire.nom.', kind: { type: 'text', nullable: false, multiline: true },
+  },
+  {
+    key: 'proposals.lsiSignerUserId', label: 'Propositions : contre-signataire LSI (identifiant utilisateur)',
+    hint: 'Vide : le commercial propriétaire contre-signe.', kind: { type: 'text', nullable: true },
+  },
 ];
 
 export function toInput(value: unknown, kind: Kind): string {
   if (value == null) return '';
   if (kind.type === 'list') return Array.isArray(value) ? value.join(', ') : String(value);
+  if (kind.type === 'followUps') {
+    const v = value as { noOpenAfterDays?: number; noDecisionAfterDays?: number; beforeExpiryDays?: number };
+    return [v.noOpenAfterDays, v.noDecisionAfterDays, v.beforeExpiryDays].join(', ');
+  }
   if (kind.type === 'number') return String(value).replace('.', ',');
   return String(value);
 }
@@ -142,7 +177,13 @@ export function fromInput(raw: string, kind: Kind): { value: unknown } | { error
     case 'select':
       return { value: t };
     case 'text':
-      return { value: t === '' ? null : t };
+      if (t === '') return kind.nullable ? { value: null } : { error: 'Valeur obligatoire.' };
+      return { value: t };
+    case 'followUps': {
+      const n = t.split(/[,;]/).map((x) => x.trim()).filter(Boolean).map(Number);
+      if (n.length !== 3 || n.some((x) => !Number.isInteger(x) || x < 1)) return { error: 'Trois nombres entiers attendus (ex. 3, 7, 2).' };
+      return { value: { noOpenAfterDays: n[0], noDecisionAfterDays: n[1], beforeExpiryDays: n[2] } };
+    }
     case 'number': {
       if (t === '') return kind.nullable ? { value: null } : { error: 'Valeur obligatoire.' };
       const n = Number(t.replace(',', '.'));
@@ -223,6 +264,8 @@ export function TenantSettingsCard() {
                 <Select id={id} value={v} onChange={onChange}>
                   {d.kind.options.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
                 </Select>
+              ) : d.kind.type === 'text' && d.kind.multiline ? (
+                <textarea id={id} className="min-h-[120px] w-full rounded border border-line-strong px-2.5 py-2 text-sm" value={v} onChange={onChange} />
               ) : (
                 <Input id={id} value={v} onChange={onChange} inputMode={d.kind.type === 'number' ? 'decimal' : undefined} />
               )}

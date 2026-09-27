@@ -26,6 +26,11 @@ import { LibraryPage } from './features/library/library-page.js';
 import { RemindersPage } from './features/reminders/reminders-page.js';
 import { ProposalPublicPage } from './features/proposals/public/proposal-public-page.js';
 import { PendingValidationsPage } from './features/proposals/pending-validations-page.js';
+import { ProposalsPage } from './features/proposals/proposals-page.js';
+import { ProposalWorkspacePage } from './features/proposals/proposal-workspace-page.js';
+import {
+  ContentLibraryPage, ContractTemplateSlugsPage, ProposalTemplateDetailPage, ProposalTemplatesPage, TermsPage,
+} from './features/proposals/admin/proposal-admin-pages.js';
 
 function InternalRoutes() {
   return (
@@ -55,6 +60,15 @@ function InternalRoutes() {
         <Route path="/templates/:id" element={<TemplateDetailPage />} />
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/proposal-admin/pending" element={<PendingValidationsPage />} />
+        {/* Lot 9 : propositions commerciales (interface interne). */}
+        <Route path="/proposals" element={<ProposalsPage />} />
+        <Route path="/proposals/:id" element={<ProposalWorkspacePage />} />
+        <Route path="/proposal-admin" element={<Navigate to="/proposal-admin/templates" replace />} />
+        <Route path="/proposal-admin/templates" element={<ProposalTemplatesPage />} />
+        <Route path="/proposal-admin/templates/:slug" element={<ProposalTemplateDetailPage />} />
+        <Route path="/proposal-admin/library" element={<ContentLibraryPage />} />
+        <Route path="/proposal-admin/terms" element={<TermsPage />} />
+        <Route path="/proposal-admin/contract-templates" element={<ContractTemplateSlugsPage />} />
       </Route>
     </Routes>
   );

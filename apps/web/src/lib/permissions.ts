@@ -28,6 +28,12 @@ const PERMISSIONS = {
   // Lot 9 — propositions commerciales.
   'proposals.read': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER'],
   'proposals.prices.validate': ['MSP_ADMIN'],
+  'proposals.write': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'proposals.send': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'proposals.review': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
+  'proposals.library.manage': ['MSP_ADMIN'],
+  'proposals.convert': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
+  'customers.write': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UiAction = keyof typeof PERMISSIONS;
