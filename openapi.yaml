@@ -10,6 +10,7 @@ tags:
   - name: Contrats
   - name: Tarification
   - name: Échéances
+  - name: Propositions
   - name: Webhooks
 components:
   securitySchemes:
@@ -17,7 +18,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: ctr_<prefix>_<secret>
-      description: "Clé créée par un administrateur (Paramètres → API). Scopes : contracts:read, contracts:dates:read, pricing:read, pricing:quote, webhooks:manage."
+      description: "Clé créée par un administrateur (Paramètres → API). Scopes : contracts:read, contracts:dates:read, pricing:read, pricing:quote, webhooks:manage, proposals:read, proposals:pricing:read."
   schemas:
     Contract:
       type: object
@@ -602,6 +603,448 @@ components:
         - code
       additionalProperties: {}
       description: Erreur RFC 9457 (`application/problem+json`).
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        number:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - IN_INTERNAL_REVIEW
+            - READY
+            - SENT
+            - VIEWED
+            - IN_DISCUSSION
+            - ACCEPTED
+            - PENDING_SIGNATURE
+            - SIGNED
+            - CONVERTED
+            - EXPIRED
+            - DECLINED
+            - WITHDRAWN
+        acceptanceMode:
+          type: string
+          enum:
+            - DOCUSEAL_SIGNATURE
+            - CLICK_ACCEPT
+        customer:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            name:
+              type: string
+            externalRef:
+              anyOf:
+                - type: string
+                - type: "null"
+            siren:
+              anyOf:
+                - type: string
+                - type: "null"
+          required:
+            - id
+            - name
+            - externalRef
+            - siren
+          additionalProperties: false
+        template:
+          anyOf:
+            - type: object
+              properties:
+                slug:
+                  type: string
+                name:
+                  type: string
+              required:
+                - slug
+                - name
+              additionalProperties: false
+            - type: "null"
+        versionNumber:
+          anyOf:
+            - type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            - type: "null"
+        oneTimeCents:
+          anyOf:
+            - type: string
+              pattern: ^-?\d+$
+              description: Montant en centimes, en chaîne.
+            - type: "null"
+        monthlyCents:
+          anyOf:
+            - type: string
+              pattern: ^-?\d+$
+              description: Montant en centimes, en chaîne.
+            - type: "null"
+        commitmentTotalCents:
+          anyOf:
+            - type: string
+              pattern: ^-?\d+$
+              description: Montant en centimes, en chaîne.
+            - type: "null"
+        commitmentMonths:
+          anyOf:
+            - type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            - type: "null"
+        contractId:
+          anyOf:
+            - type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            - type: "null"
+          description: Contrat généré à la conversion.
+        expiresAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        sentAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        acceptedAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        signedAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        convertedAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        declinedAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        expiredAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+      required:
+        - id
+        - number
+        - title
+        - status
+        - acceptanceMode
+        - customer
+        - template
+        - versionNumber
+        - oneTimeCents
+        - monthlyCents
+        - commitmentTotalCents
+        - commitmentMonths
+        - contractId
+        - expiresAt
+        - sentAt
+        - acceptedAt
+        - signedAt
+        - convertedAt
+        - declinedAt
+        - expiredAt
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+    ProposalPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              number:
+                type: string
+              title:
+                type: string
+              status:
+                type: string
+                enum:
+                  - DRAFT
+                  - IN_INTERNAL_REVIEW
+                  - READY
+                  - SENT
+                  - VIEWED
+                  - IN_DISCUSSION
+                  - ACCEPTED
+                  - PENDING_SIGNATURE
+                  - SIGNED
+                  - CONVERTED
+                  - EXPIRED
+                  - DECLINED
+                  - WITHDRAWN
+              acceptanceMode:
+                type: string
+                enum:
+                  - DOCUSEAL_SIGNATURE
+                  - CLICK_ACCEPT
+              customer:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                  externalRef:
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                  siren:
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                required:
+                  - id
+                  - name
+                  - externalRef
+                  - siren
+                additionalProperties: false
+              template:
+                anyOf:
+                  - type: object
+                    properties:
+                      slug:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                      - slug
+                      - name
+                    additionalProperties: false
+                  - type: "null"
+              versionNumber:
+                anyOf:
+                  - type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  - type: "null"
+              oneTimeCents:
+                anyOf:
+                  - type: string
+                    pattern: ^-?\d+$
+                    description: Montant en centimes, en chaîne.
+                  - type: "null"
+              monthlyCents:
+                anyOf:
+                  - type: string
+                    pattern: ^-?\d+$
+                    description: Montant en centimes, en chaîne.
+                  - type: "null"
+              commitmentTotalCents:
+                anyOf:
+                  - type: string
+                    pattern: ^-?\d+$
+                    description: Montant en centimes, en chaîne.
+                  - type: "null"
+              commitmentMonths:
+                anyOf:
+                  - type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  - type: "null"
+              contractId:
+                anyOf:
+                  - type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  - type: "null"
+                description: Contrat généré à la conversion.
+              expiresAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              sentAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              acceptedAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              signedAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              convertedAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              declinedAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              expiredAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+              updatedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            required:
+              - id
+              - number
+              - title
+              - status
+              - acceptanceMode
+              - customer
+              - template
+              - versionNumber
+              - oneTimeCents
+              - monthlyCents
+              - commitmentTotalCents
+              - commitmentMonths
+              - contractId
+              - expiresAt
+              - sentAt
+              - acceptedAt
+              - signedAt
+              - convertedAt
+              - declinedAt
+              - expiredAt
+              - createdAt
+              - updatedAt
+            additionalProperties: false
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
+      required:
+        - data
+        - nextCursor
+      additionalProperties: false
+    ProposalPricing:
+      type: object
+      properties:
+        proposalId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        source:
+          type: string
+          enum:
+            - ACCEPTED
+            - PROPOSED
+          description: "`ACCEPTED` : configuration figée à l’acceptation (barème du contrat) ; `PROPOSED` : tableau de la version courante."
+        versionNumber:
+          anyOf:
+            - type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            - type: "null"
+        oneTimeCents:
+          anyOf:
+            - type: string
+              pattern: ^-?\d+$
+              description: Montant en centimes, en chaîne.
+            - type: "null"
+        monthlyCents:
+          anyOf:
+            - type: string
+              pattern: ^-?\d+$
+              description: Montant en centimes, en chaîne.
+            - type: "null"
+        commitmentTotalCents:
+          anyOf:
+            - type: string
+              pattern: ^-?\d+$
+              description: Montant en centimes, en chaîne.
+            - type: "null"
+        commitmentMonths:
+          anyOf:
+            - type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            - type: "null"
+        definition:
+          description: Tableau de prix (forme de l’annexe C, 11-propositions.md).
+        selection:
+          description: Configuration retenue (acceptée) ; null si non acceptée.
+        sha256:
+          anyOf:
+            - type: string
+            - type: "null"
+          description: Empreinte de la configuration figée.
+        frozenAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+      required:
+        - proposalId
+        - source
+        - versionNumber
+        - oneTimeCents
+        - monthlyCents
+        - commitmentTotalCents
+        - commitmentMonths
+        - definition
+        - selection
+        - sha256
+        - frozenAt
+      additionalProperties: false
 paths:
   /api/v1/clients/{clientRef}/contracts:
     get:
@@ -1064,6 +1507,345 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeadlinePage"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/proposals:
+    get:
+      operationId: listProposals
+      summary: Propositions commerciales du tenant
+      tags:
+        - Propositions
+      security:
+        - apiKey:
+            - proposals:read
+      x-required-scope: proposals:read
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+          schema:
+            description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+            type: string
+            maxLength: 500
+        - name: limit
+          in: query
+          required: false
+          schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: status
+          in: query
+          required: false
+          description: Statuts séparés par des virgules, ex. `SENT,VIEWED`.
+          schema:
+            description: Statuts séparés par des virgules, ex. `SENT,VIEWED`.
+            type: string
+            pattern: ^[A-Z_]+(,[A-Z_]+)*$
+        - name: updatedSince
+          in: query
+          required: false
+          description: Propositions modifiées depuis cet instant (synchronisation incrémentale).
+          schema:
+            description: Propositions modifiées depuis cet instant (synchronisation incrémentale).
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalPage"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/clients/{clientRef}/proposals:
+    get:
+      operationId: listClientProposals
+      summary: Propositions d’un client ou d’un prospect
+      tags:
+        - Propositions
+      security:
+        - apiKey:
+            - proposals:read
+      x-required-scope: proposals:read
+      parameters:
+        - name: clientRef
+          in: path
+          required: true
+          description: UUID, SIREN ou référence externe du client
+          schema:
+            type: string
+            maxLength: 100
+        - name: cursor
+          in: query
+          required: false
+          description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+          schema:
+            description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+            type: string
+            maxLength: 500
+        - name: limit
+          in: query
+          required: false
+          schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: status
+          in: query
+          required: false
+          description: Statuts séparés par des virgules, ex. `SENT,VIEWED`.
+          schema:
+            description: Statuts séparés par des virgules, ex. `SENT,VIEWED`.
+            type: string
+            pattern: ^[A-Z_]+(,[A-Z_]+)*$
+        - name: updatedSince
+          in: query
+          required: false
+          description: Propositions modifiées depuis cet instant (synchronisation incrémentale).
+          schema:
+            description: Propositions modifiées depuis cet instant (synchronisation incrémentale).
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalPage"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/proposals/{id}:
+    get:
+      operationId: getProposal
+      summary: "Détail d’une proposition : statut, montants, dates, contrat généré"
+      tags:
+        - Propositions
+      security:
+        - apiKey:
+            - proposals:read
+      x-required-scope: proposals:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de la proposition
+          schema:
+            type: string
+            format: uuid
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/proposals/{id}/pricing:
+    get:
+      operationId: getProposalPricing
+      summary: "Tarif : configuration acceptée (figée) ou tableau proposé"
+      tags:
+        - Propositions
+      security:
+        - apiKey:
+            - proposals:pricing:read
+      x-required-scope: proposals:pricing:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de la proposition
+          schema:
+            type: string
+            format: uuid
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalPricing"
         "304":
           description: Non modifié (If-None-Match)
         "400":

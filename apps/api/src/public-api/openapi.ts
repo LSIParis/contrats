@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { API_SCOPES, type ApiScope } from './api-key.js';
 import {
   ClientContractsQuery, Contract, ContractDates, ContractPage, CreateWebhookBody, Deadline, DeadlinePage, DeadlinesQuery,
-  Pricing, PricingAtQuery, Problem, Quote, QuoteSchema, Webhook,
+  Pricing, PricingAtQuery, Problem, Proposal, ProposalPage, ProposalPricing, ProposalsQuery, Quote, QuoteSchema, Webhook,
 } from './schemas.js';
 
 /**
@@ -34,7 +34,7 @@ interface Operation {
 /** Schémas nommés : `#/components/schemas/<nom>`. */
 const COMPONENTS: Record<string, z.ZodType> = {
   Contract, ContractPage, ContractDates, Deadline, DeadlinePage, Pricing, Quote, QuoteRequest: QuoteSchema,
-  Webhook, CreateWebhookRequest: CreateWebhookBody, Problem,
+  Webhook, CreateWebhookRequest: CreateWebhookBody, Problem, Proposal, ProposalPage, ProposalPricing,
 };
 
 export const OPERATIONS: readonly Operation[] = [
@@ -70,6 +70,27 @@ export const OPERATIONS: readonly Operation[] = [
     method: 'get', path: '/api/v1/deadlines', operationId: 'listDeadlines', tag: 'Échéances',
     summary: 'Échéances à venir, tous contrats confondus', scope: 'contracts:dates:read', etag: true, paginated: true,
     query: DeadlinesQuery, response: 'DeadlinePage',
+  },
+  {
+    method: 'get', path: '/api/v1/proposals', operationId: 'listProposals', tag: 'Propositions',
+    summary: 'Propositions commerciales du tenant', scope: 'proposals:read', etag: true, paginated: true,
+    query: ProposalsQuery, response: 'ProposalPage',
+  },
+  {
+    method: 'get', path: '/api/v1/clients/{clientRef}/proposals', operationId: 'listClientProposals', tag: 'Propositions',
+    summary: 'Propositions d’un client ou d’un prospect', scope: 'proposals:read', etag: true, paginated: true,
+    pathParams: { clientRef: { description: 'UUID, SIREN ou référence externe du client' } },
+    query: ProposalsQuery, response: 'ProposalPage',
+  },
+  {
+    method: 'get', path: '/api/v1/proposals/{id}', operationId: 'getProposal', tag: 'Propositions',
+    summary: 'Détail d’une proposition : statut, montants, dates, contrat généré', scope: 'proposals:read', etag: true,
+    pathParams: { id: { description: 'Identifiant de la proposition', uuid: true } }, response: 'Proposal',
+  },
+  {
+    method: 'get', path: '/api/v1/proposals/{id}/pricing', operationId: 'getProposalPricing', tag: 'Propositions',
+    summary: 'Tarif : configuration acceptée (figée) ou tableau proposé', scope: 'proposals:pricing:read', etag: true,
+    pathParams: { id: { description: 'Identifiant de la proposition', uuid: true } }, response: 'ProposalPricing',
   },
   {
     method: 'get', path: '/api/v1/webhooks', operationId: 'listWebhooks', tag: 'Webhooks',
@@ -161,7 +182,7 @@ export function buildOpenApi(serverUrl = 'https://contrats.lsi-maintenance.fr') 
         'Pagination par curseur (`nextCursor`), `ETag` / `If-None-Match`, erreurs RFC 9457. Guide : docs/contrats/07-api.md.',
     },
     servers: [{ url: serverUrl }],
-    tags: [{ name: 'Contrats' }, { name: 'Tarification' }, { name: 'Échéances' }, { name: 'Webhooks' }],
+    tags: [{ name: 'Contrats' }, { name: 'Tarification' }, { name: 'Échéances' }, { name: 'Propositions' }, { name: 'Webhooks' }],
     components: {
       securitySchemes: {
         apiKey: {

@@ -48,6 +48,8 @@ serveur d'autorisation de plus).
 | `pricing:read` | `GET /contracts/{id}/pricing` |
 | `pricing:quote` | `POST /pricing/quote` |
 | `webhooks:manage` | `GET/POST /webhooks`, `DELETE /webhooks/{id}` |
+| `proposals:read` | `GET /proposals`, `GET /proposals/{id}`, `GET /clients/{clientRef}/proposals` |
+| `proposals:pricing:read` | `GET /proposals/{id}/pricing` |
 
 **Débit** : fenêtre glissante d'une minute par client (`rateLimitPerMinute`, 120 par défaut), en-têtes
 `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` ; dépassement → `429` + `Retry-After`
@@ -73,6 +75,10 @@ utilisateur non plus.
 | `GET` | `/api/v1/deadlines?from=&to=&kind=&cursor=&limit=` | `contracts:dates:read` | `DeadlinePage` |
 | `GET` / `POST` | `/api/v1/webhooks` | `webhooks:manage` | abonnements (§5) |
 | `DELETE` | `/api/v1/webhooks/{id}` | `webhooks:manage` | abonnement désactivé |
+| `GET` | `/api/v1/proposals?status=&updatedSince=&cursor=&limit=` | `proposals:read` | `ProposalPage` |
+| `GET` | `/api/v1/clients/{clientRef}/proposals` | `proposals:read` | `ProposalPage` |
+| `GET` | `/api/v1/proposals/{id}` | `proposals:read` | `Proposal` |
+| `GET` | `/api/v1/proposals/{id}/pricing` | `proposals:pricing:read` | `ProposalPricing` |
 
 - `clientRef` : UUID du client, **ou** son SIREN (9 chiffres), **ou** sa référence externe (Client Help).
 - `status` : liste séparée par des virgules (`ACTIVE,RENEWAL_DUE`).
@@ -83,6 +89,9 @@ utilisateur non plus.
 - `deadlines` : échéances **ouvertes** entre `from` (défaut aujourd'hui) et `to` (défaut +90 jours,
   fenêtre de 366 jours au plus), triées par date.
 - `pricing` et `quote` appellent **le même service** que l'application (même moteur, même trace).
+- Propositions (lot 9.8) : module `contrats.proposals.enabled` coupé → `404 PROPOSALS_DISABLED` ;
+  `updatedSince` permet une synchronisation incrémentale ; aucune donnée personnelle
+  (11-propositions §16).
 
 Exemple :
 
@@ -300,10 +309,8 @@ Content-Type: application/problem+json; charset=utf-8
 ## 7. Propositions commerciales (lot 9)
 
 > API **interne** (session, UI) et **page publique** (jeton). L'exposition
-> dans l'API publique `/api/v1` (`GET /proposals`, `/proposals/{id}`,
-> `/proposals/{id}/pricing`, `/clients/{clientRef}/proposals`, scopes
-> `proposals:read`, `proposals:pricing:read`), l'OpenAPI et le client régénérés
-> relèvent du **lot 9.8**. Toutes les entrées sont validées par Zod
+> dans l'API publique `/api/v1` est décrite au §3 (lot 9.8) ; pilotage commercial :
+> `/v1/proposal-reports/*` (11-propositions §15). Toutes les entrées sont validées par Zod
 > (`apps/api/src/proposals/proposals.schemas.ts`, `.strict()`).
 
 ### 7.1 API interne `/v1/proposals` (droits : `permissions.ts`, `proposals.*`)

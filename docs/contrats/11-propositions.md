@@ -416,6 +416,33 @@ slug (`PUT /v1/proposal-admin/contract-templates/:id/slug`).
   archive bornée ; résultat en brouillon, soumis aux mêmes contrôles.
 - **Assistance IA** : lot 9.9 (colonne `ai_pending_review` prévue).
 
+## 15. Pilotage commercial (lot 9.8)
+
+Service `ProposalReportingService`, routes `/v1/proposal-reports/*` (droit `proposals.read`, portefeuille
+de l'appelant, module désactivé → 404) :
+
+| Route | Contenu |
+|---|---|
+| `GET pipeline?ownerUserId=&templateId=` | propositions **ouvertes** (brouillon → en signature) en colonnes par statut : nombre, montant (total HT sur la durée d'engagement), montant **pondéré** = montant × probabilité ; chaque carte : client, commercial, modèle, mensuel, échéance |
+| `GET dashboard?from=&to=` | période sur la **date d'envoi** (défaut 12 mois glissants, 3 ans au plus) : envoyées, signées, perdues, en cours ; taux de conversion (sur les envoyées et sur les décidées) ; délai moyen envoi → signature ; récurrent mensuel et frais uniques signés ; conversion **par modèle** (rapport par modèle) et **par commercial** ; sections les plus lues (ouvertures, durée moyenne) ; motifs de refus ; options les plus retenues dans les configurations figées |
+| `GET dashboard.csv` | les mêmes indicateurs en CSV (UTF-8 avec BOM, séparateur `;`, cellules neutralisées contre l'injection de formules) |
+
+Probabilité de gain : `winProbability` saisie par le commercial, sinon celle de l'étape (V2-H67) :
+brouillon 10 %, revue interne 15 %, prête 20 %, envoyée 30 %, consultée 40 %, en discussion 50 %,
+acceptée 80 %, en signature 90 %.
+
+« Par offre » (brief §12.8) est lu comme « par modèle de proposition », chaque modèle portant une offre
+(infogérance, supervision, RSSI, sauvegarde) — V2-H68.
+
+## 16. API publique et webhooks (lot 9.8)
+
+`/api/v1/proposals`, `/api/v1/clients/{clientRef}/proposals`, `/api/v1/proposals/{id}` (scope
+`proposals:read`) et `/api/v1/proposals/{id}/pricing` (scope `proposals:pricing:read`) : voir
+`07-api.md` §3. Aucune donnée personnelle n'y figure (ni destinataires, ni suivi de lecture, ni
+commentaires). Le tarif renvoie la configuration **figée à l'acceptation** (`source: ACCEPTED`, avec son
+empreinte) ou, à défaut, le tableau proposé de la version courante (`source: PROPOSED`). Webhooks
+`proposal.*` : §7 et `07-api.md` §5.
+
 ## 14. Tests
 
 | Suite | Contenu |
