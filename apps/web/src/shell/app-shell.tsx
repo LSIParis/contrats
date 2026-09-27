@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { useMe } from '../lib/queries.js';
+import { canDo } from '../lib/permissions.js';
 import { roleLabel } from '../lib/labels.js';
 import { NotificationBell } from '../features/notifications/notification-bell.js';
 import { AccountChip, NavItem, NavSection, Shell, Sidebar, Topbar } from '../ui/layout.js';
@@ -14,6 +15,7 @@ const SECTION_TITLES: Array<[prefix: string, title: string]> = [
   ['/audit', 'Journal d’audit'],
   ['/templates', 'Modèles de contrat'],
   ['/settings', 'Paramètres'],
+  ['/pricing', 'Tarification'],
 ];
 
 function sectionTitle(pathname: string): string {
@@ -35,6 +37,7 @@ export function AppShell() {
           <NavItem to="/customers" icon="building">Clients</NavItem>
           <NavItem to="/contracts" icon="contract">Contrats</NavItem>
           <NavItem to="/reminders" icon="bell">Rappels</NavItem>
+          {canDo(me.data, 'pricing.simulate') && <NavItem to="/pricing" icon="tag">Tarification</NavItem>}
           {(isAdmin || canTemplates) && (
             <NavSection label="Administration">
               {canTemplates && <NavItem to="/templates" icon="book">Modèles</NavItem>}
