@@ -51,6 +51,9 @@ import { CommentsController } from './comments/comments.controller.js';
 import { CommentsService } from './comments/comments.service.js';
 import { DocusealWebhookController } from './webhooks/docuseal.controller.js';
 import { DocusealWebhookService } from './webhooks/docuseal-webhook.service.js';
+import { WebhooksAdminController } from './webhooks-out/webhooks-admin.controller.js';
+import { WebhooksAdminService } from './webhooks-out/webhooks-admin.service.js';
+import { WebhookDeliveryService } from './webhooks-out/webhook-delivery.service.js';
 import { DocusealAdapter } from './signature/docuseal.adapter.js';
 import { SendForSignatureService } from './signature/send-for-signature.service.js';
 import { SignatureActionsController } from './signature/signature-actions.controller.js';
@@ -129,9 +132,13 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     NegotiationController,
     TemplatesController,
     AiDraftingController,
+    WebhooksAdminController,
   ],
   providers: [
     TenantConfigService,
+    // Webhooks sortants (lot 5) : administration + livraison (job minute).
+    WebhooksAdminService,
+    WebhookDeliveryService,
     ImportsService,
     DeadlinesService,
     StructureService,
