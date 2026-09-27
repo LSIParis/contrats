@@ -60,6 +60,15 @@ const PROBES: Partial<Record<Action, Probe>> = {
   'contracts.sendForSignature': { method: 'post', path: () => `/v1/contracts/${ghost}/signature/remind` },
   'contracts.read': { method: 'get', path: () => '/v1/feature-flags' },
   'comments.internal': { method: 'get', path: () => `/v1/contracts/${ghost}/comments` },
+  // --- Tarification (lot 3) : un rôle autorisé obtient 404 (contrat, série ou règle inexistants).
+  'pricing.write': {
+    method: 'post', path: () => `/v1/contracts/${ghost}/pricing/schedules`,
+    body: { validFrom: '2026-01-01', lines: [{ lineKey: 'l', articleCode: 'A', label: 'A', unit: 'u', kind: 'UNIT', mode: 'MANUAL', vatRatePercent: '20', unitPrice: '1' }] },
+  },
+  'pricing.simulate': { method: 'post', path: () => `/v1/contracts/${ghost}/pricing/simulate`, body: { at: '2026-01-01', changes: {} } },
+  'pricing.override.approve': { method: 'post', path: () => `/v1/contracts/${ghost}/pricing/overrides/${ghost}/approve` },
+  'pricing.indexes.manage': { method: 'post', path: () => '/v1/price-indexes/FANTOME/values', body: { period: '2026-01', value: '1', publishedAt: '2026-02-01' } },
+  'pricing.rules.manage': { method: 'put', path: () => '/v1/pricing-rules/fantome', body: { label: 'x' } },
 };
 
 describe('matrice rôle × action (API)', () => {
@@ -114,6 +123,12 @@ describe('invariants de sécurité de la matrice', () => {
     expect(can(['ACCOUNT_MANAGER'], 'contracts.review')).toBe(false);
     expect(can(['ACCOUNT_MANAGER'], 'imports.validate')).toBe(false);
     expect(can(['ACCOUNT_MANAGER'], 'clauses.validateAi')).toBe(false);
+  });
+
+  test('le commercial saisit une dérogation mais ne la valide pas (quatre yeux)', () => {
+    expect(can(['ACCOUNT_MANAGER'], 'pricing.write')).toBe(true);
+    expect(can(['ACCOUNT_MANAGER'], 'pricing.override.approve')).toBe(false);
+    expect(can(['READER'], 'pricing.simulate')).toBe(false);
   });
 
   test('seul l’admin paramètre le tenant et gère les clients API', () => {
