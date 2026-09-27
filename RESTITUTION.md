@@ -46,8 +46,13 @@ uniquement** : aucun parcours n'a encore été fait dans un navigateur (§6).
 
 ## 3. Écarts au brief et modifications de fichiers fournis
 
-- **Annexe A** (`ci.yml`, `release.yml`, `deploy.yml`, `dependabot.yml`) : reprise **à l'identique**
-  (vérifié octet par octet). Aucune modification.
+- **Annexe A** : `ci.yml`, `release.yml`, `dependabot.yml` repris **à l'identique**. **`deploy.yml`
+  modifié** (décision du 2026-09-27) : Portainer est en **Community Edition**, sans webhook de stack.
+  Le redéploiement et le retour arrière passent par `deploy/portainer/redeploy-stack.sh` — webhook si
+  `PORTAINER_WEBHOOK_ID` est défini (comportement d'origine, Business Edition), sinon **API Portainer**
+  avec un jeton d'un compte dédié (`PORTAINER_API_TOKEN`, `PORTAINER_STACK_ID`). Le reste du workflow
+  (tunnel SSH, test de fumée, fermeture) est inchangé. Script testé contre un faux Portainer
+  (13 contrôles) et shellcheck ; `09-exploitation.md` §4.8.
 - **Annexe B** (`deploy/ssh/create-deploy-key.sh`) : reprise à l'identique.
 - **Annexe C** : fichiers placés sous `packages/persistence/prisma/seed/proposal-templates/` (Prisma
   vit dans ce paquet) ; `repository.ts` adapté à Prisma 5 ; tenant `lsi` (`SEED_TENANT_SLUG`) ;
@@ -67,14 +72,14 @@ uniquement** : aucun parcours n'a encore été fait dans un navigateur (§6).
 
 ## 5. Décisions attendues de votre part
 
-1. **Dépôt privé et `release.yml`** : sur un compte GitHub non Enterprise, l'attestation de
-   provenance et l'envoi SARIF de `release.yml` échouent pour un dépôt privé → aucune image publiée,
-   aucun déploiement. Choix : (a) dépôt public, (b) GitHub Enterprise Cloud, (c) m'autoriser à retirer
-   ces deux étapes de `release.yml` (écart à l'annexe A, à consigner). `09-exploitation.md` §2.1.
-2. **Emplacement de Portainer** : `deploy.yml` ouvre un tunnel vers `127.0.0.1:9443` **sur le VPS**,
-   alors que Portainer est servi par `portainer.lsi-maintenance.fr` (serveur distinct). Soit
-   `PORTAINER_LOCAL_ADDR` pointe vers l'adresse joignable depuis le VPS, soit le tunnel vise l'hôte
-   de Portainer.
+1. ~~Dépôt privé et `release.yml`~~ : **réglé** le 2026-09-27, dépôt rendu **public** (historique
+   analysé par gitleaks au préalable : aucun secret ; *secret scanning* et *push protection* activés).
+2. ~~Emplacement de Portainer~~ : **réglé** — serveur sur le pair WireGuard `10.99.0.1:9443` (CE
+   2.45.1), agent seul sur le VPS ; tunnel par le VPS, redéploiement par l'API (§3). Reste à faire :
+   compte `gha-deploy` et son jeton, clé de déploiement (`create-deploy-key.sh all --portainer
+   10.99.0.1:9443 --repo LSIParis/contrats --env production`) — `09-exploitation.md` §4.8.
+   **Exposition à corriger** : agent Portainer ouvert sur `0.0.0.0:9001` sans `AGENT_SECRET`,
+   interface `portainer.lsi-maintenance.fr` publique (§4.1).
 3. **Secrets de la stack** à renseigner dans Portainer (DocuSeal, OIDC Entra, Brevo, Wasabi,
    Perplexity/Anthropic, `COMPOSE_PROFILES=backup`), puis « redéployer » sans nouveau tirage d'image.
 4. **Révoquer le jeton Portainer** apparu dans la conversation (non conservé localement).
