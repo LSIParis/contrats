@@ -19,7 +19,7 @@
     "@aws-sdk/client-s3": "^3.1090.0",
     "@aws-sdk/s3-request-presigner": "^3.1090.0",
     "@fastify/cookie": "^9",
-    "@fastify/multipart": "^8",
+    "@fastify/multipart": "^10",
     "@fastify/static": "^7",
     "@lsi/domain": "workspace:*",
     "@lsi/persistence": "workspace:*",
