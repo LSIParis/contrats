@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module.js';
 import { SessionService } from '../../src/auth/session.service.js';
 import { LifecycleService } from '../../src/jobs/lifecycle.service.js';
+import { DeadlinesService } from '../../src/deadlines/deadlines.service.js';
 import { internalScope, adminScope, withScope, uuidv7 } from '@lsi/persistence';
 import { seedTwoCustomers, type TwoCustomerFixture } from '@lsi/persistence/testing';
 
@@ -143,5 +144,24 @@ describe('résiliation', () => {
     const { c } = await read(id);
     expect(c!.status).toBe('ACTIVE');
     expect(c!.terminationEffectiveDate).toBeNull();
+  });
+
+  test('échéance rendue obsolète puis de nouveau due (résiliation retirée) → réactivée avec ses alertes', async () => {
+    const id = await seed({ endDate: day(200), renewalMode: 'TACIT', renewalPeriodMonths: 12, noticePeriodMonths: 3 });
+    const deadlines = app.get(DeadlinesService);
+    const scope = adminScope(fx.tenantId, fx.adminUserId);
+    await deadlines.recomputeInScope(scope, id, new Date());
+    const open = () => withScope(scope, (tx) => tx.deadline.findMany({ where: { contractId: id, kind: 'NOTICE_DEADLINE' } }));
+    expect((await open())[0]!.status).toBe('OPEN');
+
+    await http().post(`/v1/contracts/${id}/terminate`).set('x-lsi-session', 'ren-am').send({ reason: 'Fin', initiatedBy: 'CLIENT' }).expect(201);
+    await deadlines.recomputeInScope(scope, id, new Date());
+    expect((await open())[0]!.status).toBe('OBSOLETE');
+
+    await http().post(`/v1/contracts/${id}/withdraw-termination`).set('x-lsi-session', 'ren-am').send({ reason: 'Rétractation' }).expect(201);
+    const [d] = await open();
+    expect(d!.status).toBe('OPEN');
+    const pending = await withScope(scope, (tx) => tx.reminder.count({ where: { deadlineId: d!.id, status: 'PENDING' } }));
+    expect(pending).toBeGreaterThan(0);
   });
 });

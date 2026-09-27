@@ -71,7 +71,12 @@ export class DeadlinesService {
         )
       : [];
 
-    const existing: any[] = await tx.deadline.findMany({ where: { contractId, status: { in: ['OPEN', 'DONE'] } } });
+    const all: any[] = await tx.deadline.findMany({ where: { contractId } });
+    const existing = all.filter((e) => e.status === 'OPEN' || e.status === 'DONE');
+    // Une échéance rendue obsolète puis de nouveau calculée (résiliation
+    // retirée, terme rétabli…) est RÉACTIVÉE : l'unicité (contrat, type, date)
+    // interdit de la recréer, et ses alertes futures doivent revivre avec elle.
+    const obsolete = new Map(all.filter((e) => e.status === 'OBSOLETE').map((e) => [key(e.kind, e.dueDate), e]));
     const wanted = new Map(computed.map((d) => [key(d.kind, d.dueDate), d]));
     const today = dayOf(now);
     let created = 0;
@@ -91,7 +96,18 @@ export class DeadlinesService {
     for (const [k, d] of wanted) {
       const past = dayOf(d.dueDate) < today;
       let row = byKey.get(k);
-      if (!row) {
+      const revived = row ? undefined : obsolete.get(k);
+      if (revived) {
+        row = await tx.deadline.update({
+          where: { id: revived.id },
+          data: { status: past ? 'DONE' : 'OPEN', details: d.details, computedAt: now },
+        });
+        await tx.reminder.updateMany({
+          where: { deadlineId: revived.id, status: 'CANCELLED', dueAt: { gt: now } },
+          data: { status: 'PENDING' },
+        });
+        created++;
+      } else if (!row) {
         row = await tx.deadline.create({
           data: {
             id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId,
