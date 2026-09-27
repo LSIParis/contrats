@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -45,4 +45,11 @@ export class CreateCustomerDto {
   /** Référence du client dans Client Help (ou saisie locale). Unique par tenant. */
   @IsOptional() @IsString() @MaxLength(100)
   externalRef?: string;
+
+  /**
+   * Statut commercial (lot 9) : un prospect créé depuis une proposition est
+   * `PROSPECT` ; il devient `CLIENT` à la signature. Défaut : `CLIENT`.
+   */
+  @IsOptional() @IsIn(['PROSPECT', 'CLIENT'])
+  commercialStatus?: 'PROSPECT' | 'CLIENT';
 }

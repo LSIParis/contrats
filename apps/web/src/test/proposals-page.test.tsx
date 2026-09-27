@@ -107,7 +107,7 @@ test('création pour un nouveau prospect : le client est créé d’abord, puis 
   await user.type(within(dialog).getByLabelText('Raison sociale'), 'Gamma');
   await user.click(within(dialog).getByRole('button', { name: 'Créer la proposition' }));
   await screen.findByText('Espace de la proposition');
-  expect(api.find('POST', '/v1/customers')[0]!.body).toEqual({ name: 'Gamma' });
+  expect(api.find('POST', '/v1/customers')[0]!.body).toEqual({ name: 'Gamma', commercialStatus: 'PROSPECT' });
   expect(api.find('POST', '/v1/proposals')[0]!.body).toEqual({ customerId: 'c-9' });
 });
 

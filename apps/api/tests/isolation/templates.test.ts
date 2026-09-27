@@ -35,6 +35,13 @@ describe('bibliothèque de modèles', () => {
     expect(list.body.items.some((t: any) => t.id === id)).toBe(true);
   });
 
+  test('la liste expose le slug de rattachement aux modèles de proposition (lot 9)', async () => {
+    const id = await newTemplate();
+    await req('sess-admin', 'put', `/v1/proposal-admin/contract-templates/${id}/slug`).send({ slug: `rssi-${id.slice(-6)}` }).expect(200);
+    const list = await req('sess-admin', 'get', '/v1/templates').expect(200);
+    expect(list.body.items.find((t: any) => t.id === id)).toMatchObject({ slug: `rssi-${id.slice(-6)}` });
+  });
+
   test('enregistrement : sanitise + extrait les variables des placeholders', async () => {
     const id = await newTemplate();
     await req('sess-admin', 'put', `/v1/templates/${id}/content`)

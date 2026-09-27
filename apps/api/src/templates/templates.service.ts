@@ -26,9 +26,9 @@ export class TemplatesService {
     return withScope(scope, async (tx) => {
       const rows = await tx.contractTemplate.findMany({
         orderBy: { name: 'asc' },
-        select: { id: true, name: true, category: true, status: true, currentVersionId: true, updatedAt: true, _count: { select: { versions: true } } },
+        select: { id: true, name: true, slug: true, category: true, status: true, currentVersionId: true, updatedAt: true, _count: { select: { versions: true } } },
       });
-      return { items: rows.map((t: any) => ({ id: t.id, name: t.name, category: t.category, status: t.status, versionCount: t._count.versions, updatedAt: t.updatedAt })) };
+      return { items: rows.map((t: any) => ({ id: t.id, name: t.name, slug: t.slug ?? null, category: t.category, status: t.status, versionCount: t._count.versions, updatedAt: t.updatedAt })) };
     });
   }
 

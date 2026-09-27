@@ -477,7 +477,7 @@ export function ContractTemplateSlugsPage() {
   const canManage = allows(me.data, 'proposals.library.manage');
   const templates = useQuery({ queryKey: ['proposal-templates'], queryFn: proposalAdminApi.templates });
   const contracts = useQuery({ queryKey: ['contract-templates'], queryFn: proposalAdminApi.contractTemplates, enabled: canManage });
-  /** Slugs posés pendant la session (l'API de liste des contrats types n'expose pas encore le slug). */
+  /** Slugs posés pendant la session (affichage immédiat, avant rechargement de la liste). */
   const [assigned, setAssigned] = useState<Record<string, string | null>>({});
   const [choice, setChoice] = useState<Record<string, string>>({});
   const put = useMutation({
@@ -535,7 +535,7 @@ export function ContractTemplateSlugsPage() {
               })}
             </Table>
             <p className="mt-2 text-xs text-ink-faint">
-              État connu d’après la liste des contrats types et les associations faites ici ; si un slug a été posé ailleurs et n’apparaît pas, réassociez-le.
+              État d’après la liste des contrats types (slug) et les associations faites ici.
             </p>
           </Card>
           <ErrorNote>{errorMessage(put.error)}</ErrorNote>

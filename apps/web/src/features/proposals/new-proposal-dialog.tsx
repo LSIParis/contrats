@@ -51,6 +51,7 @@ export function NewProposalDialog({ onClose, customers, canCreateCustomer }: { o
       if (mode === 'prospect') {
         const created = await apiPost<{ id: string }>('/v1/customers', {
           name: prospectName.trim(),
+          commercialStatus: 'PROSPECT',
           ...(prospectSiren.trim() ? { siren: prospectSiren.trim() } : {}),
         });
         cid = created.id;

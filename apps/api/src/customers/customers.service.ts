@@ -48,11 +48,14 @@ export class CustomersService {
       // Champs v2 (migration 19) : posés APRÈS la création, dans le scope de
       // l'utilisateur — la fonction SECURITY DEFINER de création (migration 12)
       // reste inchangée.
-      if (dto.isConsumer !== undefined || dto.externalRef !== undefined) {
+      if (dto.isConsumer !== undefined || dto.externalRef !== undefined || dto.commercialStatus !== undefined) {
         try {
           await tx.customer.update({
             where: { id: created.id },
-            data: { isConsumer: dto.isConsumer ?? false, externalRef: dto.externalRef ?? null },
+            data: {
+              isConsumer: dto.isConsumer ?? false, externalRef: dto.externalRef ?? null,
+              ...(dto.commercialStatus ? { commercialStatus: dto.commercialStatus } : {}),
+            },
           });
         } catch (e: any) {
           if (e?.code === 'P2002') throw new ConflictException('Référence externe déjà utilisée');
@@ -61,7 +64,7 @@ export class CustomersService {
       }
       return tx.customer.findUniqueOrThrow({
         where: { id: created.id },
-        select: { id: true, name: true, siren: true, country: true, isConsumer: true, externalRef: true },
+        select: { id: true, name: true, siren: true, country: true, isConsumer: true, externalRef: true, commercialStatus: true },
       });
     });
   }

@@ -36,6 +36,14 @@ describe('clients v2', () => {
     await http().post('/v1/customers').set('x-lsi-session', 'cv2-admin').send({ name: 'B', externalRef: 'CH-DUP' }).expect(409);
   });
 
+  test('prospect créé depuis une proposition : statut commercial PROSPECT ; valeur inconnue refusée', async () => {
+    const res = await http().post('/v1/customers').set('x-lsi-session', 'cv2-admin').send({ name: 'Prospect SAS', commercialStatus: 'PROSPECT' }).expect(201);
+    expect(res.body.commercialStatus).toBe('PROSPECT');
+    await http().post('/v1/customers').set('x-lsi-session', 'cv2-admin').send({ name: 'X', commercialStatus: 'FORMER_CLIENT' }).expect(400);
+    const def = await http().post('/v1/customers').set('x-lsi-session', 'cv2-admin').send({ name: 'Client SAS' }).expect(201);
+    expect(def.body.commercialStatus).toBe('CLIENT');
+  });
+
   test('par défaut un client est professionnel', async () => {
     const res = await http().post('/v1/customers').set('x-lsi-session', 'cv2-admin').send({ name: 'SARL Pro' }).expect(201);
     expect(res.body.isConsumer).toBe(false);
