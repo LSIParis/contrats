@@ -529,3 +529,170 @@ prix non décroissant). Aucun appel réseau.
 | V2-H21 | Récurrences par défaut : `UNIT`/`TIERED` mensuelles, `HOURLY`/`HOUR_PACK` ponctuelles (à l'usage). | usage MSP courant | champ `recurrence` sur la ligne |
 | V2-H22 | Les dates du moteur sont des dates **calendaires** (pas d'instant) ; la conversion `Europe/Paris` se fait à la frontière API. | aucun fuseau dans une règle de prix | — |
 | V2-H23 | Une valeur d'indice simulée sans date de publication est réputée publiée le 1er jour de sa période. | permet de simuler une révision à venir | préciser `publishedAt` |
+
+Reportées dans `00-architecture.md` §6 avec celles du lot 3 (§17.9).
+
+## 17. Persistance et API (lot 3)
+
+Le moteur reste pur ; `apps/api/src/pricing/` le branche sur la base.
+Migration `00000000000021_tarification`, services, API interne `/v1`.
+
+### 17.1 Tables (migration 21)
+
+| Table | Classe | Rôle et garanties portées par la base |
+|---|---|---|
+| `price_indexes` | tenant | série d'indice (`code` unique par tenant, `connector` JSON sans secret) ; pas de DELETE |
+| `price_index_values` | tenant | valeur (période `YYYY-MM`, `numeric(18,6)`, `published_at`, source `MANUAL`/`IMPORT`) ; **append-only** (UPDATE/DELETE révoqués) ; correction = nouvelle ligne `supersedes_id` + motif : UNIQUE (série, période, révision), UNIQUE (`supersedes_id`), FK composite « même série, même période » → l'historique est une **chaîne** ; la valeur retenue est sa pointe |
+| `pricing_rules` | tenant | catalogue (`code` = `id` de règle du moteur, `type`, `definition` JSON) ; interne ; archivage au lieu de DELETE |
+| `pricing_schedules` | customer | version (contrat, n°) `DRAFT` → `ACTIVE` → `SUPERSEDED` ; **EXCLUDE gist** `(contract_id =, daterange &&)` sur les versions non DRAFT : deux versions engagées ne couvrent jamais un même jour ; trigger : une version engagée est immuable, sauf sa **clôture** (SUPERSEDED, fin de validité posée ou avancée) ; `commitment_months` (remises d'engagement) |
+| `pricing_lines` | customer | colonnes typées (`article_code`, `kind`, `mode`, `vat_rate_percent`, `quantity` / `quantity_source`, `unit_price numeric(20,6)`) + `params` JSON (`tiers`, `rule`, `formula`, `revision`, `hourPack`, `discount` — types du moteur) ; **`line_key` stable** entre versions = `lineId` du moteur ; trigger : lignes figées avec leur version |
+| `price_overrides` | customer | dérogation bornée (`valid_to` NOT NULL), motif non vide, `line_key` ; **CHECK `approved_by_user_id <> author_user_id`** (idem pour le refus) ; CHECK statut ↔ validation ; prix, période, motif, auteur figés (GRANT UPDATE limité aux colonnes de décision) ; pas de DELETE |
+
+RLS `ENABLE` + `FORCE` + politique `TO lsi_app` (`USING` + `WITH CHECK`) sur
+les six tables. Le portail client pourra **lire** barème, lignes et indices de
+ses contrats (écriture interne seulement) ; règles et dérogations sont
+internes (grilles de tous les clients, motifs). Un calcul pour le portail
+passera par un scope SYSTEM borné au client.
+
+### 17.2 `priceAt(contractId, date)` et sa réponse
+
+`PricingService` : instantané sous `withScope` (versions engagées, lignes,
+indices référencés repliés à la pointe de chaîne, dérogations ACTIVE,
+catalogue, paramètres `pricing.*` via `TenantConfigService`) →
+`resolveQuantities` (hors transaction) → `priceAt` du moteur → `toJsonSafe`.
+
+`GET /v1/contracts/{id}/pricing?at=YYYY-MM-DD&trace=true&version=N` (`at` par
+défaut : aujourd'hui à Paris ; `version` prévisualise une seule version,
+brouillon compris) :
+
+```json
+{
+  "contractId": "…", "date": "2026-09-15", "scheduleId": "…", "scheduleVersion": 1,
+  "scheduleValidFrom": "2025-09-15", "scheduleValidTo": null, "currency": "EUR",
+  "settings": { "rounding": "HALF_AWAY_FROM_ZERO", "unitPriceScale": 6, "overrideApprovalThresholdPercent": "10", "indexLookup": "LATEST_PUBLISHED" },
+  "lines": [{ "lineId": "infogerance", "code": "INFOG", "label": "…", "unit": "mois", "kind": "FLAT_MONTHLY",
+              "mode": "MANUAL", "recurrence": "MONTHLY", "quantity": "1", "unitPrice": "1288.666407",
+              "vatRatePercent": "20", "totalHtCents": "128867", "trace": ["…"] }],
+  "totals": { "htCents": "128867", "vatCents": "25773", "ttcCents": "154640", "vatByRate": ["…"],
+              "monthlyRecurringCents": "128867", "annualRecurringCents": "1546404" },
+  "pendingOverrides": []
+}
+```
+
+**Monnaie en JSON** : prix unitaires en chaînes décimales (euros, au moins
+`unitPriceScale` décimales : `"1250.000000"`) ; totaux en **chaînes d'entiers
+de centimes**. Jamais de nombre JSON pour de la monnaie. Sans `trace=true`,
+les lignes n'ont pas de `trace`. L'exemple §6.3 est asserté à l'identique sur
+HTTP (`apps/api/tests/isolation/pricing.test.ts`).
+
+Erreurs du moteur → corps RFC 9457 (`type` `urn:lsi:contrats:pricing:<code>`,
+`title`, `status`, `detail`) + `code` et `details` : `NO_SCHEDULE` 404 ;
+`INDEX_*`, `MISSING_QUANTITY`, `QUANTITY_UNAVAILABLE`, `RULE_NOT_FOUND` 409 ;
+le reste 422.
+
+### 17.3 Dérogations : flux de double validation
+
+1. `POST …/pricing/overrides` (`pricing.write`) : motif, période bornée, prix
+   (règles `validateOverride` du moteur). La ligne doit exister à `validFrom`.
+   Prix de référence = prix calculé **sans dérogation** à `validFrom` ; écart
+   comparé **strictement** au seuil `pricing.overrideApprovalThresholdPercent`
+   (défaut 10). Sous le seuil : `ACTIVE` (+ `pricing.revised`) ; au-delà :
+   `PENDING_APPROVAL`.
+2. `…/overrides/{oid}/approve` (`pricing.override.approve`, admin) par un
+   utilisateur **distinct de l'auteur** (403 sinon ; CHECK en base) →
+   `ACTIVE`. Mise à jour conditionnelle : deux validations concurrentes → 409.
+3. `…/reject` (motif obligatoire) → `REJECTED` ; `…/cancel` (`pricing.write`) → `CANCELLED`.
+
+Au calcul, une dérogation `PENDING_APPROVAL` n'est **jamais** transmise au
+moteur (V2-H29) ; elle figure dans la trace de la ligne (`OVERRIDE_SKIPPED`,
+`REQUIRES_SECOND_APPROVAL`) et dans `pendingOverrides`. Une dérogation
+`ACTIVE` sans validateur dont l'écart dépasse le seuil à une date ultérieure
+(après révision) est écartée par le moteur avec la même trace ; elle peut
+alors être validée.
+
+### 17.4 Quantités : brancher un vrai `QuantityProvider`
+
+Jeton `QUANTITY_PROVIDER` (`apps/api/src/pricing/quantity-provider.ts`) ; le
+service dépend du port du moteur. Défaut : `ManualQuantityProvider` (les
+lignes `FIXED` portent leur quantité ; une ligne `PROVIDER` sans connecteur →
+409 `QUANTITY_UNAVAILABLE`, jamais 0). `contractRef` = **id du contrat**.
+Pour le RMM de Client Help (§9) : écrire `ClientHelpRmmQuantityProvider`
+dans `apps/api/src/pricing/`, qui résout `contractRef` → `Customer.externalRef`
+par une lecture `withScope(systemScope(…))`, et le déclarer dans
+`app.module.ts` (`{ provide: QUANTITY_PROVIDER, useClass: … }`, conditionné à
+la présence de sa clé, comme les autres adaptateurs). Tests :
+`overrideProvider(QUANTITY_PROVIDER)` + fixtures JSON, sans réseau. Rien de
+l'API du RMM n'est supposé ici.
+
+### 17.5 Indices et connecteur d'import
+
+- Saisie : `POST /v1/price-indexes/{code}/values` `{ period, value, publishedAt }` ;
+  période déjà publiée → 409 `PERIOD_ALREADY_PUBLISHED`. Correction :
+  `{ …, supersedesId, correctionReason }` sur la valeur **courante** (sinon 409).
+- Import : `POST /v1/price-indexes/{code}/values/import`, multipart `file`.
+  Port `IndexConnector` (`index-connector.ts`), registre `INDEX_CONNECTORS`,
+  choisi par `price_indexes.connector.type` (défaut `CSV`). `CsvIndexConnector` :
+  `period;value[;publishedAt]`, séparateur et virgule décimale paramétrables,
+  en-tête, commentaires et BOM tolérés, ≤ 1 000 lignes. **Tout ou rien** : une
+  ligne invalide, un doublon dans le fichier ou une valeur contredisant une
+  période publiée → 422 `INVALID_IMPORT` avec erreurs numérotées, rien n'est
+  écrit ; une valeur identique à l'existant est ignorée (ré-import idempotent).
+  Aucun connecteur n'ouvre le réseau ; un connecteur INSEE s'ajouterait au
+  registre sans toucher au service.
+
+### 17.6 API interne — récapitulatif
+
+| Méthode | Chemin | Droit |
+|---|---|---|
+| GET | `/v1/contracts/{id}/pricing/schedules` (+ `nextRevisionDate`) | `contracts.read` |
+| POST | `/v1/contracts/{id}/pricing/schedules` (brouillon : `lines` ou `copyFromVersion`) | `pricing.write` |
+| PUT, DELETE | `/v1/contracts/{id}/pricing/schedules/{n}` (brouillon seulement, sinon 409) | `pricing.write` |
+| POST | `/v1/contracts/{id}/pricing/schedules/{n}/activate` | `pricing.write` |
+| GET | `/v1/contracts/{id}/pricing?at=&trace=&version=` | `contracts.read` |
+| POST | `/v1/contracts/{id}/pricing/simulate` `{ at, beforeDate?, changes, trace? }` | `pricing.simulate` |
+| POST | `/v1/pricing/quote` `{ contractId? \| customerId?, articleCode, quantity, date?, ruleCode? }` | `pricing.simulate` |
+| GET, POST | `/v1/contracts/{id}/pricing/overrides` | `contracts.read`, `pricing.write` |
+| POST | `…/overrides/{oid}/approve`, `…/reject` | `pricing.override.approve` |
+| POST | `…/overrides/{oid}/cancel` | `pricing.write` |
+| GET, POST | `/v1/price-indexes`, `/v1/price-indexes/{code}/values`, `…/values/import` | `contracts.read`, `pricing.indexes.manage` |
+| GET, POST, PUT | `/v1/pricing-rules`, `/v1/pricing-rules/{code}`, `…/{code}/archive` | `contracts.read`, `pricing.rules.manage` |
+
+Activation d'une version : le moteur la calcule à sa date d'effet (erreur
+structurelle → 422, ex. `FORMULA_SYNTAX`) ; les versions engagées antérieures
+qui la chevauchent sont clôturées la veille (SUPERSEDED) ; une version engagée
+commençant le même jour ou après → 409 `SCHEDULE_OVERLAP` ; une course est
+tranchée par la contrainte d'exclusion (409). Puis `pricing.revised` et
+recalcul de l'échéancier.
+
+Catalogue : `definition` validée par type (champs de `PricingRule`) ; pas de
+suppression, archivage (la règle reste résoluble pour les barèmes qui la citent).
+
+Devis : le barème du contrat fait foi s'il porte l'article (contrat désigné,
+ou **unique** contrat du client portant l'article à la date — plusieurs →
+409) ; sinon la grille GRID du catalogue (plusieurs → 409, préciser
+`ruleCode`). La future route publique `POST /api/v1/pricing/quote` appellera
+ce service.
+
+### 17.7 Événement `pricing.revised` et échéancier
+
+`PricingEvents.publish` (après commit) : entrée `pricing.revised` dans la
+piste d'audit chaînée (source durable pour le lot webhooks) + abonnés
+`onPricingRevised(listener)`, point de branchement du dispatcher de webhooks
+sortants. Causes : `SCHEDULE_ACTIVATED`, `OVERRIDE_EFFECTIVE`,
+`OVERRIDE_CANCELLED`. Les mutations HTTP restent auditées par l'`AuditInterceptor`.
+
+`DeadlinesService.nextRevision` appelle `PricingService.nextRevisionDate` :
+date de révision à venir des versions engagées en vigueur ; une fois passée,
+sur une version sans fin, l'anniversaire suivant (V2-H24) → échéance
+`PRICE_REVISION` et ses alertes.
+
+### 17.8 Hypothèses du lot 3
+
+| # | Hypothèse | Impact si fausse |
+|---|---|---|
+| V2-H24 | Révision annuelle : une date de révision passée, sur une version sans fin, annonce la suivante à la date anniversaire. | périodicité par ligne |
+| V2-H25 | Import d'indice sans date de publication : publiée le jour de l'import (seule date certaine). Pour une reprise d'historique, fournir la 3ᵉ colonne. | — |
+| V2-H26 | Devis catalogue sans taux précisé : TVA 20 %. | passer `vatRatePercent` |
+| V2-H27 | Le catalogue de règles est l'état courant : modifier une grille modifie le prix des lignes RULE qui la citent, à toute date. Figer = ligne MANUAL ou une grille par millésime. | versionner le catalogue |
+| V2-H28 | Une correction de valeur d'indice vaut rétroactivement (erratum), y compris pour rejouer une date passée. | rejouer « tel que connu à la date » |
+| V2-H29 | Une dérogation EN ATTENTE n'est jamais appliquée, même si l'écart à la date retombe sous le seuil. | la transmettre au moteur |
