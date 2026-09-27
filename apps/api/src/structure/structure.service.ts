@@ -214,17 +214,7 @@ export class StructureService {
       // EDIT_CONTENT passe par la machine : APPROVED → DRAFT (validation
       // invalidée), IN_NEGOTIATION reste en négociation (validation invalidée),
       // tout autre état non éditable → 409 (verrouillage en signature, V2-LOCK).
-      const event: ContractEvent = { type: 'EDIT_CONTENT', actorUserId: scope.userId };
-      let next;
-      try {
-        next = applyEvent(toContractSnapshot(c), event, now);
-      } catch (e) {
-        if (e instanceof InvalidTransitionError) {
-          throw new ConflictException({ code: 'RM-04', detail: `Le contenu d’un contrat « ${c.status} » n’est pas modifiable.`, allowedTransitions: e.allowedTransitions });
-        }
-        if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message });
-        throw e;
-      }
+      const { event, next } = editContent(c, scope.userId, now);
 
       const prev = c.currentVersionId
         ? await tx.contractVersion.findUnique({ where: { id: c.currentVersionId }, select: { variables: true } })
@@ -250,6 +240,53 @@ export class StructureService {
         values, custom, now, scope.userId, input.changeSummary ?? null,
       );
       await persistTransition(tx, contractId, event, { ...next, currentVersionId: versionId }, now, scope.userId);
+      return this.summary(tx, contractId, versionId);
+    });
+  }
+
+  /**
+   * Clauses rédigées par IA (lot 6) : ajoutées au contenu courant ou le
+   * remplaçant ; annexes et variables conservées. Chaque clause porte son
+   * origine AI, son risque, sa justification et ses sources ; la revue
+   * humaine clause par clause reste obligatoire avant soumission (V2-AI).
+   */
+  async saveAiClauses(
+    scope: Scope,
+    contractId: string,
+    aiClauses: Omit<ClauseInput, 'clauseKey' | 'origin' | 'sourceClauseVersionId'>[],
+    mode: 'replace' | 'append',
+    changeSummary: string,
+    now: Date,
+  ) {
+    return withScope(scope, async (tx) => {
+      const c = await tx.contract.findUnique({ where: { id: contractId } });
+      if (!c) throw new NotFoundException('Contrat introuvable');
+      const { event, next } = editContent(c, scope.userId, now);
+      const prev = c.currentVersionId
+        ? await tx.contractVersion.findUnique({
+            where: { id: c.currentVersionId },
+            include: { clauses: { orderBy: { position: 'asc' } }, annexes: { orderBy: { position: 'asc' } } },
+          })
+        : null;
+      const kept: ClauseInput[] = mode === 'append' && prev
+        ? prev.clauses.map((cl) => ({
+            clauseKey: cl.clauseKey, title: cl.title, category: cl.category, bodyHtml: cl.bodyHtml, origin: cl.origin,
+            sourceClauseVersionId: cl.sourceClauseVersionId, aiRisk: cl.aiRisk, aiJustification: cl.aiJustification, aiSources: cl.aiSources,
+          }))
+        : [];
+      const added: ClauseInput[] = aiClauses.map((cl) => ({
+        ...cl, clauseKey: `AI-${uuidv7().slice(-10).toUpperCase()}`, origin: 'AI', sourceClauseVersionId: null,
+      }));
+      const prevVars = (prev?.variables ?? {}) as { values?: Record<string, unknown>; custom?: Record<string, VariableType> };
+      const max = await tx.contractVersion.aggregate({ where: { contractId }, _max: { versionNumber: true } });
+      const versionId = uuidv7();
+      await this.writeVersion(
+        tx, contractId, versionId, (max._max.versionNumber ?? 0) + 1, [...kept, ...added],
+        (prev?.annexes ?? []).map((a) => ({ kind: a.kind, title: a.title, bodyHtml: a.bodyHtml, data: a.data })),
+        prevVars.values ?? {}, prevVars.custom ?? {}, now, scope.userId, changeSummary,
+      );
+      await persistTransition(tx, contractId, event, { ...next, currentVersionId: versionId }, now, scope.userId);
+      if (mode === 'replace' && c.origin === 'NATIVE') await tx.contract.update({ where: { id: contractId }, data: { origin: 'AI' } });
       return this.summary(tx, contractId, versionId);
     });
   }
@@ -438,4 +475,22 @@ function monthsBetween(start: Date, end: Date): number {
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+}
+
+/**
+ * EDIT_CONTENT passe par la machine : APPROVED → DRAFT (validation
+ * invalidée), IN_NEGOTIATION reste en négociation (validation invalidée),
+ * tout autre état non éditable → 409 (verrouillage en signature, V2-LOCK).
+ */
+function editContent(c: Parameters<typeof toContractSnapshot>[0], userId: string, now: Date) {
+  const event: ContractEvent = { type: 'EDIT_CONTENT', actorUserId: userId };
+  try {
+    return { event, next: applyEvent(toContractSnapshot(c), event, now) };
+  } catch (e) {
+    if (e instanceof InvalidTransitionError) {
+      throw new ConflictException({ code: 'RM-04', detail: `Le contenu d’un contrat « ${c.status} » n’est pas modifiable.`, allowedTransitions: e.allowedTransitions });
+    }
+    if (e instanceof BusinessRuleError) throw new ConflictException({ code: e.code, detail: e.message });
+    throw e;
+  }
 }

@@ -4,6 +4,7 @@ import type {
   CompareClauseInput,
   DetectMissingClausesInput,
   ExplainClauseInput,
+  ImportExtractInput,
   RephraseClauseInput,
   StructuredDraftInput,
   TemplateClauseInput,
@@ -12,6 +13,7 @@ import {
   CompareOutputSchema,
   DraftOutputSchema,
   ExplainOutputSchema,
+  ImportExtractOutputSchema,
   MissingClausesOutputSchema,
   RephraseOutputSchema,
   SCHEMA_NAMES,
@@ -132,4 +134,12 @@ export function buildMissingClausesTask(input: DetectMissingClausesInput) {
     ].join('\n\n'),
     true,
   );
+}
+
+export const IMPORT_EXTRACT_TASK = `Tâche : le texte fourni est la transcription (OCR, possiblement imparfaite) d'un contrat DÉJÀ SIGNÉ. Relève les informations demandées par le schéma, TELLES QU'ELLES FIGURENT dans le document, sans rien déduire ni compléter.
+Pour chaque champ, recopie dans excerpt le passage exact (mot pour mot, y compris les fautes d'OCR et les jetons) qui justifie la valeur. Si l'information est absente ou ambiguë, laisse value ET excerpt vides.
+N'utilise aucune recherche : seul le document fait foi.`;
+
+export function buildImportExtractTask(input: ImportExtractInput) {
+  return task(SCHEMA_NAMES.importExtract, ImportExtractOutputSchema, IMPORT_EXTRACT_TASK, `Document :\n\n${input.text}`, false);
 }

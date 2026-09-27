@@ -100,6 +100,10 @@ import { TemplatesController } from './templates/templates.controller.js';
 import { TemplatesService } from './templates/templates.service.js';
 import { AiDraftingController } from './ai-drafting/ai-drafting.controller.js';
 import { AiDraftingService } from './ai-drafting/ai-drafting.service.js';
+import { AiGateway, DRAFTING_REGISTRY } from './ai-drafting/ai-gateway.service.js';
+import { ContractAiController } from './ai-drafting/contract-ai.controller.js';
+import { ContractAiService } from './ai-drafting/contract-ai.service.js';
+import { DraftingProviderRegistry } from './ai-drafting/drafting-provider-registry.js';
 import { CONTRACT_DRAFTER } from './ai-drafting/contract-drafter.port.js';
 import { ClaudeContractDrafter } from './ai-drafting/claude-contract-drafter.js';
 import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-drafter.js';
@@ -150,6 +154,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     PricingCatalogController,
     TemplatesController,
     AiDraftingController,
+    ContractAiController,
     WebhooksAdminController,
   ],
   providers: [
@@ -192,6 +197,11 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     AuditReadService,
     TemplatesService,
     AiDraftingService,
+    AiGateway,
+    ContractAiService,
+    // Registre unique des fournisseurs structurés (Perplexity, Claude) : vit
+    // aussi longtemps que le processus (schémas préparés côté fournisseur).
+    { provide: DRAFTING_REGISTRY, useFactory: () => new DraftingProviderRegistry(process.env) },
     {
       // Claude si la clé est fournie (prod), sinon un adaptateur qui renvoie 503.
       // Le service dépend du PORT, pas de l'adaptateur : en test, le port est

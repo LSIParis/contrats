@@ -1,5 +1,5 @@
 import type { KnownEntities } from '@lsi/domain';
-import type { ClauseCategory, CompareOutput, ExplainOutput, MissingClausesOutput, RiskLevel } from './drafting-schemas.js';
+import type { ClauseCategory, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput, RiskLevel } from './drafting-schemas.js';
 
 /**
  * Port de rédaction IA STRUCTURÉE (brief §6). Coexiste avec l'ancien port
@@ -87,6 +87,11 @@ export interface DetectMissingClausesInput extends CommonInput {
   readonly templateClauses: readonly TemplateClauseInput[];
 }
 
+/** Texte OCR d'un contrat importé, DÉJÀ pseudonymisé par l'appelant. */
+export interface ImportExtractInput extends CommonInput {
+  readonly text: string;
+}
+
 export interface DraftedClause {
   readonly title: string;
   readonly text: string;
@@ -156,4 +161,5 @@ export interface ContractDraftingProvider {
   explainClause(input: ExplainClauseInput): Promise<AiCallResult<ExplainOutput>>;
   compareClause(input: CompareClauseInput): Promise<AiCallResult<CompareOutput>>;
   detectMissingClauses(input: DetectMissingClausesInput): Promise<AiCallResult<MissingClausesOutput>>;
+  extractImportMetadata(input: ImportExtractInput): Promise<AiCallResult<ImportExtractOutput>>;
 }

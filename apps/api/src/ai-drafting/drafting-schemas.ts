@@ -130,4 +130,28 @@ export const SCHEMA_NAMES = {
   explain: 'clause_explain_v1',
   compare: 'clause_compare_v1',
   missing: 'missing_clauses_v1',
+  importExtract: 'import_extract_v1',
 } as const;
+
+/**
+ * Extraction assistée des métadonnées d'un contrat IMPORTÉ (brief §3.4).
+ * Chaque champ porte l'extrait EXACT du document qui le justifie ; chaîne
+ * vide = non trouvé. Une valeur sans extrait retrouvé mot pour mot dans le
+ * document est écartée côté serveur (garde-fou contre l'invention).
+ */
+const found = (desc: string) =>
+  z.object({
+    value: z.string().max(300).describe(desc),
+    excerpt: z.string().max(400).describe('Extrait EXACT du document (copié mot pour mot) qui justifie la valeur ; chaîne vide si non trouvé.'),
+  });
+export const ImportExtractOutputSchema = z.object({
+  dateSignature: found('Date de signature, format AAAA-MM-JJ ; chaîne vide si absente.'),
+  dateEffet: found("Date de prise d'effet, format AAAA-MM-JJ ; chaîne vide si absente."),
+  dureeMois: found('Durée initiale en MOIS, nombre entier écrit en chiffres ; chaîne vide si absente.'),
+  reconduction: found('TACITE, EXPRESSE ou AUCUNE ; chaîne vide si le document ne dit rien.'),
+  preavis: found('Préavis sous la forme « <nombre> JOURS » ou « <nombre> MOIS » ; chaîne vide si absent.'),
+  montantMensuelHt: found('Montant mensuel HORS TAXES tel qu’écrit (jeton [MONTANT_n] compris) ; chaîne vide si absent.'),
+  montantAnnuelHt: found('Montant annuel HORS TAXES tel qu’écrit (jeton [MONTANT_n] compris) ; chaîne vide si absent.'),
+  indiceRevision: found('SYNTEC, ICHT, IPC, BT01, ILAT, ILC ou PSDC ; chaîne vide si aucun indice.'),
+});
+export type ImportExtractOutput = z.infer<typeof ImportExtractOutputSchema>;

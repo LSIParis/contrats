@@ -196,6 +196,8 @@ isolation → souveraineté → réversibilité).
 | V2-H27 | Le catalogue de règles est l'état courant (non versionné) : le figer = ligne MANUAL ou grille par millésime. | simplicité | versionner le catalogue |
 | V2-H28 | Une correction de valeur d'indice vaut rétroactivement (erratum). | une correction corrige une erreur | rejouer « tel que connu à la date » |
 | V2-H29 | Une dérogation en attente de seconde validation n'est jamais appliquée, même si l'écart retombe sous le seuil. | sens le plus prudent | la transmettre au moteur |
+| V2-H30 | L'extraction assistée par LLM d'un import est déclenchée par une action explicite, jamais automatiquement par le job OCR. | envoyer un document client à un sous-traitant se décide au cas par cas | l'enchaîner à l'OCR quand `contrats.ai.enabled` est actif |
+| V2-H31 | Une rédaction IA en mode `replace` fait passer `contracts.origin` de `NATIVE` à `AI` ; `append` ne la change pas. | l'origine qualifie le texte dominant | champ dédié |
 
 ## 7. Ce qui n'est pas dans le périmètre
 

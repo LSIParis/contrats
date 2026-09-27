@@ -376,6 +376,7 @@ model Tenant {
   settings     TenantSetting[]
   clauseItems  ClauseLibraryItem[]
   priceIndexes PriceIndex[]
+  aiUsage      AiUsage[]
   pricingRules PricingRule[]
 
   webhookSubscriptions WebhookSubscription[]
@@ -1753,3 +1754,53 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
+
+// ===========================================================================
+// Lot 6 : usage de l'assistance IA (migration 26)
+// ===========================================================================
+
+enum AiOperation {
+  DRAFT
+  REPHRASE
+  HARDEN
+  EXPLAIN
+  COMPARE
+  MISSING
+  IMPORT_EXTRACT
+}
+
+enum AiCallStatus {
+  OK
+  NOT_CONFIGURED
+  AUTH
+  BAD_REQUEST
+  RATE_LIMIT
+  TIMEOUT
+  SCHEMA_VIOLATION
+  UPSTREAM
+  LEAK_BLOCKED
+}
+
+/// Un appel au fournisseur IA (réussi ou non) : coût, jetons, durée. Aucun texte.
+model AiUsage {
+  id              String       @id @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  userId          String?      @map("user_id") @db.Uuid
+  contractId      String?      @map("contract_id") @db.Uuid
+  operation       AiOperation
+  provider        String
+  model           String?
+  schemaName      String?      @map("schema_name")
+  status          AiCallStatus
+  inputTokens     Int          @default(0) @map("input_tokens")
+  outputTokens    Int          @default(0) @map("output_tokens")
+  costUsd         Decimal?     @map("cost_usd") @db.Decimal(12, 6)
+  toolInvocations Json?        @map("tool_invocations")
+  durationMs      Int          @map("duration_ms")
+  createdAt       DateTime     @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, createdAt], map: "ai_usage_tenant_month_idx")
+  @@map("ai_usage")
+}

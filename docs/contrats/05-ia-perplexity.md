@@ -29,8 +29,9 @@ Deux ports coexistent :
 | `ContractDrafter.draft()` (historique) | brouillon HTML d'un **modèle** avec variables `{{…}}` | Claude, Unavailable |
 | `ContractDraftingProvider` (nouveau) | rédaction **structurée** d'un contrat client : `draftStructured`, `rephraseClause`, `explainClause`, `compareClause`, `detectMissingClauses` | **Perplexity** (défaut), Claude, Unavailable |
 
-`DraftingProviderRegistry` (classe simple, non câblée dans `app.module`) rend le
-fournisseur selon les clés présentes et la préférence du tenant.
+`DraftingProviderRegistry` rend le fournisseur selon les clés présentes et la préférence du
+tenant. Depuis le lot 6 il est câblé (`DRAFTING_REGISTRY`, une instance par processus) et n'est
+appelé qu'à travers `AiGateway` (§16).
 
 ## 2. Contrat de l'API Perplexity — vérifié le 2026-09-26
 
@@ -693,8 +694,25 @@ dégradé ; bon de commande lacunaire). Le test vérifie chaque valeur attendue 
 l'extrait exact du texte à la position annoncée.
 
 L'écran de validation côte à côte (PDF / champs) reste obligatoire : aucun contrat importé ne passe
-`ACTIVE` sans validation humaine. L'extraction par LLM, optionnelle (`contrats.ai.enabled`), ne
-recevrait que le texte pseudonymisé et les mêmes garde-fous.
+`ACTIVE` sans validation humaine.
+
+### 11.1 Extraction assistée par LLM (lot 6)
+
+`POST /v1/contracts/:id/import/ai-extract` — **action explicite** d'un utilisateur (`contracts.import`),
+jamais automatique dans le job OCR : l'envoi d'un document client à un sous-traitant se décide
+document par document (hypothèse V2-H30).
+
+1. Texte OCR relu depuis le stockage (60 000 caractères au plus), pseudonymisé avec les entités du
+   client (raison sociale, SIREN, TVA, adresse, contacts) ; `assertNoLeak` avant l'envoi.
+2. Schéma `import_extract_v1` : pour chaque champ, `{value, excerpt}` ; chaîne vide = non trouvé ;
+   aucune recherche web.
+3. Réponse réidentifiée, puis **interprétée strictement** (`interpretExtraction`) : une valeur n'est
+   retenue que si son `excerpt` figure mot pour mot dans le texte OCR (espaces normalisés) et si elle
+   se laisse analyser (date ISO, entier de mois, `TACITE/EXPRESSE/AUCUNE`, `<n> JOURS|MOIS`, montant,
+   indice connu). Confiance fixe 0,6, `method: 'LLM'`.
+4. Fusion : **seuls les champs encore vides** sont complétés — la saisie au dépôt et les règles
+   locales priment. `extractionMethod` passe à `RULES+LLM` si au moins un champ a été ajouté.
+
 
 ## 12. Alternative Claude
 
@@ -712,8 +730,8 @@ fournisseur à l'autre (transfert de données vers un sous-traitant non choisi).
 
 ## 13. Coût et usage par tenant
 
-Chaque appel renvoie `usage` ; à persister dans une table `AiUsage` (à créer par le lead dev, schéma
-Prisma hors périmètre de cette passe) :
+Chaque appel (réussi ou non) est journalisé dans `ai_usage` (migration 26, RLS tenant, jamais visible
+d'un client, append-only : `UPDATE`/`DELETE` révoqués à `lsi_app`). **Aucun texte** n'y est stocké :
 
 | Champ | Source |
 |---|---|
@@ -727,8 +745,10 @@ Prisma hors périmètre de cette passe) :
 | `status` (`OK`, `AUTH`, `RATE_LIMIT`, `TIMEOUT`, `SCHEMA_VIOLATION`, `UPSTREAM`, `LEAK_BLOCKED`) | résultat / `err.kind` |
 | `durationMs`, `createdAt`, `upstreamRequestId?` | mesure / en-tête `X-Request-ID` |
 
-Budget : plafond mensuel par tenant (`contrats.ai.monthlyBudgetUsd`) vérifié **avant** l'appel ;
-dépassement → refus explicite, pas d'appel.
+Budget : plafond mensuel par tenant (paramètre `ai.monthlyBudgetUsd`, mois civil UTC, somme de
+`cost_usd`) vérifié **avant** l'appel ; dépassement → `429 AI_BUDGET_EXCEEDED`, pas d'appel. Un
+appel Claude (coût non communiqué) n'entre pas dans la somme : plafond à suivre par les jetons.
+Synthèse : `GET /v1/admin/ai/usage?month=AAAA-MM` (`tenant.configure`).
 
 ## 14. RGPD et conformité
 
@@ -772,3 +792,33 @@ Variables d'environnement : `PERPLEXITY_API_KEY`, `PERPLEXITY_BASE_URL` (défaut
 Fixtures `test/fixtures/perplexity/` (format `{status, headers, body}`, rejouées par un double de
 `fetch`, aucun réseau) : `success.json`, `hallucinated-url.json`, `schema-violation.json`,
 `truncated-json.json`, `error-401.json`, `error-422.json`, `error-429.json`, `timeout.json`.
+
+## 16. Câblage applicatif (lot 6)
+
+`AiGateway` est le point de passage **unique** vers un fournisseur :
+
+| Étape | Règle |
+|---|---|
+| Drapeau | `contrats.ai.enabled` coupé → `503 AI_DISABLED`, rien ne part |
+| Fournisseur | `ai.provider` du tenant (Perplexity par défaut) ; clé absente → `503`, jamais de repli vers l'autre |
+| Modèle | `ai.model` / `ai.preset` du tenant, jamais codés en dur |
+| Budget | §13, vérifié avant l'appel |
+| Journal | une ligne `ai_usage` par appel, statut `OK` ou type d'erreur (`TIMEOUT`, `LEAK_BLOCKED`…) |
+| Erreurs | `toHttpException` : 503 / 504 / 502 ; aucun brouillon partiel |
+
+`ContractAiService` (droits `contracts.aiDraft`, portefeuille respecté par la RLS) :
+
+| Route | Effet |
+|---|---|
+| `GET /v1/ai/availability` | `{enabled, provider, configured, budgetUsd, spentUsd, available}` pour l'interface |
+| `POST /v1/contracts/:id/ai/draft` `{needs, services[], contractType?, mode: replace\|append}` | rédaction structurée ; les clauses du contrat courant (ou du modèle) servent de base ; nouvelle version, clauses `origin = AI` avec risque, justification et sources ; `unreviewedAiClauses` > 0 bloque la soumission (V2-AI) jusqu'à la revue clause par clause ; `contracts.origin = AI` en mode `replace` |
+| `POST /v1/contracts/:id/clauses/:clauseKey/ai` `{action: rephrase\|harden\|explain\|compare}` | **suggestion seulement** (aucune version créée) ; `compare` confronte à la bibliothèque du tenant |
+| `POST /v1/contracts/:id/ai/missing-clauses` | clauses absentes par rapport au modèle et à l'usage |
+| `POST /v1/contracts/:id/import/ai-extract` | §11.1 |
+
+Entités pseudonymisées pour un contrat : raison sociale et nom du client, SIREN, TVA, adresse,
+contacts (noms, e-mails, téléphones) et signataires. Les catégories fines du fournisseur sont
+ramenées aux catégories du modèle de données (`DEFINITIONS → OBJET`, `PAIEMENT/REVISION → PRIX`,
+`NIVEAUX_DE_SERVICE → SLA`, `DONNEES_PERSONNELLES → RGPD`, `REVERSIBILITE → RESILIATION`, autres →
+`DIVERS`). Le texte généré est échappé puis mis en paragraphes (`textToHtml`) : aucun HTML du
+fournisseur n'entre dans le contrat.

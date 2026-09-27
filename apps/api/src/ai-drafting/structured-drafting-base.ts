@@ -1,5 +1,6 @@
 import { assertNoLeak, type KnownEntities } from '@lsi/domain';
 import type {
+  ImportExtractInput,
   AiCallResult,
   CompareClauseInput,
   ContractDraftingProvider,
@@ -19,11 +20,12 @@ import {
   buildCompareTask,
   buildDraftTask,
   buildExplainTask,
+  buildImportExtractTask,
   buildMissingClausesTask,
   buildRephraseTask,
   type StructuredTask,
 } from './drafting-prompts.js';
-import type { ClauseOutput, CompareOutput, ExplainOutput, MissingClausesOutput } from './drafting-schemas.js';
+import type { ClauseOutput, CompareOutput, ExplainOutput, ImportExtractOutput, MissingClausesOutput } from './drafting-schemas.js';
 import { stripUrlsAndMarkers } from './drafting-sources.js';
 
 /** Ce que l'adaptateur rend pour UN appel structuré, avant post-traitement commun. */
@@ -135,5 +137,10 @@ export abstract class StructuredDraftingBase implements ContractDraftingProvider
       missing: r.data.missing.map((m) => ({ ...m, reason: stripUrlsAndMarkers(m.reason).text })),
     };
     return StructuredDraftingBase.envelope(this.name, r, data, [...r.warnings]);
+  }
+
+  async extractImportMetadata(input: ImportExtractInput): Promise<AiCallResult<ImportExtractOutput>> {
+    const r = await this.run(buildImportExtractTask(input), input.selection, input.knownEntities);
+    return StructuredDraftingBase.envelope(this.name, r, r.data, [...r.warnings]);
   }
 }
