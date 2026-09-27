@@ -69,9 +69,9 @@ x-app-env: &app-env
   GOTENBERG_URL: http://gotenberg:3000
   OCR_URL: http://ocr:8080
   # DocuSeal Pro (VPS dédié)
-  DOCUSEAL_URL: ${DOCUSEAL_URL:?DOCUSEAL_URL requis (ex. https://signe.lsi-maintenance.fr/api)}
-  DOCUSEAL_API_KEY: ${DOCUSEAL_API_KEY:?}
-  DOCUSEAL_WEBHOOK_SECRET: ${DOCUSEAL_WEBHOOK_SECRET:?}
+  DOCUSEAL_URL: ${DOCUSEAL_URL:-}
+  DOCUSEAL_API_KEY: ${DOCUSEAL_API_KEY:-}
+  DOCUSEAL_WEBHOOK_SECRET: ${DOCUSEAL_WEBHOOK_SECRET:-}
   # DOCUSEAL_SIGN_URL volontairement absent : l'app la dérive de DOCUSEAL_URL
   # (une valeur vide passée ici serait prise telle quelle).
   DOCUSEAL_SIGNATURE_HEADER: ${DOCUSEAL_SIGNATURE_HEADER:-x-docuseal-signature}
@@ -81,9 +81,9 @@ x-app-env: &app-env
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   # Authentification
   DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-lsi}
-  OIDC_ISSUER: ${OIDC_ISSUER:?}
-  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?}
-  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
+  OIDC_ISSUER: ${OIDC_ISSUER:-}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
   CONTRACT_SERVICE_API_KEY: ${CONTRACT_SERVICE_API_KEY:-}
   # E-mails
   BREVO_API_KEY: ${BREVO_API_KEY:-}
@@ -105,7 +105,9 @@ services:
   #   pg_dump/pg_restore (09-exploitation.md §PostgreSQL 16 → 17).
   # ---------------------------------------------------------------------
   postgres:
-    image: postgres:17-alpine
+    # 17 par défaut ; POSTGRES_IMAGE=postgres:16-alpine pour une base existante
+    # en 16 tant que la migration pg_dump/pg_restore n'est pas faite.
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -340,6 +342,10 @@ services:
   # Image : deploy/backup. Aucun port.
   # ---------------------------------------------------------------------
   backup:
+    # Démarre seulement avec COMPOSE_PROFILES=backup (identifiants Wasabi
+    # renseignés) : une stack ne doit pas refuser de démarrer faute de
+    # sauvegarde, mais l'absence de sauvegarde doit être un choix visible.
+    profiles: ['backup']
     image: ghcr.io/${GHCR_OWNER:?}/contrats-backup:${BACKUP_TAG:-${tag:-${CONTRATS_TAG:?}}}
     restart: unless-stopped
     depends_on:
@@ -357,9 +363,9 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?}
       WASABI_ENDPOINT: ${WASABI_ENDPOINT:-https://s3.eu-west-2.wasabisys.com}
-      WASABI_BUCKET: ${WASABI_BUCKET:?}
-      WASABI_ACCESS_KEY: ${WASABI_ACCESS_KEY:?}
-      WASABI_SECRET_KEY: ${WASABI_SECRET_KEY:?}
+      WASABI_BUCKET: ${WASABI_BUCKET:-}
+      WASABI_ACCESS_KEY: ${WASABI_ACCESS_KEY:-}
+      WASABI_SECRET_KEY: ${WASABI_SECRET_KEY:-}
       UPTIME_PUSH_URL: ${UPTIME_PUSH_URL:-}
       UPTIME_RESTORE_PUSH_URL: ${UPTIME_RESTORE_PUSH_URL:-}
     networks: [internal, egress]
@@ -372,9 +378,15 @@ networks:
   edge: {}
   egress: {}
 
+# Noms de volumes explicites et surchargeables : une stack recréée (ou migrée
+# depuis l'ancienne stack `lsi-contrats`) reprend ses volumes existants au
+# lieu d'en créer de vides.
 volumes:
-  # Base PostgreSQL 17.
+  # Base PostgreSQL.
   pgdata:
+    name: ${PGDATA_VOLUME:-contrats_pgdata}
   redisdata:
+    name: ${REDIS_VOLUME:-contrats_redisdata}
   # Documents (MinIO) : originaux importés, PDF générés et signés, preuves.
   documents:
+    name: ${DOCUMENTS_VOLUME:-contrats_documents}
