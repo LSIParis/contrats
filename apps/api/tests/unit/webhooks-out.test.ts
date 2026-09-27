@@ -219,10 +219,12 @@ describe('garde SSRF', () => {
 });
 
 describe('charges utiles (contrat public, minimisées)', () => {
-  test('registre : les six événements du brief', () => {
+  test('registre : les six événements du brief §8 et les sept du brief §12.9 (propositions)', () => {
     expect([...WEBHOOK_EVENT_TYPES].sort()).toEqual([
       'contract.activated', 'contract.renewal_due', 'contract.renewed', 'contract.signed',
       'contract.terminated', 'pricing.revised',
+      'proposal.accepted', 'proposal.converted', 'proposal.declined', 'proposal.expired', 'proposal.sent',
+      'proposal.signed', 'proposal.viewed',
     ]);
   });
 

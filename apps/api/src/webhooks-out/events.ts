@@ -85,6 +85,39 @@ export const PricingRevisedDataSchema = z
   .strict();
 export type PricingRevisedData = z.infer<typeof PricingRevisedDataSchema>;
 
+/**
+ * `proposal.*` (lot 9, brief §12.9) : photographie MINIMALE d'une proposition —
+ * identifiants, numéro, statut, dates. Ni montant, ni titre libre, ni contact :
+ * le consommateur relit `GET /api/v1/proposals/{id}` avec ses propres droits.
+ */
+const PROPOSAL_STATUSES = [
+  'DRAFT', 'IN_INTERNAL_REVIEW', 'READY', 'SENT', 'VIEWED', 'IN_DISCUSSION', 'ACCEPTED', 'PENDING_SIGNATURE',
+  'SIGNED', 'CONVERTED', 'EXPIRED', 'DECLINED', 'WITHDRAWN',
+] as const;
+const proposalStatus = z.union([z.enum(PROPOSAL_STATUSES), z.string().regex(/^[A-Z_]+$/)]);
+
+export const ProposalRefSchema = z
+  .object({
+    id: z.string().uuid(),
+    /** Numéro métier (« PROP-2026-0042 »). */
+    number: z.string(),
+    status: proposalStatus,
+    previousStatus: proposalStatus.nullable(),
+    customerId: z.string().uuid(),
+    customerExternalRef: z.string().nullable(),
+    versionNumber: z.number().int().positive().nullable(),
+    expiresAt: isoInstant.nullable(),
+    /** Motif codé du refus (PRICE, COMPETITOR…) — jamais le texte libre. */
+    declineReasonCode: z.string().regex(/^[A-Z_]{2,40}$/).nullable(),
+    /** Contrat généré (proposal.converted). */
+    contractId: z.string().uuid().nullable(),
+  })
+  .strict();
+export type ProposalRef = z.infer<typeof ProposalRefSchema>;
+
+export const ProposalEventDataSchema = z.object({ proposal: ProposalRefSchema }).strict();
+export type ProposalEventData = z.infer<typeof ProposalEventDataSchema>;
+
 /** `ping` : envoyé par le bouton « tester » d'un abonnement. */
 export const PingDataSchema = z
   .object({ subscriptionId: z.string().uuid(), message: z.literal('ping') })
@@ -97,6 +130,14 @@ export const WEBHOOK_EVENT_SCHEMAS = {
   'contract.renewed': ContractEventDataSchema,
   'contract.terminated': ContractEventDataSchema,
   'pricing.revised': PricingRevisedDataSchema,
+  // Lot 9 — propositions commerciales.
+  'proposal.sent': ProposalEventDataSchema,
+  'proposal.viewed': ProposalEventDataSchema,
+  'proposal.accepted': ProposalEventDataSchema,
+  'proposal.signed': ProposalEventDataSchema,
+  'proposal.declined': ProposalEventDataSchema,
+  'proposal.expired': ProposalEventDataSchema,
+  'proposal.converted': ProposalEventDataSchema,
 } as const;
 
 export type WebhookEventType = keyof typeof WEBHOOK_EVENT_SCHEMAS;

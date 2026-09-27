@@ -78,6 +78,15 @@ export async function findProposalSignaturesNeedingSync(
   return rows.map((r) => ({ ...toRef(r), providerSubmissionId: r.provider_submission_id }));
 }
 
+/** Soumissions complétées dont les preuves restent à rapatrier (la proposition passe SIGNÉE après). */
+export async function findProposalSignaturesNeedingProof(
+  limit = 100,
+): Promise<(ScopeRef & { proposalId: string })[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<(Row & { proposal_id: string })[]>`
+    SELECT * FROM app_find_proposal_signatures_needing_proof(${limit}::int)`;
+  return rows.map((r) => ({ ...toRef(r), proposalId: r.proposal_id }));
+}
+
 /** Tenants ayant du suivi de lecture détaillé (purge RGPD). */
 export async function findProposalTrackingTenants(): Promise<string[]> {
   const rows = await unsafeUnscopedClient.$queryRaw<{ tenant_id: string }[]>`

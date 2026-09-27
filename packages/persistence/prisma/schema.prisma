@@ -2151,6 +2151,10 @@ model Proposal {
   commitmentTotalCents     BigInt?                @map("commitment_total_cents")
   commitmentMonths         Int?                   @map("commitment_months")
   signedProposalIsContract Boolean                @default(false) @map("signed_proposal_is_contract")
+  /// Date d'effet souhaitée, reprise par le contrat généré (migration 32).
+  desiredStartDate         DateTime?              @map("desired_start_date") @db.Date
+  /// Dernière erreur de conversion (contrat type introuvable…), retentée par le job.
+  conversionError          String?                @map("conversion_error")
   declineReasonCode        String?                @map("decline_reason_code")
   declineReason            String?                @map("decline_reason")
   withdrawReason           String?                @map("withdraw_reason")

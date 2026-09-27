@@ -33,6 +33,7 @@ export {
   findProposalFollowUpsDue,
   findProposalsToConvert,
   findProposalSignaturesNeedingSync,
+  findProposalSignaturesNeedingProof,
   findProposalTrackingTenants,
   purgeProposalViewEvents,
   nextProposalSequence,
