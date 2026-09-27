@@ -403,7 +403,7 @@ slug (`PUT /v1/proposal-admin/contract-templates/:id/slug`).
   `TERMS`, `SIGNATURE`), écrits en bloc (`PUT /v1/proposals/:id/sections`) ;
   exactement une section de prix et une de signature. Rendu HTML **assaini**
   (texte échappé puis liste blanche des contrats). L'éditeur par blocs de
-  l'interface interne (glisser-déposer, aperçu bureau / mobile) relève du lot 9.8.
+  l'interface interne : glisser-déposer, aperçu bureau / mobile.
 - **Bibliothèque** : le texte est copié dans la proposition avec son empreinte
   source (détection des clauses dérogatoires) ; figé à l'envoi.
 - **Balises de fusion** typées (`packages/domain/src/proposal/merge-tags.ts`) :
@@ -414,7 +414,49 @@ slug (`PUT /v1/proposal-admin/contract-templates/:id/slug`).
 - **Import Word** (`POST /v1/proposals/:id/import-docx`) : lecture de
   `word/document.xml` (sans dépendance), un titre de niveau 1 = une section ;
   archive bornée ; résultat en brouillon, soumis aux mêmes contrôles.
-- **Assistance IA** : lot 9.9 (colonne `ai_pending_review` prévue).
+- **Assistance IA** (lot 9.9, `ProposalAiService`, droit `proposals.write`, drapeau `contrats.ai.enabled`,
+  fournisseur et budget du tenant — `05-ia-perplexity.md` §17) :
+  - `POST /v1/proposals/:id/ai/draft` `{notes, sections[contexte|enjeux|solution], publicResearch, website?}` :
+    rédige les sections demandées à partir de la prise de notes **pseudonymisée** ; chaque section
+    écrite (remplacée si la clé existe, sinon insérée après la couverture) porte
+    `ai_pending_review = true` et ses sources (`ai_sources`). Réponse : la proposition, les
+    **points à vérifier**, la synthèse de recherche, les sources.
+  - **Recherche publique** sur le prospect : option **explicite à chaque demande**
+    (`publicResearch: true`) ; un appel **séparé** qui ne reçoit **que** la raison sociale et le site
+    web ; sa synthèse est pseudonymisée avant d'être jointe aux notes (V2-H69).
+  - `POST /v1/proposals/:id/ai/rephrase` `{text, mode: reformuler|synthetiser}` : suggestion, jamais
+    appliquée.
+  - `POST /v1/proposals/:id/sections/:key/ai-validate` : relecture humaine. Tant qu'une section
+    générée par IA n'est pas validée, la préparation signale `AI_PENDING` et la compte parmi les
+    validations bloquantes : **ni « prête », ni envoi**. Réenregistrer ou modifier la section ne lève
+    pas le marquage. L'interface affiche le bandeau « généré par IA » tant qu'il est posé.
+
+## 15. Pilotage commercial (lot 9.8)
+
+Service `ProposalReportingService`, routes `/v1/proposal-reports/*` (droit `proposals.read`, portefeuille
+de l'appelant, module désactivé → 404) :
+
+| Route | Contenu |
+|---|---|
+| `GET pipeline?ownerUserId=&templateId=` | propositions **ouvertes** (brouillon → en signature) en colonnes par statut : nombre, montant (total HT sur la durée d'engagement), montant **pondéré** = montant × probabilité ; chaque carte : client, commercial, modèle, mensuel, échéance |
+| `GET dashboard?from=&to=` | période sur la **date d'envoi** (défaut 12 mois glissants, 3 ans au plus) : envoyées, signées, perdues, en cours ; taux de conversion (sur les envoyées et sur les décidées) ; délai moyen envoi → signature ; récurrent mensuel et frais uniques signés ; conversion **par modèle** (rapport par modèle) et **par commercial** ; sections les plus lues (ouvertures, durée moyenne) ; motifs de refus ; options les plus retenues dans les configurations figées |
+| `GET dashboard.csv` | les mêmes indicateurs en CSV (UTF-8 avec BOM, séparateur `;`, cellules neutralisées contre l'injection de formules) |
+
+Probabilité de gain : `winProbability` saisie par le commercial, sinon celle de l'étape (V2-H67) :
+brouillon 10 %, revue interne 15 %, prête 20 %, envoyée 30 %, consultée 40 %, en discussion 50 %,
+acceptée 80 %, en signature 90 %.
+
+« Par offre » (brief §12.8) est lu comme « par modèle de proposition », chaque modèle portant une offre
+(infogérance, supervision, RSSI, sauvegarde) — V2-H68.
+
+## 16. API publique et webhooks (lot 9.8)
+
+`/api/v1/proposals`, `/api/v1/clients/{clientRef}/proposals`, `/api/v1/proposals/{id}` (scope
+`proposals:read`) et `/api/v1/proposals/{id}/pricing` (scope `proposals:pricing:read`) : voir
+`07-api.md` §3. Aucune donnée personnelle n'y figure (ni destinataires, ni suivi de lecture, ni
+commentaires). Le tarif renvoie la configuration **figée à l'acceptation** (`source: ACCEPTED`, avec son
+empreinte) ou, à défaut, le tableau proposé de la version courante (`source: PROPOSED`). Webhooks
+`proposal.*` : §7 et `07-api.md` §5.
 
 ## 14. Tests
 

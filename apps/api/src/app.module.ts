@@ -33,6 +33,7 @@ import { ApiClientsService } from './public-api/api-clients.service.js';
 import { OpenApiController } from './public-api/openapi.controller.js';
 import { PublicApiController } from './public-api/public-api.controller.js';
 import { PublicReadService } from './public-api/public-read.service.js';
+import { PublicProposalsService } from './public-api/public-proposals.service.js';
 import { RenewalService } from './renewal/renewal.service.js';
 import { ImportsService } from './imports/imports.service.js';
 import { HttpOcrClient, OCR_CLIENT } from './imports/ocr.client.js';
@@ -116,6 +117,10 @@ import { ClaudeContractDrafter } from './ai-drafting/claude-contract-drafter.js'
 import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-drafter.js';
 // Lot 9 — propositions commerciales (docs/contrats/11-propositions.md).
 import { ProposalsController } from './proposals/proposals.controller.js';
+import { ProposalReportsController } from './proposals/proposal-reports.controller.js';
+import { ProposalAiController } from './proposals/proposal-ai.controller.js';
+import { ProposalAiService } from './proposals/proposal-ai.service.js';
+import { ProposalReportingService } from './proposals/proposal-reporting.service.js';
 import { ProposalAdminController } from './proposals/proposal-admin.controller.js';
 import { ProposalPublicController } from './proposals/proposal-public.controller.js';
 import { ProposalsService } from './proposals/proposals.service.js';
@@ -183,6 +188,8 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     ContractAiController,
     WebhooksAdminController,
     ProposalsController,
+    ProposalReportsController,
+    ProposalAiController,
     ProposalAdminController,
     ProposalPublicController,
   ],
@@ -191,6 +198,8 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     // Lot 9 — propositions commerciales. File de jobs propre (capture des
     // preuves, conversion) : BullMQ si JOBS_ENABLED, sinon no-op (tests).
     ProposalsService,
+    ProposalReportingService,
+    ProposalAiService,
     ProposalSendService,
     ProposalPublicService,
     ProposalAdminService,
@@ -212,6 +221,7 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     ApiClientsService,
     ApiClientGuard,
     PublicReadService,
+    PublicProposalsService,
     DeadlinesService,
     StructureService,
     ClauseLibraryService,

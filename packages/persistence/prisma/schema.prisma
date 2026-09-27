@@ -1804,6 +1804,9 @@ enum AiOperation {
   COMPARE
   MISSING
   IMPORT_EXTRACT
+  PROPOSAL_DRAFT
+  PROPOSAL_REPHRASE
+  PROSPECT_RESEARCH
 }
 
 enum AiCallStatus {
@@ -2326,6 +2329,8 @@ model ProposalSection {
   excluded         Boolean             @default(false)
   validationStatus ProposalPriceStatus @default(VALIDATED) @map("validation_status")
   aiPendingReview  Boolean             @default(false) @map("ai_pending_review")
+  /// Sources citées par l'IA (recherche publique, lot 9.9) : [{ url, title }].
+  aiSources        Json?               @map("ai_sources")
 
   version ProposalVersion @relation(fields: [versionId, tenantId, customerId], references: [id, tenantId, customerId], map: "proposal_sections_version_fk", onDelete: NoAction, onUpdate: NoAction)
   blocks  ProposalBlock[]

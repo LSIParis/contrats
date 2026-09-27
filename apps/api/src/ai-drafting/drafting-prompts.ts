@@ -5,6 +5,9 @@ import type {
   DetectMissingClausesInput,
   ExplainClauseInput,
   ImportExtractInput,
+  CompanyResearchInput,
+  ProposalDraftInput,
+  ProposalRephraseInput,
   RephraseClauseInput,
   StructuredDraftInput,
   TemplateClauseInput,
@@ -14,6 +17,9 @@ import {
   DraftOutputSchema,
   ExplainOutputSchema,
   ImportExtractOutputSchema,
+  CompanyResearchOutputSchema,
+  ProposalDraftOutputSchema,
+  ProposalRephraseOutputSchema,
   MissingClausesOutputSchema,
   RephraseOutputSchema,
   SCHEMA_NAMES,
@@ -142,4 +148,58 @@ N'utilise aucune recherche : seul le document fait foi.`;
 
 export function buildImportExtractTask(input: ImportExtractInput) {
   return task(SCHEMA_NAMES.importExtract, ImportExtractOutputSchema, IMPORT_EXTRACT_TASK, `Document :\n\n${input.text}`, false);
+}
+
+/**
+ * Propositions commerciales (lot 9.9). Socle distinct du socle juridique :
+ * un texte commercial clair, jamais d'engagement chiffré inventé.
+ */
+export const PROPOSAL_BASE_INSTRUCTIONS = `Tu es un assistant de rédaction commerciale pour un prestataire de services informatiques français (infogérance, supervision, sauvegarde, sécurité, RSSI externalisé) qui s'adresse à des TPE et PME.
+Tu produis des PROJETS relus et validés par un commercial avant tout envoi. Style : français clair, concret, sans jargon inutile ni superlatifs, vouvoiement, phrases courtes.
+N'invente JAMAIS de chiffre (prix, délai, taux de disponibilité, effectif), de référence client, de certification ni d'engagement contractuel : si une information manque, écris [à compléter].
+Données : le texte fourni contient des jetons entre crochets ([CLIENT], [PERSONNE_1], [MONTANT_1]…) qui remplacent des données réelles confidentielles. Recopie-les EXACTEMENT là où la donnée doit apparaître ; n'essaie pas de deviner ce qu'ils représentent.
+Forme : réponds UNIQUEMENT par un objet JSON conforme au schéma fourni. N'écris aucune URL ni marqueur de citation dans les champs texte.`;
+
+export const PROPOSAL_DRAFT_TASK = `Tâche : à partir de la prise de notes du commercial (et, si elle est fournie, de la synthèse publique sur l'entreprise), rédige les sections demandées de la proposition :
+- « contexte » : la situation du client telle que décrite dans les notes ;
+- « enjeux » : ce que le client doit sécuriser ou améliorer, et pourquoi c'est important pour lui ;
+- « solution » : comment l'offre y répond, en termes de résultats pour le client, sans détailler les prix.
+Ne rédige QUE les sections demandées. Liste dans pointsToVerify toute affirmation tirée de la synthèse publique ou déduite, que le commercial doit confirmer.`;
+
+export const PROPOSAL_REPHRASE_TASK = {
+  reformuler: `Tâche : reformule le texte fourni pour le rendre plus clair et plus convaincant, sans en changer le sens ni ajouter d'information. Liste les modifications dans changes.`,
+  synthetiser: `Tâche : résume le texte fourni en un texte court (un tiers de sa longueur au plus), sans perdre d'information importante ni en ajouter. Liste dans changes ce qui a été retiré.`,
+} as const;
+
+export const COMPANY_RESEARCH_TASK = `Tâche : recherche des informations PUBLIQUES sur l'entreprise dont la raison sociale et le site web sont fournis : secteur d'activité, taille (effectif, chiffre d'affaires publiés), activité, actualités récentes. Appuie-toi sur son site, sur les registres publics (annuaire des entreprises, RNE) et sur la presse.
+Ne mentionne AUCUNE personne physique (dirigeant, salarié), aucune coordonnée, aucune information non publique. Si les sources sont contradictoires ou absentes, dis-le dans la synthèse.`;
+
+function proposalTask<T>(schemaName: string, schema: z.ZodType<T>, taskText: string, input: string, webSearch: boolean): StructuredTask<T> {
+  return { schemaName, schema, jsonSchema: toProviderJsonSchema(schema), instructions: `${PROPOSAL_BASE_INSTRUCTIONS}\n\n${taskText}`, input, webSearch };
+}
+
+export function buildProposalDraftTask(input: ProposalDraftInput) {
+  return proposalTask(
+    SCHEMA_NAMES.proposalDraft, ProposalDraftOutputSchema, PROPOSAL_DRAFT_TASK,
+    [
+      `Offre : ${input.offer}`,
+      `Sections demandées : ${input.sections.join(', ')}`,
+      `Prise de notes du commercial :\n\n${input.notes}`,
+      ...(input.research ? [`Synthèse publique sur l'entreprise (à vérifier) :\n\n${input.research}`] : []),
+    ].join('\n\n'),
+    false,
+  );
+}
+
+export function buildProposalRephraseTask(input: ProposalRephraseInput) {
+  return proposalTask(SCHEMA_NAMES.proposalRephrase, ProposalRephraseOutputSchema, PROPOSAL_REPHRASE_TASK[input.mode], `Texte :\n\n${input.text}`, false);
+}
+
+/** Recherche publique : SEULS la raison sociale et le site web partent (brief §12.3). */
+export function buildCompanyResearchTask(input: CompanyResearchInput) {
+  return proposalTask(
+    SCHEMA_NAMES.companyResearch, CompanyResearchOutputSchema, COMPANY_RESEARCH_TASK,
+    `Raison sociale : ${input.companyName}${input.website ? `\nSite web : ${input.website}` : ''}`,
+    true,
+  );
 }

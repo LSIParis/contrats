@@ -144,6 +144,95 @@ export type Problem = {
   [key: string]: unknown;
 };
 
+export type Proposal = {
+  id: string;
+  number: string;
+  title: string;
+  status: "DRAFT" | "IN_INTERNAL_REVIEW" | "READY" | "SENT" | "VIEWED" | "IN_DISCUSSION" | "ACCEPTED" | "PENDING_SIGNATURE" | "SIGNED" | "CONVERTED" | "EXPIRED" | "DECLINED" | "WITHDRAWN";
+  acceptanceMode: "DOCUSEAL_SIGNATURE" | "CLICK_ACCEPT";
+  customer: {
+    id: string;
+    name: string;
+    externalRef: string | null;
+    siren: string | null;
+  };
+  template: {
+    slug: string;
+    name: string;
+  } | null;
+  versionNumber: number | null;
+  oneTimeCents: string | null;
+  monthlyCents: string | null;
+  commitmentTotalCents: string | null;
+  commitmentMonths: number | null;
+  /** Contrat généré à la conversion. */
+  contractId: string | null;
+  expiresAt: string | null;
+  sentAt: string | null;
+  acceptedAt: string | null;
+  signedAt: string | null;
+  convertedAt: string | null;
+  declinedAt: string | null;
+  expiredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProposalPage = {
+  data: Array<{
+    id: string;
+    number: string;
+    title: string;
+    status: "DRAFT" | "IN_INTERNAL_REVIEW" | "READY" | "SENT" | "VIEWED" | "IN_DISCUSSION" | "ACCEPTED" | "PENDING_SIGNATURE" | "SIGNED" | "CONVERTED" | "EXPIRED" | "DECLINED" | "WITHDRAWN";
+    acceptanceMode: "DOCUSEAL_SIGNATURE" | "CLICK_ACCEPT";
+    customer: {
+      id: string;
+      name: string;
+      externalRef: string | null;
+      siren: string | null;
+    };
+    template: {
+      slug: string;
+      name: string;
+    } | null;
+    versionNumber: number | null;
+    oneTimeCents: string | null;
+    monthlyCents: string | null;
+    commitmentTotalCents: string | null;
+    commitmentMonths: number | null;
+    /** Contrat généré à la conversion. */
+    contractId: string | null;
+    expiresAt: string | null;
+    sentAt: string | null;
+    acceptedAt: string | null;
+    signedAt: string | null;
+    convertedAt: string | null;
+    declinedAt: string | null;
+    expiredAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  nextCursor: string | null;
+};
+
+export type ProposalPricing = {
+  proposalId: string;
+  /** `ACCEPTED` : configuration figée à l’acceptation (barème du contrat) ; `PROPOSED` : tableau de la version courante. */
+  source: "ACCEPTED" | "PROPOSED";
+  versionNumber: number | null;
+  oneTimeCents: string | null;
+  monthlyCents: string | null;
+  commitmentTotalCents: string | null;
+  commitmentMonths: number | null;
+  /** Tableau de prix (forme de l’annexe C, 11-propositions.md). */
+  definition: unknown;
+  /** Configuration retenue (acceptée) ; null si non acceptée. */
+  selection: unknown;
+  /** Empreinte de la configuration figée. */
+  sha256: string | null;
+  frozenAt: string | null;
+};
+
 export interface Transport {
   request<T>(method: string, path: string, opts: { query?: Record<string, string | number | undefined>; body?: unknown }): Promise<T>;
 }
@@ -179,6 +268,26 @@ export class ContratsOperations {
   /** Échéances à venir, tous contrats confondus — scope `contracts:dates:read`. */
   listDeadlines(query: { cursor?: string; limit?: number; from?: string; to?: string; kind?: string } = {}): Promise<DeadlinePage> {
     return this.transport.request<DeadlinePage>('GET', `/api/v1/deadlines`, { query, });
+  }
+
+  /** Propositions commerciales du tenant — scope `proposals:read`. */
+  listProposals(query: { cursor?: string; limit?: number; status?: string; updatedSince?: string } = {}): Promise<ProposalPage> {
+    return this.transport.request<ProposalPage>('GET', `/api/v1/proposals`, { query, });
+  }
+
+  /** Propositions d’un client ou d’un prospect — scope `proposals:read`. */
+  listClientProposals(clientRef: string, query: { cursor?: string; limit?: number; status?: string; updatedSince?: string } = {}): Promise<ProposalPage> {
+    return this.transport.request<ProposalPage>('GET', `/api/v1/clients/${encodeURIComponent(clientRef)}/proposals`, { query, });
+  }
+
+  /** Détail d’une proposition : statut, montants, dates, contrat généré — scope `proposals:read`. */
+  getProposal(id: string): Promise<Proposal> {
+    return this.transport.request<Proposal>('GET', `/api/v1/proposals/${encodeURIComponent(id)}`, { });
+  }
+
+  /** Tarif : configuration acceptée (figée) ou tableau proposé — scope `proposals:pricing:read`. */
+  getProposalPricing(id: string): Promise<ProposalPricing> {
+    return this.transport.request<ProposalPricing>('GET', `/api/v1/proposals/${encodeURIComponent(id)}/pricing`, { });
   }
 
   /** Abonnements aux webhooks sortants du tenant — scope `webhooks:manage`. */

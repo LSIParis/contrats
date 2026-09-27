@@ -56,6 +56,9 @@ class FakeProvider implements ContractDraftingProvider {
     this.track(i);
     return env({ missing: [{ title: 'Réversibilité', category: 'REVERSIBILITE', reason: 'Absente', riskLevel: 'MEDIUM' }] } as never);
   }
+  async draftProposalSections(): Promise<never> { throw new Error('non utilisé'); }
+  async rephraseProposalText(): Promise<never> { throw new Error('non utilisé'); }
+  async researchCompany(): Promise<never> { throw new Error('non utilisé'); }
   async extractImportMetadata(i: Parameters<ContractDraftingProvider['extractImportMetadata']>[0]) {
     this.track(i);
     const none = { value: '', excerpt: '' };

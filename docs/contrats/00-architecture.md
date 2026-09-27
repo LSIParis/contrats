@@ -228,6 +228,10 @@ isolation → souveraineté → réversibilité).
 | V2-H64 | Conversion : date d'effet = date souhaitée (`desiredStartDate`), sinon laissée vide (contrat brouillon) ou date de signature (proposition valant contrat) ; reconduction `NONE` (à fixer par le juriste sur le contrat) ; révision Syntec à la date anniversaire des lignes indexées. | aucune donnée de reconduction dans les modèles | champs dédiés au modèle |
 | V2-H65 | Les comptes du portail et la page publique n'ont aucun accès aux modèles, à la bibliothèque et aux paramètres ; la page publique lit les CGV de SA version dans le scope système du client. | classe tenant fermée au client | politique de lecture dédiée |
 | V2-H66 | Relance = nouvel e-mail avec un **nouveau** lien personnel (l'ancien est révoqué) ; « réponse du client » (qui suspend les relances) = question, acceptation ou refus. | les jetons ne sont jamais conservés en clair | — |
+| V2-H67 | Montant pondéré du pipeline = total HT sur la durée d'engagement × probabilité ; probabilité par défaut selon l'étape (10 % brouillon … 90 % en signature) quand le commercial n'en saisit pas. | usage courant d'un pipeline B2B | probabilités paramétrables par tenant |
+| V2-H68 | « Conversion par offre » (brief §12.8) = par modèle de proposition, chaque modèle portant une offre. | les quatre modèles livrés sont les quatre offres | champ « offre » distinct |
+| V2-H69 | Recherche publique sur un prospect : consentement explicite à **chaque** demande (`publicResearch: true`), pas un réglage mémorisé ; site web fourni par le commercial (le client n'a pas de champ « site »). | le brief exige une option explicite par proposition ; rien ne part par défaut | champ `website` du client, option mémorisée par proposition |
+| V2-H70 | La relecture d'une section IA peut être faite par le commercial auteur (`proposals.write`) ; la revue interne (`proposals.review`) reste exigée selon les seuils. | « validation humaine » ≠ validation par un tiers | réserver au valideur |
 
 ## 7. Ce qui n'est pas dans le périmètre
 

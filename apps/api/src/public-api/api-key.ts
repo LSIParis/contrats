@@ -9,7 +9,11 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
  *   de passe faibles ; il n'apporte rien contre un secret de 256 bits.
  * La clé complète n'est montrée qu'UNE fois, à la création ou à la rotation.
  */
-export const API_SCOPES = ['contracts:read', 'contracts:dates:read', 'pricing:read', 'pricing:quote', 'webhooks:manage'] as const;
+export const API_SCOPES = [
+  'contracts:read', 'contracts:dates:read', 'pricing:read', 'pricing:quote', 'webhooks:manage',
+  // Lot 9.8 — propositions commerciales.
+  'proposals:read', 'proposals:pricing:read',
+] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';

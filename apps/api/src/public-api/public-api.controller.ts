@@ -13,7 +13,9 @@ import { ApiClientGuard, RequireScopes } from './api-client.guard.js';
 import { EtagInterceptor } from './etag.interceptor.js';
 import { ProblemFilter } from './problem.filter.js';
 import { PublicReadService } from './public-read.service.js';
-import { ClientContractsQuery, CreateWebhookBody, DeadlinesQuery, PricingAtQuery, QuoteSchema } from './schemas.js';
+import { PublicProposalsService } from './public-proposals.service.js';
+import { ProposalsService } from '../proposals/proposals.service.js';
+import { ClientContractsQuery, CreateWebhookBody, DeadlinesQuery, PricingAtQuery, ProposalsQuery, QuoteSchema } from './schemas.js';
 
 /**
  * API publique de la suite — `/api/v1` (brief §8, 07-api.md).
@@ -33,6 +35,8 @@ export class PublicApiController {
     private readonly read: PublicReadService,
     private readonly pricing: PricingService,
     private readonly webhooks: WebhooksAdminService,
+    private readonly proposals: PublicProposalsService,
+    private readonly proposalModule: ProposalsService,
   ) {}
 
   @Get('clients/:clientRef/contracts')
@@ -76,6 +80,39 @@ export class PublicApiController {
   @RequireScopes('contracts:dates:read')
   deadlines(@CurrentScope() scope: Scope, @Query(new ZodPipe(DeadlinesQuery)) q: z.infer<typeof DeadlinesQuery>) {
     return this.read.deadlines(scope, q, new Date());
+  }
+
+  // --- Propositions (lot 9.8) — module désactivé = 404 ------------------------
+
+  @Get('proposals')
+  @RequireScopes('proposals:read')
+  async listProposals(@CurrentScope() scope: Scope, @Query(new ZodPipe(ProposalsQuery)) q: z.infer<typeof ProposalsQuery>) {
+    await this.proposalModule.assertEnabled(scope);
+    return this.proposals.list(scope, q);
+  }
+
+  @Get('clients/:clientRef/proposals')
+  @RequireScopes('proposals:read')
+  async clientProposals(
+    @CurrentScope() scope: Scope, @Param('clientRef') clientRef: string,
+    @Query(new ZodPipe(ProposalsQuery)) q: z.infer<typeof ProposalsQuery>,
+  ) {
+    await this.proposalModule.assertEnabled(scope);
+    return this.proposals.list(scope, q, clientRef.slice(0, 100));
+  }
+
+  @Get('proposals/:id')
+  @RequireScopes('proposals:read')
+  async proposal(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    await this.proposalModule.assertEnabled(scope);
+    return this.proposals.get(scope, id);
+  }
+
+  @Get('proposals/:id/pricing')
+  @RequireScopes('proposals:pricing:read')
+  async proposalPricing(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string) {
+    await this.proposalModule.assertEnabled(scope);
+    return this.proposals.pricing(scope, id);
   }
 
   // --- Webhooks sortants (scope webhooks:manage) ----------------------------

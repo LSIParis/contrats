@@ -41,6 +41,16 @@ export const DeadlinesQuery = PageQuery.extend({
 
 export { QuoteSchema };
 
+export const PROPOSAL_STATUSES = [
+  'DRAFT', 'IN_INTERNAL_REVIEW', 'READY', 'SENT', 'VIEWED', 'IN_DISCUSSION', 'ACCEPTED', 'PENDING_SIGNATURE',
+  'SIGNED', 'CONVERTED', 'EXPIRED', 'DECLINED', 'WITHDRAWN',
+] as const;
+
+export const ProposalsQuery = PageQuery.extend({
+  status: z.string().regex(/^[A-Z_]+(,[A-Z_]+)*$/).optional().describe('Statuts séparés par des virgules, ex. `SENT,VIEWED`.'),
+  updatedSince: z.iso.datetime().optional().describe('Propositions modifiées depuis cet instant (synchronisation incrémentale).'),
+}).strict();
+
 export { CreateWebhookBody } from '../webhooks-out/webhooks-admin.dto.js';
 
 // --- Réponses -----------------------------------------------------------------
@@ -95,6 +105,48 @@ export const Deadline = z.object({
   details: z.unknown().nullable(),
 });
 export const DeadlinePage = z.object({ data: z.array(Deadline), nextCursor: z.string().nullable() });
+
+const Cents = z.string().regex(/^-?\d+$/).describe('Montant en centimes, en chaîne.');
+
+export const Proposal = z.object({
+  id: Uuid,
+  number: z.string(),
+  title: z.string(),
+  status: z.enum(PROPOSAL_STATUSES),
+  acceptanceMode: z.enum(['DOCUSEAL_SIGNATURE', 'CLICK_ACCEPT']),
+  customer: CustomerRef,
+  template: z.object({ slug: z.string(), name: z.string() }).nullable(),
+  versionNumber: z.number().int().nullable(),
+  oneTimeCents: Cents.nullable(),
+  monthlyCents: Cents.nullable(),
+  commitmentTotalCents: Cents.nullable(),
+  commitmentMonths: z.number().int().nullable(),
+  contractId: Uuid.nullable().describe('Contrat généré à la conversion.'),
+  expiresAt: z.iso.datetime().nullable(),
+  sentAt: z.iso.datetime().nullable(),
+  acceptedAt: z.iso.datetime().nullable(),
+  signedAt: z.iso.datetime().nullable(),
+  convertedAt: z.iso.datetime().nullable(),
+  declinedAt: z.iso.datetime().nullable(),
+  expiredAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export const ProposalPage = z.object({ data: z.array(Proposal), nextCursor: z.string().nullable() });
+
+export const ProposalPricing = z.object({
+  proposalId: Uuid,
+  source: z.enum(['ACCEPTED', 'PROPOSED']).describe('`ACCEPTED` : configuration figée à l’acceptation (barème du contrat) ; `PROPOSED` : tableau de la version courante.'),
+  versionNumber: z.number().int().nullable(),
+  oneTimeCents: Cents.nullable(),
+  monthlyCents: Cents.nullable(),
+  commitmentTotalCents: Cents.nullable(),
+  commitmentMonths: z.number().int().nullable(),
+  definition: z.unknown().describe('Tableau de prix (forme de l’annexe C, 11-propositions.md).'),
+  selection: z.unknown().describe('Configuration retenue (acceptée) ; null si non acceptée.'),
+  sha256: z.string().nullable().describe('Empreinte de la configuration figée.'),
+  frozenAt: z.iso.datetime().nullable(),
+});
 
 export const Pricing = z
   .object({ contractId: Uuid.optional(), at: IsoDate.optional(), currency: z.string().optional(), lines: z.array(z.record(z.string(), z.unknown())).optional() })
