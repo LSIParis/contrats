@@ -26,6 +26,7 @@ import { TenantConfigController } from './tenant/tenant-config.controller.js';
 import { TenantConfigService } from './tenant/tenant-config.service.js';
 import { ImportsController } from './imports/imports.controller.js';
 import { RenewalController } from './renewal/renewal.controller.js';
+import { ContractDocumentsController } from './documents/contract-documents.controller.js';
 import { ApiClientGuard } from './public-api/api-client.guard.js';
 import { ApiClientsController } from './public-api/api-clients.controller.js';
 import { ApiClientsService } from './public-api/api-clients.service.js';
@@ -152,6 +153,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     TenantConfigController,
     ImportsController,
     RenewalController,
+    ContractDocumentsController,
     PublicApiController,
     OpenApiController,
     ApiClientsController,

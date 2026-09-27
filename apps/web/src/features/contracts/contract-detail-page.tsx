@@ -36,6 +36,7 @@ import { InternalSigning } from '../signature/internal-signing.js';
 import { RenewalDecision } from '../lifecycle/renewal-decision.js';
 import { TerminationPanel } from '../lifecycle/termination-panel.js';
 import { LifecycleTimeline } from '../lifecycle/lifecycle-timeline.js';
+import { StoredDocuments } from './stored-documents.js';
 import { ContractPricing } from '../pricing/contract-pricing.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
@@ -332,6 +333,9 @@ export function ContractDetailPage() {
           <li className="text-ink-faint">Aucun document.</li>
         )}
       </ul>
+      <div className="mt-4">
+        <StoredDocuments contractId={contract.id} />
+      </div>
     </Card>
   );
 

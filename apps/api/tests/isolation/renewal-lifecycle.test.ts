@@ -158,6 +158,14 @@ describe('résiliation', () => {
     const doc = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => tx.storedDocument.findFirst({ where: { contractId: id, kind: 'TERMINATION_LETTER' } }));
     expect(doc!.sha256).toBe(up.body.sha256);
 
+    // Pièces du contrat : listées, téléchargeables, hors portefeuille → 404.
+    const list = await http().get(`/v1/contracts/${id}/documents`).set('x-lsi-session', 'ren-am').expect(200);
+    expect(list.body.items).toEqual([expect.objectContaining({ id: doc!.id, kind: 'TERMINATION_LETTER', label: 'Courrier de résiliation', sha256: up.body.sha256 })]);
+    const file = await http().get(`/v1/contracts/${id}/documents/${doc!.id}`).set('x-lsi-session', 'ren-am').buffer(true).expect(200);
+    expect(file.headers['content-type']).toContain('application/pdf');
+    await http().get(`/v1/contracts/${id}/documents`).set('x-lsi-session', 'ren-am-b').expect(404);
+    await http().get(`/v1/contracts/${id}/documents/${doc!.id}`).set('x-lsi-session', 'ren-am-b').expect(404);
+
     await http().post(`/v1/contracts/${id}/withdraw-termination`).set('x-lsi-session', 'ren-am').send({ reason: 'Le client se rétracte' }).expect(201);
     const { c } = await read(id);
     expect(c!.status).toBe('ACTIVE');
