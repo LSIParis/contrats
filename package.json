@@ -17,6 +17,8 @@
     "db:validate": "node scripts/prisma-validate.mjs",
     "db:migrate:deploy": "pnpm --filter @lsi/persistence exec prisma migrate deploy",
     "db:check-drift": "node scripts/check-drift.mjs",
+    "db:seed": "pnpm --filter @lsi/persistence seed",
+    "db:seed:propositions": "pnpm --filter @lsi/persistence seed:propositions",
     "seed": "pnpm --filter @lsi/persistence exec tsx src/seed/demo.ts",
     "openapi:generate": "pnpm --filter @lsi/api exec node --import @swc-node/register/esm-register scripts/generate-openapi.ts",
     "client:generate": "pnpm --filter @lsi/contrats-client generate",

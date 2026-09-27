@@ -41,4 +41,14 @@ ALTER ROLE lsi_webhook   LOGIN PASSWORD '${LSI_WEBHOOK_PASSWORD}';
 ALTER ROLE lsi_scheduler LOGIN PASSWORD '${LSI_SCHEDULER_PASSWORD}';
 SQL
 
+# Lot 9 — données de référence du tenant (annexe C) : modèles de proposition et
+# bibliothèque de contenus. Idempotent (UNCHANGED au second passage), ne réécrit
+# jamais un modèle modifié dans l'interface. Un fichier invalide ou un cas de
+# contrôle chiffré en échec fait échouer CE job : app et worker ne démarrent
+# pas (service_completed_successfully) et le déploiement est annulé.
+if [ "${SEED_PROPOSAL_TEMPLATES:-false}" = "true" ]; then
+  echo "→ Seed des modèles de proposition (tenant ${SEED_TENANT_SLUG:-lsi})…"
+  pnpm --filter @lsi/persistence exec tsx prisma/seed.ts --only=propositions
+fi
+
 echo "✓ Migrations appliquées et mots de passe de rôles renouvelés."

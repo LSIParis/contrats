@@ -1,0 +1,265 @@
+{
+  "slug": "rssi",
+  "seedVersion": 1,
+  "name": "RSSI externalisé",
+  "description": "Gouvernance de la sécurité de l'information par un RSSI nommé, avec option DPO externalisé.",
+  "target": "Organisations soumises à des exigences de sécurité (NIS2, annexes sécurité de donneurs d'ordre, appels d'offres, cyberassurance) sans RSSI à plein temps.",
+  "contractTemplateSlug": "rssi-externalise",
+  "acceptanceMode": "DOCUSEAL_SIGNATURE",
+  "providerCountersign": true,
+  "validityDays": 30,
+  "followUps": { "noOpenAfterDays": 3, "noDecisionAfterDays": 7, "beforeExpiryDays": 2 },
+  "vatRatePercent": 20,
+  "currency": "EUR",
+  "tags": ["rssi", "dpo", "cybersécurité", "conformité"],
+  "sections": [
+    {
+      "key": "couverture",
+      "title": "Couverture",
+      "kind": "COVER",
+      "body": "# Proposition de RSSI externalisé\n\n**{{client.raisonSociale}}**\n\nProposition n° {{proposition.numero}} — préparée par {{commercial.nom}}\n\nValable jusqu'au {{proposition.dateExpiration}}"
+    },
+    {
+      "key": "vos-enjeux",
+      "title": "Vos enjeux",
+      "kind": "CLIENT_INPUT",
+      "aiAssist": true,
+      "guidance": "Lister les exigences à couvrir : NIS2 (entité essentielle ou importante ?), annexe sécurité d'un donneur d'ordre (citer sa référence), RGPD, cyberassurance, questionnaires de clients. Mentionner les incidents passés et l'échéance qui motive la démarche. Laisser [à compléter] si une information manque."
+    },
+    {
+      "key": "maturite",
+      "title": "Où en êtes-vous ?",
+      "kind": "TEXT",
+      "body": "## Où en êtes-vous ?\n\nNous mesurons la maturité de votre sécurité avec notre référentiel RMM2RSSI, aligné sur le guide d'hygiène informatique de l'ANSSI et sur NIS2. Il comporte cinq niveaux :\n\n| Niveau | Nom | En bref |\n|---|---|---|\n| N1 | Réactif | Les problèmes sont traités quand ils surviennent |\n| N2 | Outillé | Les outils de base sont en place et supervisés |\n| N3 | Mesuré | Des indicateurs suivent l'état réel de la sécurité |\n| N4 | Maîtrisé | Une gouvernance pilote les risques et les actions |\n| N5 | Gouverné | La sécurité est intégrée aux décisions de l'entreprise |\n\nLe RSSI externalisé a pour mission de vous amener au niveau N4, puis de vous y maintenir en visant N5. Si un diagnostic a déjà été réalisé, votre niveau actuel est indiqué ici ; sinon, il est établi pendant la mise en place."
+    },
+    {
+      "key": "mission",
+      "title": "Notre mission",
+      "kind": "TEXT",
+      "body": "## Notre mission\n\n- **Gouvernance** : pilotage de la sécurité, comités périodiques avec la direction, suivi des décisions.\n- **Politique de sécurité** : rédaction et mise à jour de la PSSI et des règles associées.\n- **Analyse de risques** : démarche inspirée d'EBIOS Risk Manager, adaptée à votre taille.\n- **Hygiène informatique** : suivi des mesures du guide de l'ANSSI, en s'appuyant sur les données réelles de votre parc.\n- **Plan d'action** : actions priorisées, budgétées et suivies.\n- **Conformité** : préparation aux audits, réponse aux questionnaires et annexes sécurité de vos clients et donneurs d'ordre.\n- **Sensibilisation** : actions auprès de vos équipes.\n- **Incidents** : accompagnement de la direction en cas d'incident de sécurité, y compris pour les notifications réglementaires."
+    },
+    {
+      "key": "livrables",
+      "title": "Livrables",
+      "kind": "TEXT",
+      "body": "## Livrables\n\n| Livrable | Fréquence |\n|---|---|\n| Diagnostic de maturité RMM2RSSI | À la mise en place, puis chaque année |\n| Politique de sécurité (PSSI) | À la mise en place, revue annuelle |\n| Cartographie des risques | À la mise en place, revue annuelle |\n| Plan d'action priorisé | Mis à jour en continu |\n| Tableau de bord sécurité | Trimestriel |\n| Rapport annuel à la direction | Annuel |"
+    },
+    {
+      "key": "organisation",
+      "title": "Organisation",
+      "kind": "TEXT",
+      "validationStatus": "TO_VALIDATE",
+      "body": "## Organisation\n\nUn RSSI nommé est votre interlocuteur. Volume de référence par formule :\n\n| Formule | RSSI | DPO (option) | Comité de pilotage |\n|---|---|---|---|\n| TPE-PME (moins de 50 salariés) | 1 jour / mois | 0,5 jour / mois | Trimestriel |\n| PME (50 à 250 salariés) | 2,5 jours / mois | 1 jour / mois | Trimestriel |\n| ETI (plus de 250 salariés) | 5 jours / mois | 2 jours / mois | Mensuel |\n\nLes jours additionnels sont facturés sur devis accepté."
+    },
+    {
+      "key": "option-dpo",
+      "title": "Option DPO externalisé",
+      "kind": "TEXT",
+      "optional": true,
+      "body": "## Option DPO externalisé\n\nNous pouvons aussi assurer la fonction de délégué à la protection des données :\n\n- tenue du registre des traitements ;\n- conformité RGPD des traitements et des contrats de sous-traitance ;\n- référent auprès de la CNIL ;\n- gestion des demandes d'exercice des droits et des violations de données.\n\nLes offres RSSI et DPO souscrites ensemble bénéficient d'une remise de 10 % sur le forfait mensuel."
+    },
+    {
+      "key": "investissement",
+      "title": "Votre investissement",
+      "kind": "PRICING",
+      "body": "## Votre investissement\n\nChoisissez votre formule, la durée d'engagement et les options : les totaux se mettent à jour immédiatement. Tous les prix sont hors taxes."
+    },
+    {
+      "key": "confidentialite",
+      "title": "Confidentialité",
+      "kind": "TEXT",
+      "body": "## Confidentialité\n\nLes informations et les livrables de la mission sont hébergés dans un espace dédié, strictement séparé de l'exploitation informatique. Seuls le RSSI, le DPO et les personnes que vous désignez y ont accès."
+    },
+    { "key": "conditions", "title": "Conditions", "kind": "LIBRARY", "libraryKey": "conditions-rssi" },
+    { "key": "qui-sommes-nous", "title": "Qui sommes-nous", "kind": "LIBRARY", "libraryKey": "qui-sommes-nous" },
+    { "key": "prochaines-etapes", "title": "Prochaines étapes", "kind": "LIBRARY", "libraryKey": "prochaines-etapes" },
+    { "key": "cgv", "title": "Conditions générales de vente", "kind": "TERMS" },
+    { "key": "signature", "title": "Acceptation et signature", "kind": "SIGNATURE" }
+  ],
+  "pricing": {
+    "choices": [
+      {
+        "key": "formule",
+        "label": "Formule selon la taille de votre organisation",
+        "editableByClient": true,
+        "options": [
+          { "value": "TPE_PME", "label": "TPE-PME", "description": "Moins de 50 salariés", "default": true },
+          { "value": "PME", "label": "PME", "description": "De 50 à 250 salariés" },
+          { "value": "ETI", "label": "ETI", "description": "Plus de 250 salariés" }
+        ]
+      },
+      {
+        "key": "engagement",
+        "label": "Durée d'engagement",
+        "editableByClient": true,
+        "note": "Remises éventuelles selon la durée : à définir.",
+        "options": [
+          { "value": "12", "label": "12 mois", "default": true, "commitmentMonths": 12 },
+          { "value": "24", "label": "24 mois", "commitmentMonths": 24 },
+          { "value": "36", "label": "36 mois", "commitmentMonths": 36 }
+        ]
+      }
+    ],
+    "lines": [
+      {
+        "key": "rssi-forfait",
+        "label": "RSSI externalisé — forfait mensuel",
+        "kind": "REQUIRED",
+        "unit": "forfait / mois",
+        "recurrence": "MONTHLY",
+        "group": "RECURRING",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "dependsOn": "formule", "byChoice": { "TPE_PME": 120000, "PME": 300000, "ETI": 600000 } },
+        "priceStatus": "VALIDATED",
+        "priceStatusByChoice": { "TPE_PME": "VALIDATED", "PME": "TO_VALIDATE", "ETI": "VALIDATED" },
+        "priceSource": "Offre RSSI et DPO externalisés LSI SAS, août 2026 (TPE-PME et ETI) ; PME indicatif",
+        "setupLineKey": "mise-en-place",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "dpo",
+        "label": "DPO externalisé — forfait mensuel",
+        "kind": "OPTIONAL",
+        "unit": "forfait / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "dependsOn": "formule", "byChoice": { "TPE_PME": 35000, "PME": 90000, "ETI": 165000 } },
+        "priceStatus": "VALIDATED",
+        "priceStatusByChoice": { "TPE_PME": "VALIDATED", "PME": "TO_VALIDATE", "ETI": "VALIDATED" },
+        "priceSource": "Offre RSSI et DPO externalisés LSI SAS, août 2026 (TPE-PME et ETI) ; PME indicatif",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "astreinte",
+        "label": "Astreinte et notification d'incident sous 24 heures",
+        "kind": "OPTIONAL",
+        "unit": "forfait / mois",
+        "recurrence": "MONTHLY",
+        "group": "OPTIONS",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 25000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026",
+        "indexation": { "index": "SYNTEC", "a": 0.15, "b": 0.85 }
+      },
+      {
+        "key": "mise-en-place",
+        "label": "Mise en place : diagnostic de maturité, audit initial et cadrage",
+        "kind": "SETUP",
+        "unit": "forfait",
+        "recurrence": "ONE_TIME",
+        "group": "SETUP",
+        "quantity": { "default": 1, "min": 1, "max": 1, "linkedTo": "rssi-forfait", "editableByClient": false },
+        "pricing": { "dependsOn": "formule", "byChoice": { "TPE_PME": 150000, "PME": 250000, "ETI": 350000 } },
+        "priceStatus": "VALIDATED",
+        "priceStatusByChoice": { "TPE_PME": "TO_VALIDATE", "PME": "TO_VALIDATE", "ETI": "VALIDATED" },
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026 (ETI) ; TPE-PME et PME indicatifs"
+      },
+      {
+        "key": "test-intrusion",
+        "label": "Test d'intrusion applicatif",
+        "kind": "OPTIONAL",
+        "unit": "par an",
+        "recurrence": "YEARLY",
+        "group": "YEARLY",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 450000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "test-pca-pra",
+        "label": "Test du plan de continuité et de reprise d'activité",
+        "kind": "OPTIONAL",
+        "unit": "par an",
+        "recurrence": "YEARLY",
+        "group": "YEARLY",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 200000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "revue-pas",
+        "label": "Revue annuelle du plan d'assurance sécurité",
+        "kind": "OPTIONAL",
+        "unit": "par an",
+        "recurrence": "YEARLY",
+        "group": "YEARLY",
+        "quantity": { "default": 1, "min": 1, "max": 1, "editableByClient": false },
+        "pricing": { "unitPriceCents": 150000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "jour-rssi",
+        "label": "Jour additionnel RSSI, sur devis",
+        "kind": "INFO",
+        "unit": "jour",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 110000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026"
+      },
+      {
+        "key": "jour-dpo",
+        "label": "Jour additionnel DPO, sur devis",
+        "kind": "INFO",
+        "unit": "jour",
+        "recurrence": "INFO",
+        "group": "OUT_OF_SCOPE",
+        "pricing": { "unitPriceCents": 80000 },
+        "priceStatus": "VALIDATED",
+        "priceSource": "Proposition RSSI et DPO externalisés LSI-Maintenance, août 2026"
+      }
+    ],
+    "rules": [
+      {
+        "type": "DISCOUNT_PERCENT",
+        "key": "remise-combinee",
+        "percent": 10,
+        "appliesTo": ["rssi-forfait", "dpo"],
+        "when": "dpo",
+        "label": "Remise offre combinée RSSI + DPO",
+        "priceStatus": "VALIDATED",
+        "priceSource": "Offre RSSI et DPO externalisés LSI SAS, août 2026"
+      },
+      {
+        "type": "PRESELECT_CHOICE",
+        "key": "formule-selon-effectif",
+        "choice": "formule",
+        "field": "client.effectif",
+        "ranges": [
+          { "max": 49, "value": "TPE_PME" },
+          { "min": 50, "max": 250, "value": "PME" },
+          { "min": 251, "value": "ETI" }
+        ]
+      }
+    ]
+  },
+  "controlCases": [
+    {
+      "name": "TPE-PME avec option DPO — 12 mois",
+      "choices": { "formule": "TPE_PME", "engagement": "12" },
+      "quantities": {},
+      "selectedOptions": ["dpo"],
+      "expected": { "monthlyCents": 139500, "oneTimeCents": 150000, "commitmentTotalCents": 1674000 }
+    },
+    {
+      "name": "ETI avec DPO, astreinte et les trois prestations annuelles — 36 mois",
+      "choices": { "formule": "ETI", "engagement": "36" },
+      "quantities": {},
+      "selectedOptions": ["dpo", "astreinte", "test-intrusion", "test-pca-pra", "revue-pas"],
+      "expected": { "monthlyCents": 713500, "oneTimeCents": 350000, "yearlyCents": 800000, "commitmentTotalCents": 28086000 }
+    },
+    {
+      "name": "ETI avec DPO seul — 12 mois",
+      "choices": { "formule": "ETI", "engagement": "12" },
+      "quantities": {},
+      "selectedOptions": ["dpo"],
+      "expected": { "monthlyCents": 688500, "oneTimeCents": 350000, "commitmentTotalCents": 8262000 }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "key": "qui-sommes-nous",
+      "title": "Qui sommes-nous",
+      "folder": "Présentation",
+      "seedVersion": 1,
+      "body": "## Qui sommes-nous\n\nLSI-Maintenance est un prestataire de services informatiques managés basé à Aix-en-Provence, avec un bureau à Paris. Nous accompagnons exclusivement des TPE et des PME : gestion du parc, support des utilisateurs, supervision, sauvegarde, cybersécurité et conformité.\n\nNotre chaîne d'exploitation est développée en interne et hébergée sur notre propre cloud en France. Vos données de supervision et de support restent sous notre maîtrise, sans dépendance à un éditeur tiers."
+    },
+    {
+      "key": "nos-engagements",
+      "title": "Nos engagements",
+      "folder": "Présentation",
+      "seedVersion": 1,
+      "body": "## Nos engagements\n\n- **Un interlocuteur nommé** : {{commercial.nom}} suit votre compte, et une équipe technique identifiée prend en charge vos demandes.\n- **Une relation de partenaire** : nous vous conseillons sur vos choix techniques, y compris quand ils ne génèrent pas de chiffre d'affaires pour nous.\n- **La transparence** : chaque intervention est tracée, et vous recevez un rapport régulier sur l'état de votre système d'information.\n- **La sécurité par défaut** : nos pratiques suivent le guide d'hygiène informatique de l'ANSSI."
+    },
+    {
+      "key": "prochaines-etapes",
+      "title": "Prochaines étapes",
+      "folder": "Clôture",
+      "seedVersion": 1,
+      "body": "## Prochaines étapes\n\n1. Vous ajustez les options et les quantités dans le tableau de prix ci-dessus.\n2. Vous acceptez et signez la proposition en ligne, avant le {{proposition.dateExpiration}}.\n3. Nous vous adressons le contrat correspondant et planifions avec vous la mise en service.\n4. Un premier point de suivi est organisé un mois après le démarrage.\n\nUne question ? Répondez directement dans la zone de commentaires ou contactez {{commercial.nom}}."
+    },
+    {
+      "key": "conditions-infogerance-supervision",
+      "title": "Conditions particulières — infogérance et supervision",
+      "folder": "Conditions",
+      "seedVersion": 1,
+      "requiresLegalReview": true,
+      "body": "## Conditions\n\n- **Durée** : engagement ferme de {{engagement.dureeMois}} mois à compter de la date de mise en production du service.\n- **Ajustement au parc réel** : le montant mensuel est calculé sur le nombre réel d'équipements administrés ; toute évolution durable du parc est répercutée à compter de la période de facturation suivante.\n- **Révision annuelle** : les prix sont révisés à chaque date anniversaire selon la formule P1 = P0 × (0,15 + 0,85 × S1 / S0), où S est l'indice Syntec.\n- **Facturation** : mensuelle, terme à échoir ; frais de mise en service facturés au démarrage.\n- **Exclusions** : fourniture de matériel et de licences, projets et migrations, facturés sur devis.\n- **Validité** : la présente proposition est valable jusqu'au {{proposition.dateExpiration}}."
+    },
+    {
+      "key": "conditions-rssi",
+      "title": "Conditions particulières — RSSI et DPO externalisés",
+      "folder": "Conditions",
+      "seedVersion": 1,
+      "requiresLegalReview": true,
+      "body": "## Conditions\n\n- **Durée** : engagement de {{engagement.dureeMois}} mois, renouvelable par tacite reconduction par périodes de 12 mois.\n- **Nature de la mission** : obligation de moyens. Le RSSI externalisé conseille et pilote ; les décisions et l'acceptation des risques restent de la responsabilité de la direction de {{client.raisonSociale}}.\n- **Volume** : le forfait couvre le volume de jours indiqué dans la section Organisation ; les jours additionnels sont facturés sur devis accepté.\n- **Révision annuelle** : formule P1 = P0 × (0,15 + 0,85 × S1 / S0), indice Syntec.\n- **Confidentialité** : les informations et livrables de la mission sont confidentiels et hébergés dans un espace séparé de l'exploitation informatique.\n- **Validité** : la présente proposition est valable jusqu'au {{proposition.dateExpiration}}."
+    }
+  ]
+}

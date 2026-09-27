@@ -13,10 +13,14 @@
     "test:isolation": "vitest run tests/isolation",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
-    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/persistence"
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/persistence",
+    "seed": "tsx prisma/seed.ts",
+    "seed:propositions": "tsx prisma/seed.ts --only=propositions",
+    "test:seed": "vitest run --config vitest.seed.config.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
@@ -26,6 +30,10 @@
     "testcontainers": "^10.13.2",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.5",
+    "@lsi/pricing": "workspace:*"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

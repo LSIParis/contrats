@@ -273,6 +273,9 @@ services:
       LSI_APP_PASSWORD: ${LSI_APP_PASSWORD:?}
       LSI_WEBHOOK_PASSWORD: ${LSI_WEBHOOK_PASSWORD:?}
       LSI_SCHEDULER_PASSWORD: ${LSI_SCHEDULER_PASSWORD:?}
+      # Lot 9 — seed des modèles de proposition (annexe C), idempotent.
+      SEED_PROPOSAL_TEMPLATES: ${SEED_PROPOSAL_TEMPLATES:-false}
+      SEED_TENANT_SLUG: ${SEED_TENANT_SLUG:-lsi}
     networks: [internal]
     healthcheck:
       disable: true

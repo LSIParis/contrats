@@ -1,0 +1,142 @@
+// Fragment de référence : modèles Prisma attendus par le seed des modèles de proposition.
+// À fusionner dans prisma/schema.prisma (ou prisma/schema/*.prisma en multi-fichiers).
+// Si des modèles équivalents existent déjà, conserver les leurs et adapter uniquement
+// mapTemplateToPrisma() et createPrismaSeedRepository() dans repository.ts.
+// Ajouter les relations vers Tenant selon la convention du dépôt (tenantId existe déjà).
+
+enum ProposalAcceptanceMode {
+  DOCUSEAL_SIGNATURE
+  CLICK_ACCEPT
+}
+
+enum ProposalSectionKind {
+  COVER
+  LIBRARY
+  TEXT
+  CLIENT_INPUT
+  PRICING
+  TERMS
+  SIGNATURE
+}
+
+enum ProposalLineKind {
+  REQUIRED
+  OPTIONAL
+  SETUP
+  INFO
+}
+
+enum ProposalRecurrence {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  INFO
+}
+
+enum ProposalLineGroup {
+  RECURRING
+  SETUP
+  OPTIONS
+  YEARLY
+  OUT_OF_SCOPE
+}
+
+enum ProposalPriceStatus {
+  VALIDATED
+  TO_VALIDATE
+}
+
+model ContentLibraryItem {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @db.Uuid
+  key                 String
+  title               String
+  folder              String
+  body                String
+  requiresLegalReview Boolean   @default(false)
+  seedVersion         Int?
+  seedChecksum        String?   @db.Char(64)
+  userModifiedAt      DateTime? // renseigné par l'application à toute édition dans l'interface
+  archivedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId, folder])
+}
+
+model ProposalTemplate {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  tenantId             String                 @db.Uuid
+  slug                 String
+  name                 String
+  description          String
+  target               String
+  contractTemplateSlug String
+  acceptanceMode       ProposalAcceptanceMode
+  providerCountersign  Boolean                @default(true)
+  validityDays         Int                    @default(30)
+  followUps            Json // { noOpenAfterDays, noDecisionAfterDays, beforeExpiryDays }
+  vatRatePercent       Decimal                @db.Decimal(5, 2)
+  currency             String                 @default("EUR") @db.Char(3)
+  tags                 String[]
+  pricingChoices       Json // Choice[] (schema.ts)
+  pricingRules         Json // Rule[] (schema.ts), évaluées par le moteur de tarification
+  controlCases         Json? // ControlCase[] : tests de non-régression du moteur
+  seedVersion          Int?
+  seedChecksum         String?                @db.Char(64)
+  userModifiedAt       DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  sections ProposalTemplateSection[]
+  lines    ProposalTemplatePricingLine[]
+
+  @@unique([tenantId, slug])
+}
+
+model ProposalTemplateSection {
+  id               String              @id @default(uuid()) @db.Uuid
+  templateId       String              @db.Uuid
+  template         ProposalTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  position         Int
+  key              String
+  title            String
+  kind             ProposalSectionKind
+  body             String? // Markdown avec balises {{…}}
+  libraryItemKey   String? // référence ContentLibraryItem.key du même tenant
+  guidance         String?
+  aiAssist         Boolean             @default(false)
+  optional         Boolean             @default(false)
+  validationStatus ProposalPriceStatus @default(VALIDATED)
+
+  @@unique([templateId, key])
+  @@index([templateId, position])
+}
+
+model ProposalTemplatePricingLine {
+  id                  String              @id @default(uuid()) @db.Uuid
+  templateId          String              @db.Uuid
+  template            ProposalTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  position            Int
+  key                 String
+  label               String
+  description         String?
+  kind                ProposalLineKind
+  unit                String
+  recurrence          ProposalRecurrence
+  group               ProposalLineGroup
+  quantity            Json? // { default, min, max?, maxFrom?, linkedTo?, editableByClient }
+  pricing             Json // { unitPriceCents } | { dependsOn, byChoice }
+  priceFrom           Boolean             @default(false)
+  priceStatus         ProposalPriceStatus
+  priceStatusByChoice Json?
+  priceSource         String
+  setupLineKey        String?
+  indexation          Json? // { index: "SYNTEC", a, b }
+
+  @@unique([templateId, key])
+  @@index([templateId, position])
+}
