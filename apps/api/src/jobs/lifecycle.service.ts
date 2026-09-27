@@ -6,8 +6,10 @@ import {
   findContractsToActivate,
   findContractsToExpire,
   findTerminationsDue,
+  findTacitRenewalsDue,
+  findExpressRenewalsToOpen,
 } from '@lsi/persistence';
-import { applyEvent, planReminders, type ContractEvent } from '@lsi/domain';
+import { applyEvent, nextPeriodEnd, planReminders, type ContractEvent } from '@lsi/domain';
 import { persistTransition, toContractSnapshot } from '../contracts/snapshot.js';
 
 /**
@@ -31,14 +33,94 @@ import { persistTransition, toContractSnapshot } from '../contracts/snapshot.js'
 export class LifecycleService {
   private readonly log = new Logger(LifecycleService.name);
 
-  async run(now: Date): Promise<{ activated: number; expired: number; terminated: number }> {
+  async run(now: Date): Promise<{ activated: number; expired: number; terminated: number; renewed: number; renewalsOpened: number }> {
     const activated = await this.activateDue(now);
+    // Ordre : reconduire AVANT d'expirer — un contrat tacitement reconduit ne
+    // doit jamais être vu échu (la découverte d'expiration l'exclut aussi).
+    const renewed = await this.renewTacit(now);
+    const renewalsOpened = await this.openExpressRenewals(now);
     const expired = await this.expireDue(now);
     const terminated = await this.completeTerminations(now);
-    if (activated || expired || terminated) {
-      this.log.log(`cycle de vie : ${activated} activé(s), ${expired} expiré(s), ${terminated} résilié(s)`);
+    if (activated || expired || terminated || renewed || renewalsOpened) {
+      this.log.log(
+        `cycle de vie : ${activated} activé(s), ${renewed} reconduit(s), ${renewalsOpened} renouvellement(s) ouvert(s), ` +
+          `${expired} expiré(s), ${terminated} résilié(s)`,
+      );
     }
-    return { activated, expired, terminated };
+    return { activated, expired, terminated, renewed, renewalsOpened };
+  }
+
+  /**
+   * Reconduction TACITE (V2-H10) : la période échue sans dénonciation est
+   * prolongée d'une durée de reconduction, autant de fois que nécessaire pour
+   * rattraper une interruption du job. Chaque période est tracée
+   * (contract_periods, TACIT_RENEWAL) et chaque prolongation passe par la
+   * machine (RENEW_PERIOD, acteur SYSTEM).
+   */
+  private async renewTacit(now: Date): Promise<number> {
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    let n = 0;
+    for (const ref of await findTacitRenewalsDue()) {
+      const ok = await withScope(systemScope(ref.tenantId, ref.customerId), async (tx) => {
+        let c = await tx.contract.findUnique({ where: { id: ref.id } });
+        if (!c || c.renewalMode !== 'TACIT' || !c.renewalPeriodMonths || !c.endDate) return false;
+        let guard = 0;
+        while (c.endDate && c.endDate < today && guard++ < 50) {
+          const currentEnd: Date = c.endDate;
+          const newEnd = nextPeriodEnd(currentEnd, c.renewalPeriodMonths!);
+          const event: ContractEvent = { type: 'RENEW_PERIOD', newEndDate: newEnd };
+          let next;
+          try {
+            // RENEW_PERIOD n'est admis que depuis RENEWAL_DUE : un contrat ACTIVE
+            // passe d'abord par OPEN_RENEWAL (trace complète de la reconduction).
+            if (c.status === 'ACTIVE') {
+              const open: ContractEvent = { type: 'OPEN_RENEWAL' };
+              await persistTransition(tx, c.id, open, applyEvent(toContractSnapshot(c), open, now), now);
+              c = (await tx.contract.findUnique({ where: { id: c.id } }))!;
+            }
+            next = applyEvent(toContractSnapshot(c), event, now);
+          } catch (e) {
+            this.log.warn(`reconduction impossible pour ${c.id} : ${(e as Error).message}`);
+            return false;
+          }
+          const start = new Date(currentEnd.getTime() + 86_400_000);
+          const last = await tx.contractPeriod.aggregate({ where: { contractId: c.id }, _max: { periodNumber: true } });
+          await tx.contractPeriod.create({
+            data: {
+              id: uuidv7(), tenantId: c.tenantId, customerId: c.customerId, contractId: c.id,
+              periodNumber: (last._max.periodNumber ?? 0) + 1, kind: 'TACIT_RENEWAL',
+              startDate: start, endDate: newEnd, createdAt: now,
+            },
+          });
+          await persistTransition(tx, c.id, event, next, now);
+          c = (await tx.contract.findUnique({ where: { id: c.id } }))!;
+        }
+        return true;
+      });
+      if (ok) n++;
+    }
+    return n;
+  }
+
+  /** Renouvellement EXPRÈS : à la date limite de dénonciation, une décision est attendue. */
+  private async openExpressRenewals(now: Date): Promise<number> {
+    let n = 0;
+    for (const ref of await findExpressRenewalsToOpen()) {
+      const ok = await withScope(systemScope(ref.tenantId, ref.customerId), async (tx) => {
+        const c = await tx.contract.findUnique({ where: { id: ref.id } });
+        if (!c || c.status !== 'ACTIVE') return false;
+        const event: ContractEvent = { type: 'OPEN_RENEWAL' };
+        try {
+          await persistTransition(tx, c.id, event, applyEvent(toContractSnapshot(c), event, now), now);
+        } catch (e) {
+          this.log.warn(`ouverture du renouvellement impossible pour ${c.id} : ${(e as Error).message}`);
+          return false;
+        }
+        return true;
+      });
+      if (ok) n++;
+    }
+    return n;
   }
 
   private async completeTerminations(now: Date): Promise<number> {
@@ -112,7 +194,7 @@ export class LifecycleService {
     for (const ref of candidates) {
       const ok = await withScope(systemScope(ref.tenantId, ref.customerId), async (tx) => {
         const c = await tx.contract.findUnique({ where: { id: ref.id } });
-        if (!c || c.status !== 'ACTIVE') return false;
+        if (!c || (c.status !== 'ACTIVE' && c.status !== 'RENEWAL_DUE')) return false;
 
         // « Successeur signé » = renouvellement effectivement signé (RM-07).
         const successor = c.successorContractId

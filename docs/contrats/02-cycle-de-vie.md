@@ -141,6 +141,25 @@ calendaires UTC (minuit), affichées en `Europe/Paris`.
   rouge et le contrat est marqué `chatelBreach`. **À faire valider par un
   juriste.**
 
+### 5.1 Câblage (lot 5, migration 25)
+
+| Élément | Implémentation |
+|---|---|
+| Découverte reconduction tacite | `app_find_tacit_renewals_due` : `MAIN`, `ACTIVE`/`RENEWAL_DUE`, `TACIT`, terme dépassé |
+| Découverte renouvellement exprès | `app_find_express_renewals_to_open` : `ACTIVE`, `EXPRESS`, date limite (`app_notice_deadline`) atteinte |
+| Expiration | `app_find_contracts_to_expire` exclut désormais `TACIT` et inclut `RENEWAL_DUE` |
+| Job quotidien (`LifecycleService.run`) | activer → **reconduire** (`OPEN_RENEWAL` + `RENEW_PERIOD` par période manquée, rattrapage borné à 50) → ouvrir les renouvellements exprès → expirer → achever les résiliations |
+| `POST /v1/contracts/:id/renewal/renew` `{months?}` | renouvellement décidé : période `EXPRESS_RENEWAL` (ou `TACIT_RENEWAL`), durée par défaut `renewalPeriodMonths` |
+| `POST /v1/contracts/:id/renewal/close` `{reason}` | non-renouvellement décidé : retour `ACTIVE`, expiration au terme |
+| `GET /v1/contracts/:id/termination-preview?requestedDate=` | date d'effet calculée, date limite, dépassement |
+| `POST /v1/contracts/:id/terminate` | `effectiveDate` **facultative** : absente, elle est calculée côté serveur |
+| `POST /v1/contracts/:id/termination-letter` (multipart `letter`, PDF) | `StoredDocument TERMINATION_LETTER`, empreinte SHA-256 à réception ; seulement en `TERMINATION_PENDING`/`TERMINATED` |
+| `POST /v1/contracts/:id/withdraw-termination` `{reason}` | `WITHDRAW_TERMINATION` → `ACTIVE`, échéancier recalculé |
+
+Toutes les transitions passent par `persistTransition` (machine + événement
+de cycle de vie + webhooks sortants). Droits : `contracts.lifecycle`
+(MSP_ADMIN, ACCOUNT_MANAGER) ; aperçu : `contracts.read`.
+
 ## 6. Échéancier
 
 Le job quotidien du worker (`DeadlinesService.recompute`) matérialise pour

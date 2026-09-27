@@ -25,6 +25,8 @@ import { HealthController } from './health/health.controller.js';
 import { TenantConfigController } from './tenant/tenant-config.controller.js';
 import { TenantConfigService } from './tenant/tenant-config.service.js';
 import { ImportsController } from './imports/imports.controller.js';
+import { RenewalController } from './renewal/renewal.controller.js';
+import { RenewalService } from './renewal/renewal.service.js';
 import { ImportsService } from './imports/imports.service.js';
 import { HttpOcrClient, OCR_CLIENT } from './imports/ocr.client.js';
 import { DeadlinesController } from './deadlines/deadlines.controller.js';
@@ -139,6 +141,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     HealthController,
     TenantConfigController,
     ImportsController,
+    RenewalController,
     DeadlinesController,
     StructureController,
     NegotiationController,
@@ -155,6 +158,7 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     WebhooksAdminService,
     WebhookDeliveryService,
     ImportsService,
+    RenewalService,
     DeadlinesService,
     StructureService,
     ClauseLibraryService,

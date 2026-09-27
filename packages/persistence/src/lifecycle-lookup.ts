@@ -62,3 +62,19 @@ export async function findPendingOcrImports(limit = 100): Promise<ScopeRef[]> {
   >`SELECT * FROM app_find_pending_ocr_imports(${limit}::int)`;
   return rows.map(toRef);
 }
+
+/** Reconduction TACITE due : période échue sans dénonciation (02-cycle-de-vie §5). */
+export async function findTacitRenewalsDue(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_tacit_renewals_due(${limit}::int)`;
+  return rows.map(toRef);
+}
+
+/** Renouvellement EXPRÈS à ouvrir : date limite de dénonciation atteinte. */
+export async function findExpressRenewalsToOpen(limit = 500): Promise<ScopeRef[]> {
+  const rows = await unsafeUnscopedClient.$queryRaw<
+    { id: string; tenant_id: string; customer_id: string }[]
+  >`SELECT * FROM app_find_express_renewals_to_open(${limit}::int)`;
+  return rows.map(toRef);
+}

@@ -31,6 +31,8 @@ export {
   findTerminationsDue,
   findContractsForDeadlines,
   findPendingOcrImports,
+  findTacitRenewalsDue,
+  findExpressRenewalsToOpen,
   type ScopeRef,
 } from './lifecycle-lookup.js';
 export { findDueReminders, type DueReminderRef } from './scheduler-lookup.js';

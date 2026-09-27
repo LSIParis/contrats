@@ -5,6 +5,7 @@ import {
   applyEvent,
   allowedEvents,
   isNoticeRespected,
+  computeTerminationEffectiveDate,
   assertCanRenew,
   assertCanAmend,
   InvalidTransitionError,
@@ -425,7 +426,14 @@ export class ContractsService {
       });
       if (!c) throw new NotFoundException('Contrat introuvable'); // RLS -> 404 hors scope
 
-      const effectiveDate = new Date(dto.effectiveDate);
+      const effectiveDate = dto.effectiveDate
+        ? new Date(dto.effectiveDate)
+        : computeTerminationEffectiveDate({
+            today: now,
+            notice: { days: c.noticePeriodDays, months: c.noticePeriodMonths },
+            periodEnd: c.endDate,
+            renewalPeriodMonths: c.renewalMode === 'TACIT' ? c.renewalPeriodMonths : null,
+          }).effectiveDate;
       const isAdmin = session.roles.includes('MSP_ADMIN');
       const snapshot = toContractSnapshot(c);
       const event: ContractEvent = {
@@ -462,7 +470,7 @@ export class ContractsService {
       // TERMINATED si elle l'est déjà.
       await persistTransition(tx, id, event, next, now, session.userId);
 
-      return { status: next.status, effectiveDate: dto.effectiveDate, noticeRespected };
+      return { status: next.status, effectiveDate: effectiveDate.toISOString().slice(0, 10), noticeRespected };
     });
   }
 
