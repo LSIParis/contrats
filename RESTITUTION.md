@@ -117,6 +117,12 @@ uniquement** : aucun parcours n'a encore été fait dans un navigateur (§6).
   pas de liste des liens d'accès par destinataire d'une proposition (l'historique d'envoi en tient lieu).
 - Éditeur de texte des propositions en Markdown (pas de conversion HTML ↔ Markdown avec perte).
 
+- **Vulnérabilités acceptées jusqu'au 2026-12-31** (`.trivyignore`, justifiées, le scan échoue de
+  nouveau après cette date) : `@fastify/middie` 8 (NestJS 10, aucun middleware utilisé) et `tar` 6
+  embarqué par pnpm 9 (pnpm n'y sert que de lanceur). À traiter d'ici là : **migration NestJS 11 /
+  Fastify 5**, et lanceurs `node` directs dans la stack (image d'exécution sans pnpm).
+- L'image ne contient plus que les dépendances de production (outils de test et de build retirés).
+
 ## 8. Interface
 
 | Domaine | Écrans |
