@@ -1,3 +1,4 @@
+import { ApiClientsService, type AuthenticatedClient } from './public-api/api-clients.service.js';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import fastifyCookie from '@fastify/cookie';
@@ -104,6 +105,21 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
 
   fastify.addHook('onRequest', async (req, reply) => {
     void reply.header('x-request-id', req.id);
+  });
+
+  // Journal de CHAQUE appel à l'API publique (brief §8) : après la réponse,
+  // statut final compris (erreurs de guard, 304, 429). Best-effort.
+  const apiClients = app.get(ApiClientsService, { strict: false });
+  fastify.addHook('onResponse', async (req, reply) => {
+    const client = (req as { apiClient?: AuthenticatedClient }).apiClient;
+    if (!client) return;
+    void apiClients.record(client, {
+      method: req.method,
+      route: req.routeOptions?.url ?? req.url.split('?')[0]!,
+      status: reply.statusCode,
+      durationMs: reply.elapsedTime,
+      requestId: String(req.id),
+    }, new Date());
   });
 
   // En-têtes de sécurité, posés par l'APPLICATION (elle seule connaît ses

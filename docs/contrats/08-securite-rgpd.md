@@ -109,6 +109,19 @@ privé — c'est un choix d'exploitation à consigner.
   d'audit chaîné (`webhook.subscription.auto_disabled`) ; les actions
   d'administration le sont par l'intercepteur d'audit.
 
+### 3.5 API publique (lot 7)
+
+- Clés d'API `ctr_<prefix>_<secret>` : secret de 256 bits, **seul son SHA-256 est stocké**
+  (`api_clients.key_hash`) ; affichée une fois, rotation et révocation immédiates ; comparaison à temps
+  constant. Aucune clé n'est journalisée (le journal applicatif ne contient pas l'en-tête
+  `Authorization`).
+- Résolution d'une clé avant tout scope par une fonction SECURITY DEFINER bornée à un préfixe exact
+  (clés actives, tenants actifs) ; ensuite la RLS du tenant s'applique comme pour une session.
+- `api_call_log` : méthode, motif de route, statut, durée, identifiant de requête, **sans corps ni
+  paramètre** (donc sans donnée personnelle) ; table append-only (`UPDATE`/`DELETE` révoqués).
+  Conservation proposée : 12 mois (hypothèse, à confirmer avec le registre des traitements).
+- `ai_usage` (lot 6) : jetons, coût, durée, statut par appel IA — aucun texte.
+
 ## 4. Stockage des documents et preuve
 
 ## 5. Journal d'audit

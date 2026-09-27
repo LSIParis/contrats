@@ -377,6 +377,8 @@ model Tenant {
   clauseItems  ClauseLibraryItem[]
   priceIndexes PriceIndex[]
   aiUsage      AiUsage[]
+  apiClients   ApiClient[]
+  apiCalls     ApiCallLog[]
   pricingRules PricingRule[]
 
   webhookSubscriptions WebhookSubscription[]
@@ -1803,4 +1805,52 @@ model AiUsage {
 
   @@index([tenantId, createdAt], map: "ai_usage_tenant_month_idx")
   @@map("ai_usage")
+}
+
+// ===========================================================================
+// Lot 7 : API publique (migration 27)
+// ===========================================================================
+
+/// Application consommatrice de /api/v1 : clé hachée, scopes, débit.
+model ApiClient {
+  id                 String    @id @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  name               String
+  description        String?
+  keyPrefix          String    @unique @map("key_prefix")
+  keyHash            String    @map("key_hash") @db.Char(64)
+  scopes             String[]
+  rateLimitPerMinute Int       @default(120) @map("rate_limit_per_minute")
+  active             Boolean   @default(true)
+  revokedAt          DateTime? @map("revoked_at")
+  lastUsedAt         DateTime? @map("last_used_at")
+  createdByUserId    String?   @map("created_by_user_id") @db.Uuid
+  createdAt          DateTime  @map("created_at")
+  updatedAt          DateTime  @map("updated_at")
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  calls  ApiCallLog[]
+
+  @@unique([id, tenantId], map: "api_clients_scope_key")
+  @@index([tenantId, active], map: "api_clients_tenant_idx")
+  @@map("api_clients")
+}
+
+/// Un appel à /api/v1 (append-only) : route, statut, durée ; aucun corps.
+model ApiCallLog {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  method     String
+  route      String
+  status     Int
+  durationMs Int      @map("duration_ms")
+  requestId  String?  @map("request_id")
+  createdAt  DateTime @map("created_at")
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client ApiClient @relation(fields: [clientId, tenantId], references: [id, tenantId], map: "api_call_log_client_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, clientId, createdAt], map: "api_call_log_client_idx")
+  @@map("api_call_log")
 }

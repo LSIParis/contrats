@@ -6,6 +6,8 @@ import { AppModule } from '../../src/app.module.js';
 import { listRoutes, type RouteInfo } from '../support/introspect.js';
 import { IS_PUBLIC_KEY } from '../../src/auth/public.decorator.js';
 import { Reflector } from '@nestjs/core';
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
+import { ApiClientGuard } from '../../src/public-api/api-client.guard.js';
 
 let app: INestApplication;
 let routes: RouteInfo[];
@@ -36,12 +38,23 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
   test('aucune route n’est accessible sans guard ni @Public() délibéré', () => {
     const reflector = app.get(Reflector);
     const unguarded: string[] = [];
+    const apiGuarded: string[] = [];
 
     for (const r of routes) {
       const isPublic = reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [r.handler, r.controller]);
       // Le guard global couvre TOUT. La seule échappatoire est @Public(),
       // qui est cherchable dans le dépôt et refusable en revue.
       if (isPublic === undefined) continue; // couvert par le guard global
+      // API publique /api/v1 : @Public() pour le guard de SESSION, mais gardée
+      // par la clé d'API (ApiClientGuard) — ce n'est pas une route ouverte.
+      const guards = [
+        ...((Reflect.getMetadata(GUARDS_METADATA, r.controller) as unknown[]) ?? []),
+        ...((Reflect.getMetadata(GUARDS_METADATA, r.handler) as unknown[]) ?? []),
+      ];
+      if (isPublic === true && guards.includes(ApiClientGuard)) {
+        apiGuarded.push(`${r.method} ${r.path}`);
+        continue;
+      }
       if (isPublic === true) {
         // Une route publique est légitime (webhook, healthcheck), mais elle
         // doit être rare et intentionnelle.
@@ -52,6 +65,8 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
     // On fige la liste : ajouter une route publique devient une décision
     // explicite qui casse ce test et exige de le mettre à jour.
     expect(unguarded.sort()).toEqual([
+      'GET /api/v1/docs',
+      'GET /api/v1/openapi.json',
       'GET /health',
       'GET /health/ready',
       'GET /healthz',
@@ -63,6 +78,9 @@ describe('§16.4-D — toute route est gardée ou explicitement publique', () =>
       'POST /v1/portal/auth/request-link',
       'POST /v1/webhooks/docuseal',
     ]);
+    // Toute route /api/v1 hors description publique est gardée par la clé d'API.
+    expect(apiGuarded.length).toBeGreaterThan(0);
+    expect(apiGuarded.every((r) => r.includes(' /api/v1/'))).toBe(true);
   });
 });
 

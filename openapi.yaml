@@ -1,0 +1,1268 @@
+# Fichier GÉNÉRÉ (pnpm openapi:generate) depuis apps/api/src/public-api — ne pas modifier à la main.
+openapi: 3.1.0
+info:
+  title: LSI-Maintenance — API Contrats
+  version: 1.0.0
+  description: "API de lecture des contrats clients pour les applications de la suite LSI-Maintenance. Authentification par clé d’API (`Authorization: Bearer ctr_…`), scopes fins, débit limité par client. Pagination par curseur (`nextCursor`), `ETag` / `If-None-Match`, erreurs RFC 9457. Guide : docs/contrats/07-api.md."
+servers:
+  - url: https://contrats.lsi-maintenance.fr
+tags:
+  - name: Contrats
+  - name: Tarification
+  - name: Échéances
+  - name: Webhooks
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: ctr_<prefix>_<secret>
+      description: "Clé créée par un administrateur (Paramètres → API). Scopes : contracts:read, contracts:dates:read, pricing:read, pricing:quote, webhooks:manage."
+  schemas:
+    Contract:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        reference:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum:
+            - MAIN
+            - AMENDMENT
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - IN_REVIEW
+            - CHANGES_REQUESTED
+            - APPROVED
+            - SENT_TO_CLIENT
+            - IN_NEGOTIATION
+            - ACCEPTED
+            - PENDING_SIGNATURE
+            - PARTIALLY_SIGNED
+            - SIGNATURE_EXPIRED
+            - SIGNED
+            - ACTIVE
+            - RENEWAL_DUE
+            - TERMINATION_PENDING
+            - EXPIRED
+            - TERMINATED
+            - RENEWED
+            - CANCELLED
+            - DECLINED
+            - IMPORTED_PENDING_VALIDATION
+        origin:
+          type: string
+          enum:
+            - NATIVE
+            - IMPORTED
+            - AI
+        category:
+          type: string
+        customer:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            name:
+              type: string
+            externalRef:
+              anyOf:
+                - type: string
+                - type: "null"
+            siren:
+              anyOf:
+                - type: string
+                - type: "null"
+          required:
+            - id
+            - name
+            - externalRef
+            - siren
+          additionalProperties: false
+        parentContractId:
+          anyOf:
+            - type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            - type: "null"
+        currency:
+          type: string
+        startDate:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+        endDate:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+        renewalMode:
+          type: string
+          enum:
+            - NONE
+            - TACIT
+            - EXPRESS
+        signatureMode:
+          anyOf:
+            - type: string
+              enum:
+                - PDF
+                - TEMPLATE
+            - type: "null"
+          description: Mode de la dernière demande de signature ; null si aucune.
+        signedAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        activatedAt:
+          anyOf:
+            - type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            - type: "null"
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+      required:
+        - id
+        - reference
+        - title
+        - type
+        - status
+        - origin
+        - category
+        - customer
+        - parentContractId
+        - currency
+        - startDate
+        - endDate
+        - renewalMode
+        - signatureMode
+        - signedAt
+        - activatedAt
+        - updatedAt
+      additionalProperties: false
+    ContractPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              reference:
+                type: string
+              title:
+                type: string
+              type:
+                type: string
+                enum:
+                  - MAIN
+                  - AMENDMENT
+              status:
+                type: string
+                enum:
+                  - DRAFT
+                  - IN_REVIEW
+                  - CHANGES_REQUESTED
+                  - APPROVED
+                  - SENT_TO_CLIENT
+                  - IN_NEGOTIATION
+                  - ACCEPTED
+                  - PENDING_SIGNATURE
+                  - PARTIALLY_SIGNED
+                  - SIGNATURE_EXPIRED
+                  - SIGNED
+                  - ACTIVE
+                  - RENEWAL_DUE
+                  - TERMINATION_PENDING
+                  - EXPIRED
+                  - TERMINATED
+                  - RENEWED
+                  - CANCELLED
+                  - DECLINED
+                  - IMPORTED_PENDING_VALIDATION
+              origin:
+                type: string
+                enum:
+                  - NATIVE
+                  - IMPORTED
+                  - AI
+              category:
+                type: string
+              customer:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                  externalRef:
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                  siren:
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                required:
+                  - id
+                  - name
+                  - externalRef
+                  - siren
+                additionalProperties: false
+              parentContractId:
+                anyOf:
+                  - type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  - type: "null"
+              currency:
+                type: string
+              startDate:
+                anyOf:
+                  - type: string
+                    format: date
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                    description: Date calendaire AAAA-MM-JJ
+                  - type: "null"
+              endDate:
+                anyOf:
+                  - type: string
+                    format: date
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                    description: Date calendaire AAAA-MM-JJ
+                  - type: "null"
+              renewalMode:
+                type: string
+                enum:
+                  - NONE
+                  - TACIT
+                  - EXPRESS
+              signatureMode:
+                anyOf:
+                  - type: string
+                    enum:
+                      - PDF
+                      - TEMPLATE
+                  - type: "null"
+                description: Mode de la dernière demande de signature ; null si aucune.
+              signedAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              activatedAt:
+                anyOf:
+                  - type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+                  - type: "null"
+              updatedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+            required:
+              - id
+              - reference
+              - title
+              - type
+              - status
+              - origin
+              - category
+              - customer
+              - parentContractId
+              - currency
+              - startDate
+              - endDate
+              - renewalMode
+              - signatureMode
+              - signedAt
+              - activatedAt
+              - updatedAt
+            additionalProperties: false
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
+      required:
+        - data
+        - nextCursor
+      additionalProperties: false
+    ContractDates:
+      type: object
+      properties:
+        contractId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        effectiveDate:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+          description: Date d’effet.
+        currentPeriodEnd:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+          description: Fin de la période en cours ; null pour une durée indéterminée.
+        noticeDeadline:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+          description: Date limite de dénonciation de la période en cours.
+        nextPriceRevision:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+        nextRenewal:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+          description: Début de la prochaine période si le contrat se renouvelle.
+        renewalMode:
+          type: string
+          enum:
+            - NONE
+            - TACIT
+            - EXPRESS
+        terminationEffectiveDate:
+          anyOf:
+            - type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              description: Date calendaire AAAA-MM-JJ
+            - type: "null"
+      required:
+        - contractId
+        - effectiveDate
+        - currentPeriodEnd
+        - noticeDeadline
+        - nextPriceRevision
+        - nextRenewal
+        - renewalMode
+        - terminationEffectiveDate
+      additionalProperties: false
+    Deadline:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        contractId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        customerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        kind:
+          type: string
+        dueDate:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+          description: Date calendaire AAAA-MM-JJ
+        status:
+          type: string
+          enum:
+            - OPEN
+            - DONE
+        details:
+          anyOf:
+            - {}
+            - type: "null"
+      required:
+        - id
+        - contractId
+        - customerId
+        - kind
+        - dueDate
+        - status
+        - details
+      additionalProperties: false
+    DeadlinePage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              contractId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              customerId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              kind:
+                type: string
+              dueDate:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                description: Date calendaire AAAA-MM-JJ
+              status:
+                type: string
+                enum:
+                  - OPEN
+                  - DONE
+              details:
+                anyOf:
+                  - {}
+                  - type: "null"
+            required:
+              - id
+              - contractId
+              - customerId
+              - kind
+              - dueDate
+              - status
+              - details
+            additionalProperties: false
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
+      required:
+        - data
+        - nextCursor
+      additionalProperties: false
+    Pricing:
+      type: object
+      properties:
+        contractId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        at:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+          description: Date calendaire AAAA-MM-JJ
+        currency:
+          type: string
+        lines:
+          type: array
+          items:
+            type: object
+            propertyNames:
+              type: string
+            additionalProperties: {}
+      additionalProperties: {}
+      description: "Barème à la date : montants en centimes, en chaînes (précision exacte). Détail : 04-tarification.md."
+    Quote:
+      type: object
+      properties: {}
+      additionalProperties: {}
+      description: "Devis : prix unitaire, total HT/TTC en centimes (chaînes), règle appliquée, trace."
+    QuoteRequest:
+      type: object
+      properties:
+        contractId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        customerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        articleCode:
+          type: string
+          minLength: 1
+          maxLength: 64
+        quantity:
+          type: string
+          pattern: ^\d{1,14}(\.\d{1,6})?$
+        date:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        ruleCode:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$
+        vatRatePercent:
+          type: string
+          pattern: ^\d{1,3}(\.\d{1,2})?$
+      required:
+        - articleCode
+        - quantity
+      additionalProperties: false
+    Webhook:
+      type: object
+      properties: {}
+      additionalProperties: {}
+    CreateWebhookRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          minLength: 8
+          maxLength: 2048
+        description:
+          type: string
+          maxLength: 500
+        eventTypes:
+          minItems: 1
+          maxItems: 6
+          type: array
+          items:
+            type: string
+            enum:
+              - contract.activated
+              - contract.signed
+              - contract.renewal_due
+              - contract.renewed
+              - contract.terminated
+              - pricing.revised
+      required:
+        - url
+        - eventTypes
+      additionalProperties: false
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+        - code
+      additionalProperties: {}
+      description: Erreur RFC 9457 (`application/problem+json`).
+paths:
+  /api/v1/clients/{clientRef}/contracts:
+    get:
+      operationId: listClientContracts
+      summary: Contrats d’un client
+      description: "`clientRef` : identifiant du client (UUID), son SIREN (9 chiffres) ou sa référence externe (Client Help)."
+      tags:
+        - Contrats
+      security:
+        - apiKey:
+            - contracts:read
+      x-required-scope: contracts:read
+      parameters:
+        - name: clientRef
+          in: path
+          required: true
+          description: UUID, SIREN ou référence externe du client
+          schema:
+            type: string
+            maxLength: 100
+        - name: cursor
+          in: query
+          required: false
+          description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+          schema:
+            description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+            type: string
+            maxLength: 500
+        - name: limit
+          in: query
+          required: false
+          schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: status
+          in: query
+          required: false
+          description: Statuts séparés par des virgules, ex. `ACTIVE,RENEWAL_DUE`.
+          schema:
+            description: Statuts séparés par des virgules, ex. `ACTIVE,RENEWAL_DUE`.
+            type: string
+            pattern: ^[A-Z_]+(,[A-Z_]+)*$
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MAIN
+              - AMENDMENT
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractPage"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/contracts/{id}:
+    get:
+      operationId: getContract
+      summary: "Détail d’un contrat : statut, origine, mode de signature"
+      tags:
+        - Contrats
+      security:
+        - apiKey:
+            - contracts:read
+      x-required-scope: contracts:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant du contrat
+          schema:
+            type: string
+            format: uuid
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/contracts/{id}/dates:
+    get:
+      operationId: getContractDates
+      summary: "Dates clés : effet, fin de période, date limite de préavis, prochaine révision, prochain renouvellement"
+      tags:
+        - Contrats
+      security:
+        - apiKey:
+            - contracts:dates:read
+      x-required-scope: contracts:dates:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant du contrat
+          schema:
+            type: string
+            format: uuid
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractDates"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/contracts/{id}/pricing:
+    get:
+      operationId: getContractPricing
+      summary: Barème applicable à une date, trace de calcul optionnelle
+      tags:
+        - Tarification
+      security:
+        - apiKey:
+            - pricing:read
+      x-required-scope: pricing:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant du contrat
+          schema:
+            type: string
+            format: uuid
+        - name: at
+          in: query
+          required: false
+          description: "Date d’application ; défaut : aujourd’hui (Europe/Paris)."
+          schema:
+            description: "Date d’application ; défaut : aujourd’hui (Europe/Paris)."
+            type: string
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        - name: trace
+          in: query
+          required: false
+          description: "`true` : inclut la trace de calcul."
+          schema:
+            description: "`true` : inclut la trace de calcul."
+            type: string
+            enum:
+              - "true"
+              - "false"
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pricing"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/pricing/quote:
+    post:
+      operationId: quote
+      summary: Prix pour un client, un article, une quantité et une date
+      tags:
+        - Tarification
+      security:
+        - apiKey:
+            - pricing:quote
+      x-required-scope: pricing:quote
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "200":
+          description: Succès
+          headers:
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/deadlines:
+    get:
+      operationId: listDeadlines
+      summary: Échéances à venir, tous contrats confondus
+      tags:
+        - Échéances
+      security:
+        - apiKey:
+            - contracts:dates:read
+      x-required-scope: contracts:dates:read
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+          schema:
+            description: Curseur opaque renvoyé par la page précédente (`nextCursor`).
+            type: string
+            maxLength: 500
+        - name: limit
+          in: query
+          required: false
+          schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 200
+        - name: from
+          in: query
+          required: false
+          description: "Défaut : aujourd’hui."
+          schema:
+            description: "Défaut : aujourd’hui."
+            type: string
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        - name: to
+          in: query
+          required: false
+          description: "Défaut : `from` + 90 jours. Fenêtre maximale : 366 jours."
+          schema:
+            description: "Défaut : `from` + 90 jours. Fenêtre maximale : 366 jours."
+            type: string
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: ^[A-Z_]+(,[A-Z_]+)*$
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadlinePage"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/webhooks:
+    get:
+      operationId: listWebhooks
+      summary: Abonnements aux webhooks sortants du tenant
+      tags:
+        - Webhooks
+      security:
+        - apiKey:
+            - webhooks:manage
+      x-required-scope: webhooks:manage
+      parameters:
+        - name: If-None-Match
+          in: header
+          required: false
+          description: ETag d’une réponse précédente → 304 si inchangée.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Succès
+          headers:
+            ETag:
+              schema:
+                type: string
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "304":
+          description: Non modifié (If-None-Match)
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    post:
+      operationId: createWebhook
+      summary: Crée un abonnement ; le secret HMAC n’est renvoyé qu’une fois
+      tags:
+        - Webhooks
+      security:
+        - apiKey:
+            - webhooks:manage
+      x-required-scope: webhooks:manage
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWebhookRequest"
+      responses:
+        "201":
+          description: Succès
+          headers:
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/webhooks/{id}:
+    delete:
+      operationId: disableWebhook
+      summary: Désactive un abonnement
+      tags:
+        - Webhooks
+      security:
+        - apiKey:
+            - webhooks:manage
+      x-required-scope: webhooks:manage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de l’abonnement
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Succès
+          headers:
+            RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "400":
+          description: Requête invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          description: Clé d’API absente ou invalide
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          description: Scope insuffisant ou API désactivée
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: Ressource introuvable (ou hors du tenant)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          description: Débit dépassé (`Retry-After`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"

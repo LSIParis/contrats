@@ -144,6 +144,9 @@ importers:
       vitest:
         specifier: ^2.1.5
         version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(terser@5.49.0)
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
   apps/web:
     dependencies:
@@ -216,6 +219,18 @@ importers:
         version: 5.4.21(@types/node@22.20.1)(terser@5.49.0)
       vitest:
         specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(terser@5.49.0)
+
+  packages/contrats-client:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
         version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(terser@5.49.0)
 
   packages/domain:

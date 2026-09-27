@@ -25,6 +25,7 @@ export {
   type ResolvedWebhookScope,
 } from './webhook-scope-lookup.js';
 export { findSignaturesNeedingProof, findSignaturesNeedingSync } from './reconciliation-lookup.js';
+export { resolveApiKeyPrefix, type ResolvedApiKey } from './api-key-lookup.js';
 export {
   findContractsToActivate,
   findContractsToExpire,

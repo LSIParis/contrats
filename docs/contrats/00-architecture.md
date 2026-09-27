@@ -198,6 +198,9 @@ isolation → souveraineté → réversibilité).
 | V2-H29 | Une dérogation en attente de seconde validation n'est jamais appliquée, même si l'écart retombe sous le seuil. | sens le plus prudent | la transmettre au moteur |
 | V2-H30 | L'extraction assistée par LLM d'un import est déclenchée par une action explicite, jamais automatiquement par le job OCR. | envoyer un document client à un sous-traitant se décide au cas par cas | l'enchaîner à l'OCR quand `contrats.ai.enabled` est actif |
 | V2-H31 | Une rédaction IA en mode `replace` fait passer `contracts.origin` de `NATIVE` à `AI` ; `append` ne la change pas. | l'origine qualifie le texte dominant | champ dédié |
+| V2-H32 | La limitation de débit de l'API publique est tenue en mémoire du processus (fenêtre glissante d'une minute). | une seule instance d'API par déploiement | compteur Redis partagé si l'API est répliquée |
+| V2-H33 | L'API publique s'authentifie par clé d'API hachée (une par application), pas par OAuth2 *client credentials*. | le brief laisse le choix ; échanges serveur à serveur | serveur d'autorisation OAuth2 |
+| V2-H34 | `@lsi/contrats-client` reste `private` tant que le registre de paquets interne de la suite n'est pas désigné. | pas de publication accidentelle | publication GitHub Packages |
 
 ## 7. Ce qui n'est pas dans le périmètre
 

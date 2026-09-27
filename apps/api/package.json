@@ -10,7 +10,9 @@
     "start": "node --import @swc-node/register/esm-register src/main.ts",
     "start:dev": "node --watch --import @swc-node/register/esm-register src/main.ts",
     "start:worker": "node --import @swc-node/register/esm-register src/worker.ts",
-    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/api"
+    "test:ci": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=lcov --coverage.reportsDirectory=../../coverage/api",
+    "openapi:generate": "node --import @swc-node/register/esm-register scripts/generate-openapi.ts",
+    "openapi:check": "node --import @swc-node/register/esm-register scripts/generate-openapi.ts --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.114.0",
@@ -54,6 +56,7 @@
     "testcontainers": "^10.13.2",
     "typescript": "^5.6.3",
     "unplugin-swc": "^1.5.9",
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.5",
+    "yaml": "2.9.0"
   }
 }

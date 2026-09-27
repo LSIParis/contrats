@@ -1,27 +1,133 @@
 # 07 — API
 
-> Spécification des interfaces offertes aux autres applications de la suite
-> (brief §8). Plan du document — les sections marquées *(lot 7)* seront
-> rédigées avec l'API publique ; **la section 5 (webhooks sortants) est
-> livrée** (lot 5).
+> Guide d'intégration des interfaces offertes aux autres applications de la
+> suite (brief §8) : API publique `/api/v1` (§1–4, §6), webhooks sortants (§5).
 
-## 1. Principes *(lot 7)*
+## 1. Principes
 
-- `/api/v1`, versionnée ; description OpenAPI 3.1 générée depuis les schémas
-  Zod (`z.toJSONSchema()`), servie à `/api/v1/openapi.json`, documentation
-  navigable auto-hébergée `/api/v1/docs`.
-- Pagination par curseur, `ETag` / `If-None-Match`, erreurs RFC 9457
-  (`application/problem+json`).
+- Base : `https://contrats.lsi-maintenance.fr/api/v1`, versionnée dans le chemin. Une rupture de
+  contrat ouvrira `/api/v2` ; `/api/v1` n'évolue que par ajouts (champ, route, valeur d'énumération).
+- Description **OpenAPI 3.1** générée depuis les schémas Zod qui valident réellement les requêtes
+  (`apps/api/src/public-api/schemas.ts` → `openapi.ts`) : servie à `/api/v1/openapi.json`, figée dans
+  le dépôt (`openapi.yaml`), documentation navigable à `/api/v1/docs` (rendue côté serveur, sans
+  script ni ressource externe). Un test échoue si une route du contrôleur n'est pas décrite, un autre si
+  `openapi.yaml` ou le client généré ne sont pas à jour (`pnpm openapi:generate`).
+- JSON UTF-8 ; dates calendaires `AAAA-MM-JJ` ; instants ISO 8601 UTC ; montants en **centimes, en
+  chaînes** (précision exacte, cf. 04-tarification).
+- **Pagination par curseur** : `?limit=` (1–200, défaut 50) et `?cursor=` ; la réponse porte
+  `{ data: [...], nextCursor }`, `nextCursor = null` en fin de liste. Le curseur est opaque : le renvoyer
+  tel quel, ne jamais le construire.
+- **ETag** sur toutes les lectures : renvoyer `If-None-Match: <etag>` → `304 Not Modified` sans corps
+  si rien n'a changé.
+- **Erreurs RFC 9457** (`application/problem+json`, §6).
+- Lecture seule sur les contrats : l'API ne modifie rien, hors abonnements aux webhooks
+  (`webhooks:manage`) — les écritures métier restent dans l'application, sous contrôle humain.
 
-## 2. Authentification et scopes *(lot 7)*
+## 2. Authentification et scopes
 
-`ApiClient` par application consommatrice, clé d'API hachée en base
-(`ctr_<prefix>_<secret>`, V2-H8). Scopes : `contracts:read`,
-`contracts:dates:read`, `pricing:read`, `pricing:quote`, `webhooks:manage`.
+**Clé d'API hachée** (le brief laisse le choix avec OAuth2 *client credentials* ; V2-H33 : une clé
+par application de la suite, révocable et tournante, suffit à des échanges serveur à serveur et évite un
+serveur d'autorisation de plus).
 
-## 3. Endpoints de lecture *(lot 7)*
+- Un administrateur (`MSP_ADMIN`) crée un **client d'API** : `POST /v1/admin/api-clients`
+  `{name, description?, scopes[], rateLimitPerMinute?}`. La clé `ctr_<prefix>_<secret>` est affichée
+  **une seule fois** ; seul le SHA-256 du secret (256 bits aléatoires) est stocké
+  (`api_clients.key_hash`). Rotation : `POST /v1/admin/api-clients/:id/rotate` (l'ancienne clé cesse
+  immédiatement) ; révocation : `…/revoke`.
+- Chaque requête : `Authorization: Bearer ctr_<prefix>_<secret>`. La clé est résolue par son préfixe
+  (fonction `app_resolve_api_key`, SECURITY DEFINER, clés actives de tenants actifs), le hachage comparé
+  à temps constant.
+- Le drapeau **`contrats.api.enabled`** du tenant doit être actif (sinon `403 API_DISABLED`).
+- Le client lit **tout le tenant** (pas de portefeuille) ; la RLS reste la barrière entre tenants :
+  un identifiant d'un autre tenant répond `404`, comme une ressource inexistante.
 
-## 4. Client TypeScript généré *(lot 7)*
+| Scope | Donne accès à |
+|---|---|
+| `contracts:read` | `GET /clients/{clientRef}/contracts`, `GET /contracts/{id}` |
+| `contracts:dates:read` | `GET /contracts/{id}/dates`, `GET /deadlines` |
+| `pricing:read` | `GET /contracts/{id}/pricing` |
+| `pricing:quote` | `POST /pricing/quote` |
+| `webhooks:manage` | `GET/POST /webhooks`, `DELETE /webhooks/{id}` |
+
+**Débit** : fenêtre glissante d'une minute par client (`rateLimitPerMinute`, 120 par défaut), en-têtes
+`RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` ; dépassement → `429` + `Retry-After`
+(V2-H32 : compteur en mémoire du processus, une instance d'API par déploiement).
+
+**Journal** : chaque appel est tracé dans `api_call_log` (client, méthode, **motif** de route
+`/api/v1/contracts/:id`, statut final, durée, identifiant de requête — jamais de corps ni de paramètre) ;
+`api_clients.last_used_at` est mis à jour.
+
+La clé de service historique (`X-Api-Key`, `CONTRACT_SERVICE_API_KEY`, routes `@ServiceReadable` de
+`/v1/contracts`) reste en place pour le ticketing ; elle n'ouvre pas `/api/v1`, une session
+utilisateur non plus.
+
+## 3. Endpoints
+
+| Méthode | Chemin | Scope | Réponse |
+|---|---|---|---|
+| `GET` | `/api/v1/clients/{clientRef}/contracts?status=&type=&cursor=&limit=` | `contracts:read` | `ContractPage` |
+| `GET` | `/api/v1/contracts/{id}` | `contracts:read` | `Contract` |
+| `GET` | `/api/v1/contracts/{id}/dates` | `contracts:dates:read` | `ContractDates` |
+| `GET` | `/api/v1/contracts/{id}/pricing?at=&trace=` | `pricing:read` | `Pricing` |
+| `POST` | `/api/v1/pricing/quote` | `pricing:quote` | `Quote` |
+| `GET` | `/api/v1/deadlines?from=&to=&kind=&cursor=&limit=` | `contracts:dates:read` | `DeadlinePage` |
+| `GET` / `POST` | `/api/v1/webhooks` | `webhooks:manage` | abonnements (§5) |
+| `DELETE` | `/api/v1/webhooks/{id}` | `webhooks:manage` | abonnement désactivé |
+
+- `clientRef` : UUID du client, **ou** son SIREN (9 chiffres), **ou** sa référence externe (Client Help).
+- `status` : liste séparée par des virgules (`ACTIVE,RENEWAL_DUE`).
+- `Contract.signatureMode` : mode de la dernière demande de signature (`PDF`, `TEMPLATE`) ou `null`.
+- `ContractDates` : `effectiveDate`, `currentPeriodEnd`, `noticeDeadline` (terme − préavis),
+  `nextPriceRevision` (prochaine révision du barème), `nextRenewal` (début de la période suivante si le
+  contrat se renouvelle et n'est ni résilié ni échu), `renewalMode`, `terminationEffectiveDate`.
+- `deadlines` : échéances **ouvertes** entre `from` (défaut aujourd'hui) et `to` (défaut +90 jours,
+  fenêtre de 366 jours au plus), triées par date.
+- `pricing` et `quote` appellent **le même service** que l'application (même moteur, même trace).
+
+Exemple :
+
+```http
+GET /api/v1/contracts/01a0e254-…/dates HTTP/1.1
+Authorization: Bearer ctr_k3p9x2m7q1ab_…
+
+HTTP/1.1 200 OK
+ETag: "Zk3…"
+RateLimit-Remaining: 119
+
+{"contractId":"01a0e254-…","effectiveDate":"2026-01-01","currentPeriodEnd":"2026-12-31",
+ "noticeDeadline":"2026-09-30","nextPriceRevision":"2027-01-01","nextRenewal":"2027-01-01",
+ "renewalMode":"TACIT","terminationEffectiveDate":null}
+```
+
+## 4. Client TypeScript généré
+
+Paquet interne **`@lsi/contrats-client`** (`packages/contrats-client`) : types de tous les schémas et
+une méthode par opération, **générés** depuis la même description (`src/generated.ts`), plus un
+transport `fetch` écrit à la main (`src/index.ts`) :
+
+```ts
+import { ContratsApiError, ContratsClient } from '@lsi/contrats-client';
+
+const api = new ContratsClient({ baseUrl: 'https://contrats.lsi-maintenance.fr', apiKey: process.env.CONTRATS_API_KEY! });
+const dates = await api.getContractDates(contractId);
+for await (const d of api.paginate((cursor) => api.listDeadlines({ from: '2026-10-01', ...(cursor ? { cursor } : {}) }))) {
+  // …
+}
+try {
+  await api.getContract(id);
+} catch (e) {
+  if (e instanceof ContratsApiError && e.status === 404) {
+    // …
+  }
+}
+```
+
+- ETag géré automatiquement (cache mémoire par URL, `If-None-Match`, `304`).
+- Erreurs → `ContratsApiError` (`status`, `code`, `problem`, `retryAfterSeconds`).
+- La clé est un secret serveur : jamais dans un navigateur.
+- Régénération après toute modification de l'API : `pnpm openapi:generate` (vérifié par les tests).
+  Publication dans le registre interne de la suite : paquet `private` tant que le registre n'est pas
+  désigné (V2-H34).
 
 ## 5. Webhooks sortants
 
@@ -166,3 +272,26 @@ export function verifyContratsWebhook(
 | `WEBHOOK_SECRET_KEY_V<n>` | — | anciennes clés, le temps d'une rotation |
 | `WEBHOOKS_ALLOW_PRIVATE` | `false` | `true` : http et destinations privées permis (tests, dev, réseau privé) |
 | `WEBHOOKS_DISABLE_AFTER_DEAD` | `20` | seuil de désactivation automatique |
+
+## 6. Erreurs (RFC 9457)
+
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/problem+json; charset=utf-8
+
+{"type":"https://contrats.lsi-maintenance.fr/api/problems/insufficient-scope","title":"Accès refusé",
+ "status":403,"detail":"Scope manquant : contracts:dates:read.","instance":"urn:request:01a0…",
+ "code":"INSUFFICIENT_SCOPE","requiredScopes":["contracts:dates:read"]}
+```
+
+`code` est stable et sert au traitement automatique ; `detail` est destiné à un humain et peut changer.
+
+| Statut | `code` | Cas |
+|---|---|---|
+| 400 | `BAD_REQUEST`, `INVALID_CURSOR`, `INVALID_RANGE` | paramètre invalide |
+| 401 | `UNAUTHENTICATED`, `INVALID_API_KEY` | clé absente, invalide, révoquée (`WWW-Authenticate: Bearer`) |
+| 403 | `INSUFFICIENT_SCOPE`, `API_DISABLED` | scope manquant, API coupée pour le tenant |
+| 404 | `NOT_FOUND`, `CONTRACT_NOT_FOUND`, `CLIENT_NOT_FOUND` | inexistant **ou hors du tenant** |
+| 409 | codes du moteur de tarification | barème absent, article inconnu… |
+| 429 | `RATE_LIMITED` | débit dépassé (`Retry-After`) |
+| 5xx | `INTERNAL`, `UNAVAILABLE` | jamais de détail technique |

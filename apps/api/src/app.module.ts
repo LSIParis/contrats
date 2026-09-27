@@ -26,6 +26,12 @@ import { TenantConfigController } from './tenant/tenant-config.controller.js';
 import { TenantConfigService } from './tenant/tenant-config.service.js';
 import { ImportsController } from './imports/imports.controller.js';
 import { RenewalController } from './renewal/renewal.controller.js';
+import { ApiClientGuard } from './public-api/api-client.guard.js';
+import { ApiClientsController } from './public-api/api-clients.controller.js';
+import { ApiClientsService } from './public-api/api-clients.service.js';
+import { OpenApiController } from './public-api/openapi.controller.js';
+import { PublicApiController } from './public-api/public-api.controller.js';
+import { PublicReadService } from './public-api/public-read.service.js';
 import { RenewalService } from './renewal/renewal.service.js';
 import { ImportsService } from './imports/imports.service.js';
 import { HttpOcrClient, OCR_CLIENT } from './imports/ocr.client.js';
@@ -146,6 +152,9 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     TenantConfigController,
     ImportsController,
     RenewalController,
+    PublicApiController,
+    OpenApiController,
+    ApiClientsController,
     DeadlinesController,
     StructureController,
     NegotiationController,
@@ -164,6 +173,9 @@ import { UnavailableContractDrafter } from './ai-drafting/unavailable-contract-d
     WebhookDeliveryService,
     ImportsService,
     RenewalService,
+    ApiClientsService,
+    ApiClientGuard,
+    PublicReadService,
     DeadlinesService,
     StructureService,
     ClauseLibraryService,
