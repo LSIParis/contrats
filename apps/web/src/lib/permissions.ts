@@ -9,6 +9,9 @@ const PERMISSIONS = {
   'tenant.configure': ['MSP_ADMIN'],
   'contracts.import': ['MSP_ADMIN', 'ACCOUNT_MANAGER'],
   'imports.validate': ['MSP_ADMIN', 'LEGAL_REVIEWER'],
+  // Lot 9 — propositions commerciales.
+  'proposals.read': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER', 'INTERNAL_SIGNATORY', 'READER'],
+  'proposals.prices.validate': ['MSP_ADMIN'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UiAction = keyof typeof PERMISSIONS;

@@ -170,3 +170,32 @@ reportée à la main de l'autre. Proposition :
 2. lticket consomme d'abord **seulement `tokens.css`** (remplace son bloc `:root`, sans toucher à ses
    classes) ; Contrats consomme jetons + preset + composants.
 3. Le test de contraste de ce dépôt migre dans le paquet et devient la garde commune (AA ≥ 4,5:1).
+
+## 9. Lot 9 — page publique de proposition et écran « Prix à valider »
+
+**Page publique `/p/<jeton>`** (`apps/web/src/features/proposals/public/`), hors session :
+
+- Mêmes jetons et primitives que l'application : fond `page`, cartes (`rounded-lg border-line
+  bg-surface shadow-sm`, gabarit `.card`), `Button` / `buttonClass`, `Field` + `Input` + `Select`,
+  `Badge` (tons `info/success/warn/danger`), `Icon` (tracés lticket), `BrandChip` en en-tête et
+  `LegalFooter` en pied de page. Aucune barre latérale : c'est une page « client », comme le portail.
+- **Mobile d'abord** : une colonne de 900 px maximum, marges 16 px sur mobile ; tableau de prix
+  défilant horizontalement sous 520 px ; totaux en grille une colonne → quatre colonnes (`sm:`).
+- **Aucune ressource tierce** : ni police externe (Inter auto-hébergée), ni CDN, ni traceur ; le suivi
+  de lecture n'appelle que l'API de l'application. Bannière d'information sur le suivi (ton `info`)
+  toujours affichée en tête, avec le texte fourni par le serveur.
+- **Indexation et fuite du jeton** : `X-Robots-Tag: noindex` et `Cache-Control: no-store` posés par
+  l'API et par la route `/p/…` ; requêtes et lien PDF en `referrerPolicy="no-referrer"`.
+- Contenu : HTML **produit et assaini par le serveur** (liste blanche), rendu tel quel ; la page ne
+  calcule aucun prix (elle affiche le devis renvoyé par le moteur).
+- États dédiés (expirée — ton `danger`, remplacée, refusée, acceptée, signée — ton `success`),
+  accès par code à usage unique, signature DocuSeal intégrée en `iframe` (origine DocuSeal déjà
+  autorisée par la CSP).
+- Accessibilité : chaque section est un `section` titré (`aria-labelledby`), choix exclusifs en
+  groupes de boutons radio (`role="radiogroup"`), options en cases à cocher libellées, quantités en
+  champs numériques bornés avec libellé, erreurs en `role="alert"`, états en `role="status"`.
+
+**Écran « Prix à valider »** (`/proposal-admin/pending`, administrateur) : gabarit standard
+(`AppShell`, entrée « Prix à valider » de la section Administration), une `Card` par modèle, tableau
+au gabarit lticket, `Badge` `warn` pour la nature de l'élément, confirmation par `Modal` et retour par
+`Toast`.

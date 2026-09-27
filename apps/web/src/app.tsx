@@ -18,6 +18,8 @@ import { AuditPage } from './features/audit/audit-page.js';
 import { TemplatesPage } from './features/templates/templates-page.js';
 import { TemplateDetailPage } from './features/templates/template-detail-page.js';
 import { PortalApp } from './portal/portal-app.js';
+import { ProposalPublicPage } from './features/proposals/public/proposal-public-page.js';
+import { PendingValidationsPage } from './features/proposals/pending-validations-page.js';
 
 function InternalRoutes() {
   return (
@@ -41,6 +43,7 @@ function InternalRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/:id" element={<TemplateDetailPage />} />
+        <Route path="/proposal-admin/pending" element={<PendingValidationsPage />} />
       </Route>
     </Routes>
   );
@@ -51,6 +54,8 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/portal/*" element={<PortalApp />} />
+        {/* Lot 9 : page publique d'une proposition — lien personnel, HORS session. */}
+        <Route path="/p/:token" element={<ProposalPublicPage />} />
         <Route
           path="/*"
           element={
