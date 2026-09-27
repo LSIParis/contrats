@@ -68,7 +68,10 @@ describe('clients d’API (administration)', () => {
   test('clé renvoyée une seule fois, jamais relisible ; réservé à l’admin', async () => {
     expect(fullKey).toMatch(/^ctr_[a-z0-9]{12}_[A-Za-z0-9_-]{43}$/);
     const list = await http().get('/v1/admin/api-clients').set('x-lsi-session', 'api-admin').expect(200);
-    expect(JSON.stringify(list.body)).not.toContain(fullKey.split('_')[2]);
+    // Le secret (après « ctr_<prefix>_ ») peut lui-même contenir « _ » (base64url).
+    const secret = fullKey.slice('ctr_'.length + 12 + 1);
+    expect(secret).toHaveLength(43);
+    expect(JSON.stringify(list.body)).not.toContain(secret);
     expect(list.body[0]).not.toHaveProperty('keyHash');
     await http().get('/v1/admin/api-clients').set('x-lsi-session', 'api-am').expect(403);
   });

@@ -17,7 +17,7 @@
     "seed": "tsx prisma/seed.ts",
     "seed:propositions": "tsx prisma/seed.ts --only=propositions",
     "test:seed": "vitest run --config vitest.seed.config.ts",
-    "postinstall": "node scripts/postinstall.mjs"
+    "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('prisma/schema.prisma')){require('child_process').execSync('prisma generate',{stdio:'inherit'})}else{console.log('postinstall @lsi/persistence : schéma Prisma absent (étape dépendances du Dockerfile), génération différée.')}\""
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
