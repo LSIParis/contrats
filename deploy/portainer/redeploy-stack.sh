@@ -11,7 +11,9 @@
 #   1. PORTAINER_WEBHOOK_ID  : webhook de stack (Business Edition), ?tag=<tag>.
 #   2. PORTAINER_API_TOKEN + PORTAINER_STACK_ID : API de Portainer (Community
 #      Edition, sans webhook de stack) — relit la stack, remplace CONTRATS_TAG
-#      dans ses variables, renvoie le même fichier compose avec pullImage=true.
+#      (et OCR_TAG s'il est posé) dans ses variables, VÉRIFIE que toutes les
+#      images de la stack sont disponibles, puis renvoie le même fichier compose.
+#      Nécessite docker (compose, manifest) et jq sur la machine qui l'exécute.
 #
 # Le jeton ne passe jamais en argument de commande (fichier d'en-tête 600) et
 # rien de ce qui est relu (variables de la stack, secrets compris) n'est affiché.
@@ -64,19 +66,58 @@ jq -e 'any(.Env[]?; .name == "CONTRATS_TAG")' "$work/stack.json" > /dev/null \
   || { echo "::error::La stack ${PORTAINER_STACK_ID} n'a pas de variable CONTRATS_TAG."; exit 1; }
 previous="$(jq -r '.Env[] | select(.name == "CONTRATS_TAG") | .value' "$work/stack.json")"
 
+# Tag de version (X.Y.Z) : image immuable → tirée seulement si absente de l'hôte
+# (une image présente seulement en local, comme le miroir MinIO, reste utilisable).
+# Tag mobile (main, sha-…) : tirage systématique pour prendre la dernière image.
+if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then pull=false; else pull=true; fi
+
+# OCR_TAG, s'il est posé, suit la version de l'application (l'image OCR est
+# publiée à chaque tag de version) : un OCR_TAG figé sur une ancienne version
+# introuvable a déjà fait échouer un déploiement.
 jq -n \
   --rawfile file <(jq -r '.StackFileContent' "$work/file.json") \
   --slurpfile stack "$work/stack.json" \
   --arg tag "$tag" \
+  --argjson pull "$pull" \
   '{
      stackFileContent: $file,
-     env: [ $stack[0].Env[] | if .name == "CONTRATS_TAG" then .value = $tag else . end ],
+     env: [ $stack[0].Env[] | if .name == "CONTRATS_TAG" or (.name == "OCR_TAG" and .value != "") then .value = $tag else . end ],
      prune: false,
-     pullImage: true
+     pullImage: $pull
    }' > "$work/payload.json"
 
-# Tirage de l'image + recréation des conteneurs : peut prendre plusieurs minutes.
-call "Mise à jour de la stack (tirage de l'image ${tag})" --max-time 900 -X PUT -H @"$work/auth" -H 'Content-Type: application/json' \
+# --- Contrôle préalable : TOUTES les images de la stack doivent être disponibles.
+# Portainer arrête la stack AVANT de tirer les images : une image introuvable
+# coupe donc la production. On vérifie chaque image (présente sur l'hôte, ou
+# publiée) avant de toucher à quoi que ce soit.
+jq -r '.env[] | "\(.name)=\(.value)"' "$work/payload.json" > "$work/stack.env"
+jq -r '.stackFileContent' "$work/payload.json" > "$work/compose.yml"
+docker compose -p redeploy-check --env-file "$work/stack.env" -f "$work/compose.yml" config --images 2>"$work/compose.err" \
+  | sort -u > "$work/images.txt" \
+  || { echo "::error::Fichier compose de la stack invalide avec ces variables : $(tail -1 "$work/compose.err")"; exit 1; }
+call "Liste des images de l'hôte" --max-time 60 -H @"$work/auth" -o "$work/host-images.json" \
+  "${base}/endpoints/${endpoint}/docker/images/json"
+jq -r '.[].RepoTags[]?' "$work/host-images.json" | sort -u > "$work/host-images.txt"
+mkdir -p "$work/anon" && missing=0
+while read -r image; do
+  [ -n "$image" ] || continue
+  on_host=false
+  grep -qxF "$image" "$work/host-images.txt" && on_host=true
+  if [ "$pull" = false ] && [ "$on_host" = true ]; then
+    echo "  présente sur l'hôte : ${image}"
+  elif DOCKER_CONFIG="$work/anon" docker manifest inspect "$image" > /dev/null 2>&1; then
+    echo "  publiée             : ${image}"
+  elif [ "$on_host" = true ]; then
+    # Tirage systématique demandé (tag mobile) : Portainer échouerait sur cette image.
+    echo "::error::Image présente sur l'hôte mais absente du registre, alors qu'un tirage systématique est demandé (tag mobile ${tag}) : ${image}"; missing=1
+  else
+    echo "::error::Image introuvable, ni sur l'hôte ni dans le registre : ${image}"; missing=1
+  fi
+done < "$work/images.txt"
+[ "$missing" -eq 0 ] || { echo "::error::Redéploiement annulé AVANT tout arrêt de la stack : la production n'est pas touchée."; exit 1; }
+
+# Recréation des conteneurs (et tirage des images manquantes) : plusieurs minutes possibles.
+call "Mise à jour de la stack (tag ${tag})" --max-time 900 -X PUT -H @"$work/auth" -H 'Content-Type: application/json' \
   --data-binary @"$work/payload.json" -o /dev/null \
   "${base}/stacks/${PORTAINER_STACK_ID}?endpointId=${endpoint}"
-echo "Stack ${PORTAINER_STACK_ID} redéployée par l'API : CONTRATS_TAG ${previous} → ${tag}."
+echo "Stack ${PORTAINER_STACK_ID} redéployée par l'API : CONTRATS_TAG ${previous} → ${tag} (tirage systématique : ${pull})."
