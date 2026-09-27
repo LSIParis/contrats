@@ -55,7 +55,7 @@
     "supertest": "^7.0.0",
     "testcontainers": "^10.13.2",
     "typescript": "^5.6.3",
-    "unplugin-swc": "^1.5.9",
+    "unplugin-swc": "^2.0.0",
     "vitest": "^2.1.5",
     "yaml": "2.9.0"
   }
