@@ -64,6 +64,16 @@ describe('outbox transactionnelle', () => {
     expect(deliveries[0]!.nextAttemptAt).not.toBeNull();
   });
 
+  test('aucun abonné actif pour le type : rien n’est écrit (minimisation)', async () => {
+    const e = event(fx, 'contract.nobody_listens');
+    const n = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) => publishWebhookEvent(tx, e));
+    expect(n).toBe(0);
+    const count = await withScope(adminScope(fx.tenantId, fx.adminUserId), (tx) =>
+      tx.webhookEvent.count({ where: { id: e.eventId } }),
+    );
+    expect(count).toBe(0);
+  });
+
   test('ROLLBACK de la transaction métier ⇒ aucun événement, aucune livraison', async () => {
     await subscribe(fx, ['contract.renewed']);
     const e = event(fx, 'contract.renewed');

@@ -216,6 +216,18 @@ BEGIN
     RAISE EXCEPTION 'publication pour un client hors scope refusée' USING ERRCODE = 'insufficient_privilege';
   END IF;
 
+  -- Aucun abonné actif pour ce type : on n'écrit RIEN (minimisation — une
+  -- donnée qui ne sera livrée à personne n'a pas à être conservée). Un
+  -- abonnement créé plus tard ne reçoit pas l'historique (pas de rattrapage).
+  IF NOT EXISTS (
+    SELECT 1 FROM webhook_subscriptions s
+     WHERE s.tenant_id = p_tenant_id AND s.active
+       AND (CASE WHEN p_only_subscription IS NULL THEN p_type = ANY (s.event_types)
+                 ELSE s.id = p_only_subscription END)
+  ) THEN
+    RETURN 0;
+  END IF;
+
   INSERT INTO webhook_events (id, tenant_id, customer_id, type, resource_id, payload, occurred_at, created_at)
   VALUES (p_event_id, p_tenant_id, p_customer_id, p_type, p_resource_id, p_payload, p_occurred_at, v_now);
 
