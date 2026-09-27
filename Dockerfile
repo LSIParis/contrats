@@ -37,7 +37,7 @@
 # ---- base commune -----------------------------------------------------
 # Image épinglée par digest (comme les actions par SHA) ; Dependabot
 # (écosystème docker) met à jour tag et digest ensemble.
-FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS base
+FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS base
 WORKDIR /app
 # Prisma a besoin d'openssl ; ca-certificates pour les appels HTTPS sortants
 # (DocuSeal, Perplexity, Anthropic). curl pour le HEALTHCHECK.
