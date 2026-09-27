@@ -46,6 +46,16 @@ export function clientScope(tenantId: string, customerId: string, userId: string
 }
 
 /**
+ * Scope système de TENANT, sans aucun client : pour les traitements qui ne
+ * touchent que des tables de classe « tenant » (livraison des webhooks
+ * sortants). Portefeuille vide = aucune ligne client lisible, par
+ * construction — moindre privilège plutôt que d'emprunter un client au hasard.
+ */
+export function tenantSystemScope(tenantId: string): Scope {
+  return { tenantId, customerIds: [], allCustomers: false, userId: 'system', actorKind: 'SYSTEM' };
+}
+
+/**
  * Scope système, pour les webhooks et jobs.
  *
  * Prend un customerId unique et obligatoire : un traitement système

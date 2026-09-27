@@ -1,5 +1,6 @@
 import { setTransitionContext } from '@lsi/persistence';
 import type { ContractEvent, ContractSnapshot } from '@lsi/domain';
+import { contractEventFor, publishContractTransition } from '../webhooks-out/contract-producers.js';
 
 /**
  * Frontière contrat Prisma ↔ snapshot du domaine, et écriture d'une transition.
@@ -78,7 +79,17 @@ export async function persistTransition(
   userId?: string,
 ) {
   await setTransitionContext(tx, transitionContext(event));
-  return tx.contract.update({
+  // Webhooks sortants (lot 5) : si le statut d'arrivée publie un événement,
+  // on lit l'état de départ AVANT l'écriture, puis on publie dans l'outbox
+  // DANS cette même transaction (contract-producers.ts). Aucune lecture
+  // supplémentaire pour les autres transitions.
+  const before = contractEventFor(next.status)
+    ? await tx.contract.findUnique({
+        where: { id: contractId },
+        select: { status: true, customer: { select: { externalRef: true } } },
+      })
+    : null;
+  const updated = await tx.contract.update({
     where: { id: contractId },
     data: {
       status: next.status,
@@ -93,4 +104,8 @@ export async function persistTransition(
       ...(userId ? { updatedByUserId: userId } : {}),
     },
   });
+  if (before) {
+    await publishContractTransition(tx, before.status, updated, before.customer?.externalRef ?? null, now);
+  }
+  return updated;
 }

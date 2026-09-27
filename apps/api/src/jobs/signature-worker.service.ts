@@ -11,10 +11,13 @@ import { ReminderSendService } from './reminder-send.service.js';
 import { ImportsService } from '../imports/imports.service.js';
 import { DeadlinesService } from '../deadlines/deadlines.service.js';
 import { findPendingOcrImports } from '@lsi/persistence';
+import { WebhookDeliveryService } from '../webhooks-out/webhook-delivery.service.js';
 
 const RECONCILE_EVERY_MS = 60 * 60 * 1_000; // horaire
 const LIFECYCLE_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien
 const DISPATCH_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien (UC-08)
+// Webhooks sortants : latence de livraison ≤ ~1 min (outbox relevée chaque minute).
+const WEBHOOKS_EVERY_MS = 60 * 1_000;
 
 /**
  * Worker BullMQ embarqué. (§11.6, §12.3)
@@ -34,6 +37,7 @@ const DISPATCH_EVERY_MS = 24 * 60 * 60 * 1_000; // quotidien (UC-08)
  *   - import-ocr          : OCR + extraction d'un contrat importé (03-import-existant).
  *   - deadlines-sweep     : recalcule l'échéancier et ses alertes (quotidien), et
  *     réenfile les OCR restés en attente (filet si un job a été perdu).
+ *   - webhooks-deliver    : livre les webhooks sortants dus (outbox, chaque minute).
  */
 @Injectable()
 export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -49,6 +53,7 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly reminderSend: ReminderSendService,
     private readonly imports: ImportsService,
     private readonly deadlines: DeadlinesService,
+    private readonly webhooks: WebhookDeliveryService,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
   ) {}
 
@@ -103,6 +108,9 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
             }
             return;
           }
+          case 'webhooks-deliver':
+            await this.webhooks.deliverDue();
+            return;
           default:
             this.log.warn(`job inconnu ignoré : ${job.name}`);
         }
@@ -137,8 +145,13 @@ export class SignatureWorkerService implements OnModuleInit, OnModuleDestroy {
       {},
       { repeat: { every: DISPATCH_EVERY_MS }, jobId: 'dispatch-daily' },
     );
+    await this.scheduler.add(
+      'webhooks-deliver',
+      {},
+      { repeat: { every: WEBHOOKS_EVERY_MS }, jobId: 'webhooks-minute', removeOnComplete: 50, removeOnFail: 200 },
+    );
 
-    this.log.log('worker démarré (capture + réconciliation + cycle de vie + rappels)');
+    this.log.log('worker démarré (capture + réconciliation + cycle de vie + rappels + webhooks sortants)');
   }
 
   async onModuleDestroy(): Promise<void> {

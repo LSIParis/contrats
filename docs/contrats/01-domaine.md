@@ -11,7 +11,7 @@
 | Classe | Colonnes de portée | Tables |
 |---|---|---|
 | plateforme | aucune | `tenants` |
-| tenant | `tenant_id` | `users`, `roles`, `user_roles`, `customer_access`, `customers`, `contract_templates(+_versions)`, `tenant_feature_flags`, `tenant_settings`, `clause_library_items(+_versions)`, `price_indexes(+_values)`, `pricing_rules`, `api_clients`, `webhook_subscriptions` |
+| tenant | `tenant_id` | `users`, `roles`, `user_roles`, `customer_access`, `customers`, `contract_templates(+_versions)`, `tenant_feature_flags`, `tenant_settings`, `clause_library_items(+_versions)`, `price_indexes(+_values)`, `pricing_rules`, `api_clients`, `webhook_subscriptions`, `webhook_events` (outbox, `customer_id` nullable), `webhook_deliveries` |
 | client | `tenant_id` + `customer_id` | tout le reste : `contracts` et toutes leurs tables filles |
 
 - `customer_id` est **dénormalisé** sur toutes les tables filles : une
@@ -47,6 +47,7 @@
 | `Deadline` | `deadlines` | échéancier matérialisé, alertes via `reminders` |
 | `StoredDocument` | `stored_documents` | **écriture unique**, empreinte SHA-256 |
 | `ApiClient` | `api_clients` | lot 7 |
+| (webhooks sortants, brief §8) | `webhook_subscriptions`, `webhook_events`, `webhook_deliveries` | lot 5 : abonnements (secret chiffré), outbox transactionnelle append-only, livraisons et reprises (07-api.md §5) |
 | `AuditLog` | `audit_logs` | append-only, **chaîné par empreinte** |
 | — | `contract_acceptances` | acceptation d'une version, distincte de la signature |
 | — | `contract_periods` | historique des périodes (initiale, reconductions) |
@@ -79,6 +80,7 @@
 | Barème engagé et ses lignes immuables | triggers `pricing_schedules_guard`, `pricing_lines_guard` |
 | Valeur d'indice jamais réécrite | UPDATE/DELETE révoqués ; correction chaînée (UNIQUE `supersedes_id`) |
 | Dérogation : auteur ≠ second validateur ; prix et motif figés | CHECK `approved_by_user_id <> author_user_id` ; GRANT UPDATE limité aux décisions |
+| Un webhook part si et seulement si la modification est validée | outbox écrite dans la transaction métier (`app_publish_webhook_event`), `webhook_events` append-only, UNIQUE `(event_id, subscription_id)` |
 
 ## 5. Migrations de la passe v2
 
@@ -90,6 +92,7 @@
 | 20 | Import (`contract_imports`) et échéancier (`deadlines`, rappels rattachés) |
 | 21 | Tarification : `price_indexes(+_values)`, `pricing_rules`, `pricing_schedules`, `pricing_lines`, `price_overrides` ; extension `btree_gist` (04-tarification.md §17) |
 | 22 | Lot 2 : bibliothèque de clauses versionnée, composition des modèles, clauses et annexes des versions de contrat, revues de clauses, variables manquantes |
+| 23 | Lot 5 : webhooks sortants — `webhook_subscriptions`, `webhook_events` (outbox), `webhook_deliveries` ; `app_publish_webhook_event` (publication dans la transaction de l'appelant, bornée au tenant/scope courant), `app_find_due_webhook_deliveries` (découverte, identifiants seuls) |
 
 ## 6. Contrats types, clauses, variables, annexes (lot 2)
 

@@ -360,6 +360,9 @@ model Tenant {
   priceIndexes PriceIndex[]
   pricingRules PricingRule[]
 
+  webhookSubscriptions WebhookSubscription[]
+  webhookEvents        WebhookEvent[]
+
   @@map("tenants")
 }
 
@@ -1270,7 +1273,7 @@ model Deadline {
 // ===========================================================================
 // Lot 2 — bibliothèque de clauses, modèles structurés, clauses et annexes
 // (migration 22) — docs/contrats/01-domaine.md §6
-// ====================================================================
+// ===========================================================================
 model ClauseLibraryItem {
   id               String         @id @db.Uuid
   tenantId         String         @map("tenant_id") @db.Uuid
@@ -1629,3 +1632,96 @@ model PriceOverride {
   @@index([tenantId, customerId, contractId, lineKey], map: "price_overrides_contract_idx")
   @@map("price_overrides")
 }
+
+// ===========================================================================
+// Lot 5 — webhooks sortants (migration 23) — docs/contrats/07-api.md
+// ===========================================================================
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  DEAD
+}
+
+/// Abonnement d'un tenant aux événements sortants. Classe « tenant ».
+/// Le secret HMAC est CHIFFRÉ (AES-256-GCM, WEBHOOK_SECRET_KEY) : il doit être
+/// relu pour signer. Jamais renvoyé par l'API après la création.
+/// DELETE révoqué : un abonnement se désactive, il ne s'efface pas.
+model WebhookSubscription {
+  id                  String    @id @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  url                 String
+  description         String?
+  eventTypes          String[]  @map("event_types")
+  /// « base64(iv).base64(tag).base64(ciphertext) », clé `secretKeyVersion`.
+  secretCiphertext    String    @map("secret_ciphertext")
+  secretKeyVersion    Int       @default(1) @map("secret_key_version")
+  /// 4 derniers caractères du secret, pour l'identifier sans le révéler.
+  secretHint          String    @map("secret_hint")
+  active              Boolean   @default(true)
+  /// Livraisons DEAD consécutives (remis à 0 au premier succès).
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
+  disabledAt          DateTime? @map("disabled_at")
+  disabledReason      String?   @map("disabled_reason")
+  createdByUserId     String?   @map("created_by_user_id") @db.Uuid
+  createdAt           DateTime  @map("created_at")
+  updatedAt           DateTime  @map("updated_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deliveries WebhookDelivery[]
+
+  @@unique([id, tenantId], map: "webhook_subscriptions_scope_key")
+  @@index([tenantId, active], map: "webhook_subscriptions_tenant_idx")
+  @@map("webhook_subscriptions")
+}
+
+/// OUTBOX transactionnelle : écrite dans la transaction de la modification
+/// métier (fonction `app_publish_webhook_event`). Append-only (UPDATE/DELETE
+/// révoqués). Payload MINIMISÉ : identifiants, références, dates, statuts.
+model WebhookEvent {
+  id         String   @id @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  /// NULL pour un `ping`. Pas de FK : journal technique purgeable avec le client.
+  customerId String?  @map("customer_id") @db.Uuid
+  type       String
+  resourceId String?  @map("resource_id") @db.Uuid
+  payload    Json
+  occurredAt DateTime @map("occurred_at")
+  createdAt  DateTime @map("created_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deliveries WebhookDelivery[]
+
+  @@unique([id, tenantId], map: "webhook_events_scope_key")
+  @@index([tenantId, occurredAt], map: "webhook_events_tenant_idx")
+  @@map("webhook_events")
+}
+
+/// Une livraison par (événement, abonnement) ; porte l'état de reprise.
+model WebhookDelivery {
+  id             String                @id @db.Uuid
+  tenantId       String                @map("tenant_id") @db.Uuid
+  eventId        String                @map("event_id") @db.Uuid
+  subscriptionId String                @map("subscription_id") @db.Uuid
+  status         WebhookDeliveryStatus @default(PENDING)
+  /// Tentatives DÉJÀ effectuées.
+  attempt        Int                   @default(0)
+  nextAttemptAt  DateTime?             @map("next_attempt_at")
+  responseStatus Int?                  @map("response_status")
+  responseMs     Int?                  @map("response_ms")
+  /// Tronqué (500 caractères) : jamais un corps de réponse complet.
+  lastError      String?               @map("last_error")
+  deliveredAt    DateTime?             @map("delivered_at")
+  createdAt      DateTime              @map("created_at")
+  updatedAt      DateTime              @map("updated_at")
+
+  event        WebhookEvent        @relation(fields: [eventId, tenantId], references: [id, tenantId], map: "webhook_deliveries_event_fk", onDelete: NoAction, onUpdate: NoAction)
+  subscription WebhookSubscription @relation(fields: [subscriptionId, tenantId], references: [id, tenantId], map: "webhook_deliveries_subscription_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([eventId, subscriptionId], map: "webhook_deliveries_event_subscription_key")
+  @@index([status, nextAttemptAt], map: "webhook_deliveries_due_idx")
+  @@index([tenantId, subscriptionId, createdAt], map: "webhook_deliveries_subscription_idx")
+  @@map("webhook_deliveries")
+}
+

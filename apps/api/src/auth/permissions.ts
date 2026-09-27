@@ -24,6 +24,8 @@ export const PERMISSIONS = {
   'users.manage': ['MSP_ADMIN'],
   'audit.read': ['MSP_ADMIN'],
   'apiClients.manage': ['MSP_ADMIN'],
+  /** Abonnements aux webhooks sortants (URL, secret HMAC, relivraison). */
+  'webhooks.manage': ['MSP_ADMIN'],
   'pricing.rules.manage': ['MSP_ADMIN'],
   'pricing.indexes.manage': ['MSP_ADMIN'],
   /** Seconde validation d'une dérogation tarifaire au-delà du seuil. */

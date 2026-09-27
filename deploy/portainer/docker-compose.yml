@@ -79,6 +79,14 @@ x-app-env: &app-env
   # IA (facultatif : sans clé, les fonctions IA répondent 503)
   PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  # Webhooks sortants (docs/contrats/07-api.md, 08-securite-rgpd.md). La clé
+  # chiffre les secrets HMAC des abonnements : app (création, rotation) ET
+  # worker (signature des livraisons) en ont besoin — même ancre partagée.
+  WEBHOOK_SECRET_KEY: ${WEBHOOK_SECRET_KEY:?WEBHOOK_SECRET_KEY requis (32 octets en base64 : openssl rand -base64 32)}
+  WEBHOOK_SECRET_KEY_VERSION: ${WEBHOOK_SECRET_KEY_VERSION:-1}
+  WEBHOOK_SECRET_KEY_V1: ${WEBHOOK_SECRET_KEY_V1:-}
+  WEBHOOKS_ALLOW_PRIVATE: ${WEBHOOKS_ALLOW_PRIVATE:-false}
+  WEBHOOKS_DISABLE_AFTER_DEAD: ${WEBHOOKS_DISABLE_AFTER_DEAD:-20}
   # Authentification
   DEFAULT_TENANT_SLUG: ${DEFAULT_TENANT_SLUG:-lsi}
   OIDC_ISSUER: ${OIDC_ISSUER:-}
