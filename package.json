@@ -19,7 +19,7 @@
     "db:check-drift": "node scripts/check-drift.mjs",
     "seed": "pnpm --filter @lsi/persistence exec tsx src/seed/demo.ts",
     "openapi:generate": "pnpm --filter @lsi/api run openapi:generate",
-    "client:generate": "pnpm --filter @lsi/contrats-client generate",
+    "client:generate": "pnpm openapi:generate",
     "changelog": "git cliff -o CHANGELOG.md",
     "openapi:check": "pnpm --filter @lsi/api run openapi:check"
   },
