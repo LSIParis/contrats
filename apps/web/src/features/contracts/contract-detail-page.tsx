@@ -31,6 +31,8 @@ import { AiReviewBanner } from '../structure/ai-review.js';
 import { allows } from '../../lib/permissions.js';
 import { NegotiationActions } from '../negotiation/negotiation-actions.js';
 import { AcceptancesBlock } from '../negotiation/acceptances-block.js';
+import { SignatureAvailabilityBanner, useSignatureAvailability } from '../signature/signature-availability.js';
+import { InternalSigning } from '../signature/internal-signing.js';
 
 const ARCHIVABLE_STATUSES = ['TERMINATED', 'EXPIRED', 'CANCELLED', 'DECLINED', 'RENEWED'];
 
@@ -125,6 +127,7 @@ export function ContractDetailPage() {
     queryFn: () => apiGet<{ allowedActions: string[] }>(`/v1/contracts/${id}/allowed-actions`),
   });
   const me = useMe();
+  const signatureAvailability = useSignatureAvailability();
   const qc = useQueryClient();
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const requested = params.get('onglet');
@@ -234,7 +237,15 @@ export function ContractDetailPage() {
           {downloadError && <p role="alert" className="text-sm text-danger">{downloadError}</p>}
         </div>
       )}
-      <SendForSignature contractId={contract.id} signers={d.signers} allowedActions={allowedActions} roles={roles} />
+      {!imported && <SignatureAvailabilityBanner availability={signatureAvailability.data} />}
+      <InternalSigning contractId={contract.id} reference={contract.reference} status={contract.status} signers={d.signers} me={me.data} />
+      <SendForSignature
+        contractId={contract.id}
+        signers={d.signers}
+        allowedActions={allowedActions}
+        roles={roles}
+        availability={signatureAvailability.data}
+      />
       <SignersBlock
         contractId={contract.id}
         signers={d.signers}
