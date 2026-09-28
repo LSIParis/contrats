@@ -48,15 +48,15 @@
   "devDependencies": {
     "@nestjs/testing": "^10.4.15",
     "@testcontainers/postgresql": "^10.28.0",
-    "@testcontainers/redis": "^12.0.4",
+    "@testcontainers/redis": "^12.1.0",
     "@types/node": "^22.9.0",
     "@types/sanitize-html": "^2.16.1",
-    "@types/supertest": "^6.0.2",
-    "supertest": "^7.0.0",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.0",
     "testcontainers": "^10.13.2",
     "typescript": "^5.6.3",
     "unplugin-swc": "^1.5.9",
     "vitest": "^2.1.5",
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   }
 }
