@@ -101,7 +101,7 @@ approbation obligatoire des déploiements de production.
    Dependabot de versions majeures sont fermées dans ce but), image d'exécution sans pnpm, et
    **passage à Node 26 LTS** (amendement du brief, `00-architecture.md` V2-H71 : Node 26 passe en
    LTS le 2026-10-28, support jusqu'au 2029-04-30 contre 2027-04-30 pour Node 22).
-8. **DNS** de `contrats.lsi-maintenance.fr` (A vers `51.91.98.38`, qui relaie vers le VPS) : à documenter.
+8. ~~DNS~~ : documenté (`09-exploitation.md` §5.1 : zone Cloudflare, `contrats` en *DNS only* vers le proxy `51.91.98.38`, relais WireGuard vers `10.99.0.2:3001`).
 
 **Règle d'exploitation** : dans Portainer, *Update the stack* avec « Re-pull image and redeploy »
 **désactivé**, et aucune variable laissée vide ; pour changer de version, passer par un tag et la CI.
