@@ -15,6 +15,7 @@
 import { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
 import { runProposalTemplatesSeed } from '../../prisma/seed/proposal-templates/cli';
+import { seedContractTemplates } from '../seed/contract-templates.js';
 
 export interface CustomerFixture {
   id: string;
@@ -191,6 +192,16 @@ export async function seedProposalTemplates(tenantSlug: string, args: string[] =
   const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
   try {
     return await runProposalTemplatesSeed(owner, [`--tenant=${tenantSlug}`, ...args]);
+  } finally {
+    await owner.$disconnect();
+  }
+}
+
+/** Les quatre contrats types livrés pour les propositions (brouillons), pour un tenant de test. */
+export async function seedProposalContractTemplates(tenantSlug: string, databaseUrl?: string) {
+  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  try {
+    return await seedContractTemplates(owner, { slug: tenantSlug });
   } finally {
     await owner.$disconnect();
   }
