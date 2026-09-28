@@ -27,11 +27,18 @@ version) puis mettre à jour les modèles concernés, qui sont ensuite republié
 
 | Remplies automatiquement à la conversion | À compléter sur chaque contrat |
 |---|---|
-| `client.raisonSociale`, `client.siren`, `client.adresse`, `prestataire.raisonSociale`, `contrat.reference`, `contrat.dateEffet`, `contrat.dureeMois`, `contrat.preavis` (si le préavis est renseigné) | `prestataire.siren`, `prestataire.adresse`, `client.representant` ; pour la supervision : `sla.plageHoraire`, `sla.delaiIntervention` |
+| `client.raisonSociale`, `client.siren`, `client.adresse`, `contrat.reference`, `contrat.dateEffet`, `contrat.dureeMois`, `contrat.preavis` (si le préavis est renseigné) | `client.representant` ; pour la supervision : `sla.plageHoraire`, `sla.delaiIntervention` |
 
-Conseil : une fois connus, remplacer dans la clause `CT-PARTIES` les variables
-`{{prestataire.siren}}` et `{{prestataire.adresse}}` par le SIREN et l'adresse de
-LSI-Maintenance (nouvelle version de la clause) — ils n'auront plus à être saisis.
+Le **Prestataire** est écrit en toutes lettres dans la clause `CT-PARTIES` (version 2,
+2026-09-28) : LSI, SAS au capital de 5 000 €, SIREN 821 439 379, siège 849 rue de la
+Gare, 13770 Venelles (source : Registre national des entreprises). **À vérifier sur
+le Kbis : la ville du RCS (Aix-en-Provence, déduite du siège).**
+
+Modifier une clause des contrats types : corriger son texte dans
+`contract-templates-data.ts`, puis `pnpm seed:contract-templates --upgrade CODE`
+(nouvelle version de la clause, contrats types **non publiés** recomposés — texte et
+variables ; les publiés ne sont jamais touchés et sont signalés). Ou, sans code :
+Bibliothèque de clauses → nouvelle version, puis éditeur de chaque modèle.
 
 La **grille tarifaire** n'est pas à rédiger : elle est générée depuis la configuration
 acceptée dans la proposition (prix figés, 11-propositions §5).

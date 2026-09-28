@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { applyMigrations } from '../support/fixtures.js';
-import { seedContractTemplates } from '../../src/seed/contract-templates.js';
+import { seedContractTemplates, upgradeContractTemplateClause } from '../../src/seed/contract-templates.js';
 import { ALL_CLAUSES, CONTRACT_TEMPLATES } from '../../src/seed/contract-templates-data.js';
 import { uuidv7 } from '../../src/uuid.js';
 
@@ -67,5 +67,70 @@ describe('installation (pnpm seed:contract-templates)', () => {
     expect(r.templatesKept).toEqual(['infogerance']);
     const kept = await owner.contractTemplate.findFirst({ where: { tenantId: tn!.id, slug: 'infogerance' } });
     expect(kept).toMatchObject({ name: 'Mon contrat d’infogérance', status: 'PUBLISHED' });
+  });
+});
+
+describe('mise à jour d’une clause des contrats types (pnpm seed:contract-templates --upgrade CODE)', () => {
+  const PARTIES_V1 = '<p>Entre {{prestataire.raisonSociale}}, SIREN {{prestataire.siren}}, dont le siège est situé {{prestataire.adresse}}, et {{client.raisonSociale}}.</p>';
+
+  /** Installe les contrats types puis ramène CT-PARTIES à une ancienne rédaction (état de la production). */
+  async function installedWithOldParties() {
+    const slug = await tenant();
+    const r = await seedContractTemplates(owner, { slug });
+    const item = await owner.clauseLibraryItem.findUnique({ where: { tenantId_code: { tenantId: r.tenantId, code: 'CT-PARTIES' } } });
+    await owner.clauseLibraryItemVersion.update({
+      where: { id: item!.currentVersionId! },
+      data: { bodyHtml: PARTIES_V1, variables: ['client.raisonSociale', 'prestataire.adresse', 'prestataire.raisonSociale', 'prestataire.siren'] },
+    });
+    return { slug, tenantId: r.tenantId, itemId: item!.id, oldVersionId: item!.currentVersionId! };
+  }
+
+  test('nouvelle version de la clause, brouillons recomposés (texte et variables), publiés intacts', async () => {
+    const { slug, tenantId, itemId, oldVersionId } = await installedWithOldParties();
+    // Un contrat type publié (immuable) qui épingle l'ancienne version : ne doit pas bouger.
+    const published = await owner.contractTemplate.findFirst({ where: { tenantId, slug: 'supervision' }, include: { versions: true } });
+    await owner.contractTemplateVersion.update({ where: { id: published!.versions[0]!.id }, data: { isImmutable: true, publishedAt: new Date() } });
+    const publishedBody = published!.versions[0]!.bodyHtml;
+
+    const r = await upgradeContractTemplateClause(owner, { slug, code: 'CT-PARTIES' });
+
+    expect(r.created).toBe(true);
+    expect(r.templatesUpdated.sort()).toEqual(['infogerance', 'rssi-externalise', 'sauvegarde-en-ligne']);
+    expect(r.templatesSkipped).toEqual(['supervision']);
+
+    const item = await owner.clauseLibraryItem.findUnique({ where: { id: itemId }, include: { versions: true } });
+    expect(item!.versions).toHaveLength(2);
+    const current = item!.versions.find((v) => v.id === item!.currentVersionId)!;
+    expect(current.versionNumber).toBe(2);
+    expect(current.bodyHtml).toContain('821 439 379');
+    expect(current.variables).not.toContain('prestataire.siren');
+
+    const t = await owner.contractTemplate.findFirst({ where: { tenantId, slug: 'infogerance' }, include: { versions: { include: { clauses: true } } } });
+    const tv = t!.versions[0]!;
+    expect(tv.clauses.map((c) => c.clauseVersionId)).toContain(current.id);
+    expect(tv.clauses.map((c) => c.clauseVersionId)).not.toContain(oldVersionId);
+    expect(tv.bodyHtml).toContain('821 439 379');
+    expect(tv.bodyHtml.startsWith('<h2>Article 1 — Parties</h2>')).toBe(true);
+    const required = (tv.variablesSchema as { required: string[] }).required;
+    expect(required).not.toContain('prestataire.siren');
+    expect(required).not.toContain('prestataire.adresse');
+    expect(required).toContain('client.siren');
+
+    const sup = await owner.contractTemplateVersion.findUnique({ where: { id: published!.versions[0]!.id }, include: { clauses: true } });
+    expect(sup!.bodyHtml).toBe(publishedBody);
+    expect(sup!.clauses.map((c) => c.clauseVersionId)).toContain(oldVersionId);
+  });
+
+  test('relancer ne crée pas de nouvelle version (texte déjà à jour)', async () => {
+    const { slug } = await installedWithOldParties();
+    await upgradeContractTemplateClause(owner, { slug, code: 'CT-PARTIES' });
+    const again = await upgradeContractTemplateClause(owner, { slug, code: 'CT-PARTIES' });
+    expect(again.created).toBe(false);
+    expect(again.templatesUpdated).toEqual([]);
+  });
+
+  test('code inconnu : erreur explicite', async () => {
+    const slug = await tenant();
+    await expect(upgradeContractTemplateClause(owner, { slug, code: 'CT-INEXISTANTE' })).rejects.toThrow(/CT-INEXISTANTE/);
   });
 });
