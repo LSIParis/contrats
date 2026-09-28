@@ -142,6 +142,7 @@ testée exhaustivement (`tests/isolation/permissions-matrix.test.ts`).
 | PDF | Gotenberg 8 (existant) | JS désactivé, liste blanche `file:///tmp` |
 | Stockage | MinIO (S3) avec versioning ; clés `t/{tenant}/c/{customer}/…` | originaux jamais remplacés |
 | Postgres | **17** partout (CI annexe A, stack, testcontainers) | alignement demandé par `ci.yml` |
+| Node.js | **22 LTS** aujourd'hui ; **26 LTS autorisé** (amendement du brief, 2026-09-28) dès son passage en LTS (2026-10-28), migration prévue en novembre 2026 avec NestJS 11 / Fastify 5 / Prisma | Node 22 n'est plus maintenu qu'en sécurité (fin 2027-04-30) ; Node 26 LTS est maintenu jusqu'au 2029-04-30. Jamais une version impaire (non LTS) |
 
 ## 5. Flux principaux
 
@@ -232,6 +233,7 @@ isolation → souveraineté → réversibilité).
 | V2-H68 | « Conversion par offre » (brief §12.8) = par modèle de proposition, chaque modèle portant une offre. | les quatre modèles livrés sont les quatre offres | champ « offre » distinct |
 | V2-H69 | Recherche publique sur un prospect : consentement explicite à **chaque** demande (`publicResearch: true`), pas un réglage mémorisé ; site web fourni par le commercial (le client n'a pas de champ « site »). | le brief exige une option explicite par proposition ; rien ne part par défaut | champ `website` du client, option mémorisée par proposition |
 | V2-H70 | La relecture d'une section IA peut être faite par le commercial auteur (`proposals.write`) ; la revue interne (`proposals.review`) reste exigée selon les seuils. | « validation humaine » ≠ validation par un tiers | réserver au valideur |
+| V2-H71 | **Écart à l'annexe A (amendement du brief)** : l'image `node:22-slim` et `NODE_VERSION: "22"` de `ci.yml` peuvent passer à **Node 26 LTS**. Conditions : Node 26 en LTS active, même version dans le `Dockerfile`, `ci.yml` et `engines`, CI complète verte (y compris le scan Trivy), passage par un tag et l'approbation `production`. Faite en même temps que NestJS 11 / Fastify 5 / Prisma pour ne tester qu'une fois. | le brief figeait Node 22 ; Node 26 prolonge le support de deux ans et apporte V8 plus récent, `require(esm)` et le *type stripping* stables | rester en 22 jusqu'en avril 2027 |
 
 ## 7. Ce qui n'est pas dans le périmètre
 

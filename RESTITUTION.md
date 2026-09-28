@@ -97,8 +97,10 @@ approbation obligatoire des déploiements de production.
    `write:packages` de la session GitHub CLI (révocation de l'application OAuth).
 6. **Préproduction** (`staging`) à mettre en place : aujourd'hui, une fusion sur `main` publie
    l'image sans la déployer.
-7. **Avant le 2026-12-31** : migration NestJS 11 / Fastify 5 / Prisma (les PR Dependabot de
-   versions majeures sont fermées dans ce but) et image d'exécution sans pnpm.
+7. **Novembre 2026 (avant le 2026-12-31)** : migration NestJS 11 / Fastify 5 / Prisma (les PR
+   Dependabot de versions majeures sont fermées dans ce but), image d'exécution sans pnpm, et
+   **passage à Node 26 LTS** (amendement du brief, `00-architecture.md` V2-H71 : Node 26 passe en
+   LTS le 2026-10-28, support jusqu'au 2029-04-30 contre 2027-04-30 pour Node 22).
 8. **DNS** de `contrats.lsi-maintenance.fr` (A vers `51.91.98.38`, qui relaie vers le VPS) : à documenter.
 
 **Règle d'exploitation** : dans Portainer, *Update the stack* avec « Re-pull image and redeploy »
