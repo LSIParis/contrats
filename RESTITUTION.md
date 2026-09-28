@@ -62,34 +62,47 @@ uniquement** : aucun parcours n'a encore été fait dans un navigateur (§6).
 
 ## 4. Production (VPS Docker Legal, 51.178.30.81)
 
-- Stack recréée à votre demande (volumes existants conservés, sauvegarde préalable
-  `/home/lsi/sauvegarde-contrats-20260927`), image `2.0.0-rc.1` (lots 0 à 2), puis **intégrée à
-  Portainer** (stack 116, endpoint « Docker Legal »). Mode **dégradé** tant que les secrets manquent.
-- La production tourne encore sur l'image `rc.1` : **les lots 3 à 9 ne sont pas déployés**. Le
-  déploiement passe par la publication GHCR (§5).
-- PostgreSQL de production : **16** (volume existant). Procédure de passage à 17 :
-  `09-exploitation.md` §10.
+- **Version `2.0.1` en production depuis le 2026-09-27, 18 h 57**, déployée par la chaîne
+  complète : tag `vX.Y.Z` → CI → images `ghcr.io` → approbation de l'environnement `production`
+  → tunnel SSH → API Portainer (Community Edition, serveur sur le pair WireGuard `10.99.0.1`) →
+  test de fumée `/healthz`. Migrations jusqu'à la 33 appliquées (PostgreSQL 16), données intactes.
+- **Incident du 2026-09-27, 18 h 24 – 18 h 30** (premier déploiement de `2.0.0`) : Portainer a
+  arrêté la stack avant d'échouer à tirer une image introuvable (`OCR_TAG` figé sur `rc.1`).
+  Données intactes, service rétabli depuis la copie de secours ; le script de redéploiement
+  vérifie désormais toutes les images **avant** de toucher à la stack (`09-exploitation.md` §4.8–4.9).
+- **Configuration complète** : connexion Microsoft Entra (vérifiée), DocuSeal (`/readyz` : joignable,
+  clé valide), Brevo, IA (Claude, budget 100 USD/mois, drapeau actif), Wasabi.
+- **Sauvegardes vérifiées** : sauvegarde nocturne de la base et des documents vers Wasabi, test
+  de restauration mensuel (contrats restaurés = production), surveillés par Uptime Kuma (sondes
+  « en ligne », « prêt », « sauvegarde », « restauration »).
+- **MinIO** sur le miroir privé `ghcr.io/lsiparis/minio:RELEASE.2025-09-07T16-13-09Z`.
+- **Contrats types des propositions** installés en **brouillon** (`docs/contrats/12-contrats-types.md`).
+- PostgreSQL de production : **16**. Procédure de passage à 17 : `09-exploitation.md` §10.
 
-## 5. Décisions attendues de votre part
+## 5. Décisions et actions restantes
 
-1. ~~Dépôt privé et `release.yml`~~ : **réglé** le 2026-09-27, dépôt rendu **public** (historique
-   analysé par gitleaks au préalable : aucun secret ; *secret scanning* et *push protection* activés).
-2. ~~Emplacement de Portainer~~ : **réglé** — serveur sur le pair WireGuard `10.99.0.1:9443` (CE
-   2.45.1), agent seul sur le VPS ; tunnel par le VPS, redéploiement par l'API (§3). Reste à faire :
-   compte `gha-deploy` et son jeton, clé de déploiement (`create-deploy-key.sh all --portainer
-   10.99.0.1:9443 --repo LSIParis/contrats --env production`) — `09-exploitation.md` §4.8.
-   **Exposition à corriger** : agent Portainer ouvert sur `0.0.0.0:9001` sans `AGENT_SECRET`,
-   interface `portainer.lsi-maintenance.fr` publique (§4.1).
-3. **Secrets de la stack** à renseigner dans Portainer (DocuSeal, OIDC Entra, Brevo, Wasabi,
-   Perplexity/Anthropic, `COMPOSE_PROFILES=backup`), puis « redéployer » sans nouveau tirage d'image.
-4. **Révoquer le jeton Portainer** apparu dans la conversation (non conservé localement).
-5. **Contrats types des propositions** : la conversion d'une proposition signée exige un contrat
-   type **publié** portant le slug `infogerance`, `supervision`, `rssi-externalise` ou
-   `sauvegarde-en-ligne`. Aucun n'existe : à rédiger (juriste), publier, puis rattacher (écran
-   d'administration des propositions). D'ici là, la conversion échoue explicitement et est retentée.
-6. **CGV** à publier avant le premier envoi d'une proposition.
-7. **DNS** de `contrats.lsi-maintenance.fr` (A vers `51.91.98.38`, non vers le VPS) : vérifier le
-   proxy qui relaie (`09-exploitation.md` §5).
+**Réglé** : dépôt rendu public (historique analysé par gitleaks, *secret scanning* et *push
+protection* actifs) ; emplacement de Portainer et redéploiement par l'API ; secrets de la stack ;
+sauvegardes et supervision ; miroir MinIO ; contrats types préparés ; protection de `main` et
+approbation obligatoire des déploiements de production.
+
+**Reste à faire** (plan détaillé dans l'historique de la session) :
+1. **Contrats types** : relecture juridique (`12-contrats-types.md` §3), SIREN et adresse de
+   LSI-Maintenance dans la clause `CT-PARTIES`, puis publication des quatre.
+2. **CGV** à publier ; **prix « à valider »** à valider (administration des propositions).
+3. **Recette** complète dans un navigateur (proposition de bout en bout, import, contrat).
+4. **Portainer** : agent exposé sur `0.0.0.0:9001` sans `AGENT_SECRET` (à restreindre au
+   WireGuard) ; interface `portainer.lsi-maintenance.fr` publique (Cloudflare Access recommandé).
+5. **Jetons** : révoquer le jeton Portainer apparu dans la conversation ; retirer le droit
+   `write:packages` de la session GitHub CLI (révocation de l'application OAuth).
+6. **Préproduction** (`staging`) à mettre en place : aujourd'hui, une fusion sur `main` publie
+   l'image sans la déployer.
+7. **Avant le 2026-12-31** : migration NestJS 11 / Fastify 5 / Prisma (les PR Dependabot de
+   versions majeures sont fermées dans ce but) et image d'exécution sans pnpm.
+8. **DNS** de `contrats.lsi-maintenance.fr` (A vers `51.91.98.38`, qui relaie vers le VPS) : à documenter.
+
+**Règle d'exploitation** : dans Portainer, *Update the stack* avec « Re-pull image and redeploy »
+**désactivé**, et aucune variable laissée vide ; pour changer de version, passer par un tag et la CI.
 
 ## 6. À faire valider ou tester
 
@@ -143,4 +156,4 @@ Tous les écrans sont gardés par la matrice de permissions renvoyée par `/v1/a
 
 `docs/contrats/` : 00 architecture et hypothèses, 01 domaine, 02 cycle de vie, 03 import, 04
 tarification, 05 IA, 06 DocuSeal, 07 API (guide d'intégration), 08 sécurité et RGPD, 09
-exploitation, 10 charte graphique, 11 propositions. Racine : `openapi.yaml`, ce fichier.
+exploitation, 10 charte graphique, 11 propositions, 12 contrats types. Racine : `openapi.yaml`, ce fichier.

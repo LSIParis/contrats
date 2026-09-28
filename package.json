@@ -23,12 +23,13 @@
     "openapi:generate": "pnpm --filter @lsi/api run openapi:generate",
     "client:generate": "pnpm openapi:generate",
     "changelog": "git cliff -o CHANGELOG.md",
-    "openapi:check": "pnpm --filter @lsi/api run openapi:check"
+    "openapi:check": "pnpm --filter @lsi/api run openapi:check",
+    "seed:contract-templates": "pnpm --filter @lsi/persistence exec tsx src/seed/contract-templates.ts"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.15.0",
     "typescript": "^5.6.3",
-    "typescript-eslint": "^8.15.0"
+    "typescript-eslint": "^8.70.1"
   }
 }
