@@ -48,7 +48,7 @@ const ul = (...items: string[]) => `<ul>${items.map((i) => `<li>${i}</li>`).join
 // ---------------------------------------------------------------------------
 
 const PARTIES = p(
-  // Prestataire : LSI SAS (RNE, 2026-09-28). RCS déduit du siège (Venelles → Aix-en-Provence) : à vérifier sur le Kbis.
+  // Prestataire : LSI SAS (RNE, 2026-09-28 ; RCS d’Aix-en-Provence confirmé sur le Kbis).
   '<strong>Entre</strong> LSI, société par actions simplifiée au capital de 5 000 €, immatriculée au RCS d’Aix-en-Provence sous le numéro 821 439 379, dont le siège social est situé 849 rue de la Gare, 13770 Venelles, ci-après « le Prestataire »,',
   '<strong>et</strong> {{client.raisonSociale}}, SIREN {{client.siren}}, dont le siège est situé {{client.adresse}}, représentée par {{client.representant}}, ci-après « le Client »,',
   'ensemble « les Parties ». Contrat n° {{contrat.reference}}.',

@@ -31,8 +31,8 @@ version) puis mettre à jour les modèles concernés, qui sont ensuite republié
 
 Le **Prestataire** est écrit en toutes lettres dans la clause `CT-PARTIES` (version 2,
 2026-09-28) : LSI, SAS au capital de 5 000 €, SIREN 821 439 379, siège 849 rue de la
-Gare, 13770 Venelles (source : Registre national des entreprises). **À vérifier sur
-le Kbis : la ville du RCS (Aix-en-Provence, déduite du siège).**
+Gare, 13770 Venelles, RCS d’Aix-en-Provence (source : Registre national des
+entreprises ; RCS confirmé sur le Kbis le 2026-09-28).
 
 Modifier une clause des contrats types : corriger son texte dans
 `contract-templates-data.ts`, puis `pnpm seed:contract-templates --upgrade CODE`
