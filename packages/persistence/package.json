@@ -22,7 +22,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "prisma": "^5.22.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
