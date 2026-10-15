@@ -46,7 +46,7 @@ export class ProposalDocumentsService {
       return {
         loaded,
         state,
-        html: proposalHtmlDocument({ number: loaded.proposal.number, title: loaded.version.title, sections, pricingHtml: pricingTableHtml(state.quote) }),
+        html: proposalHtmlDocument({ number: loaded.proposal.number, title: loaded.version.title, sections, pricingHtml: pricingTableHtml(state.quote, state.definition) }),
       };
     });
   }
@@ -124,7 +124,7 @@ export class ProposalDocumentsService {
       number: proposal.number,
       title: `${version.title} — bon pour accord`,
       sections,
-      pricingHtml: pricingTableHtml(quote),
+      pricingHtml: pricingTableHtml(quote, state.definition),
       signatureHtml,
     });
     const rendered = await this.renderer.render({ html, documentTitle: `${proposal.number} — bon pour accord`, footerHtml: documentFooterHtml(proposal.number, '') });

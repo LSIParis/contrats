@@ -7,6 +7,7 @@ import { Input, controlClass } from '../../ui/input.js';
 import { Select } from '../../ui/select.js';
 import { ErrorNote, RegionCard } from '../../ui/region-card.js';
 import { useToast } from '../../ui/toast.js';
+import { HtmlField } from '../structure/html-field.js';
 import { KIND_LABELS, LOOKUP_LABELS, MODE_LABELS, RECURRENCE_LABELS } from './labels.js';
 import { draftFromLine, emptyDraft, lineFromDraft, revisionAllowed, type LineDraft } from './line-draft.js';
 import { draftFromGrid, gridFields, linesToSwitch, switchVariantCode } from './grid-lines.js';
@@ -61,7 +62,7 @@ export function ScheduleEditor({ contractId, schedule, onClose }: { contractId: 
       return { missing, found };
     },
     onSuccess: ({ missing, found }) => {
-      setDrafts((ds) => ds.map((d, i) => (found.has(i) ? { ...d, ...gridFields(found.get(i)!) } : d)));
+      setDrafts((ds) => ds.map((d, i) => (found.has(i) ? { ...d, ...gridFields(found.get(i)!), ...(d.description ? { description: d.description } : {}) } : d)));
       if (missing.length) toast.show(`Versions non proposées (lignes inchangées) : ${missing.join(', ')}.`, 'warn');
       else toast.show(`${found.size} ligne(s) basculée(s) : prix au ${validFrom} copiés.`, 'success');
     },
@@ -212,6 +213,7 @@ function LineEditor({
   const legend = `Ligne ${index + 1}${d.label.trim() ? ` — ${d.label.trim()}` : ''}`;
   const priceRules = rules.filter((r) => !r.archivedAt && (d.kind === 'TIERED' ? r.type === 'TIERS' : r.type === 'GRID'));
   const adjustRules = rules.filter((r) => !r.archivedAt && (r.type === 'VOLUME_DISCOUNT' || r.type === 'COMMITMENT_DISCOUNT'));
+  const [showDesc, setShowDesc] = useState(() => d.description.trim() !== '');
 
   return (
     <fieldset className="flex flex-col gap-3 rounded-lg border border-line p-4">
@@ -397,6 +399,20 @@ function LineEditor({
           )}
         </div>
       )}
+
+      <div className="flex flex-col gap-2">
+        <div>
+          <Button type="button" variant="ghost" size="sm" aria-expanded={showDesc} aria-controls={id('desc')} onClick={() => setShowDesc((v) => !v)}>
+            {showDesc ? 'Masquer la description' : d.description.trim() ? 'Afficher la description' : 'Ajouter une description'}
+          </Button>
+        </div>
+        {showDesc && (
+          <div id={id('desc')}>
+            <HtmlField label={`Description — ligne ${index + 1}`} value={d.description} onChange={(description) => onChange({ description })}
+              hint="Affichée sous la ligne (sans effet sur le prix)." />
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => onMove(-1)}>Monter</Button>

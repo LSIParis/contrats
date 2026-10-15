@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HtmlDescription } from '../common/html-description.js';
 
 /**
  * Schémas Zod de l'API de tarification (04-tarification.md §17).
@@ -92,6 +93,8 @@ export const LineInputSchema = z
     lineKey: LineKey,
     articleCode: z.string().trim().min(1).max(64),
     label: z.string().trim().min(1).max(300),
+    /** Description HTML assainie (13-types-contrats.md §3), affichée sous la ligne. */
+    description: HtmlDescription.nullable().optional(),
     unit: z.string().trim().min(1).max(40),
     kind: z.enum(['FLAT_MONTHLY', 'FLAT_YEARLY', 'UNIT', 'HOURLY', 'HOUR_PACK', 'SETUP_FEE', 'TIERED', 'DISCOUNT']),
     mode: z.enum(['MANUAL', 'RULE', 'FORMULA']),

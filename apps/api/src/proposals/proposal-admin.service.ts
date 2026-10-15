@@ -70,7 +70,7 @@ export class ProposalAdminService {
     return this.template(scope, slug);
   }
 
-  async updateLine(scope: Scope, slug: string, key: string, body: { label?: string | undefined; pricing?: unknown; priceSource?: string | undefined }, now: Date) {
+  async updateLine(scope: Scope, slug: string, key: string, body: { label?: string | undefined; pricing?: unknown; priceSource?: string | undefined; description?: string | null | undefined }, now: Date) {
     const before = await withScope(scope, async (tx) => {
       const t = await this.templateOrThrow(tx, scope, slug);
       const line = t.lines.find((l: any) => l.key === key);
@@ -90,6 +90,7 @@ export class ProposalAdminService {
         data: {
           ...(body.label !== undefined ? { label: body.label } : {}),
           ...(body.priceSource !== undefined ? { priceSource: body.priceSource } : {}),
+          ...(body.description !== undefined ? { description: body.description } : {}),
           ...(body.pricing !== undefined ? { pricing: body.pricing as object } : {}),
           ...(pricingChanged ? { priceStatus: 'TO_VALIDATE', priceStatusByChoice: undefined } : {}),
         },

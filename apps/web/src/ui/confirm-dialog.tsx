@@ -9,7 +9,7 @@ import { ErrorNote } from './region-card.js';
  * ouverte. `disabled` : action impossible tant qu'un champ requis (motif…) est vide.
  */
 export function ConfirmDialog({
-  open, title, confirmLabel, onConfirm, onClose, pending = false, error, disabled = false, variant = 'primary', children,
+  open, title, confirmLabel, onConfirm, onClose, pending = false, error, disabled = false, variant = 'primary', width, children,
 }: {
   open: boolean;
   title: string;
@@ -20,6 +20,8 @@ export function ConfirmDialog({
   error?: string;
   disabled?: boolean;
   variant?: ButtonVariant;
+  /** Largeur de la boîte (px) ; défaut de `Modal`. */
+  width?: number;
   children?: ReactNode;
 }) {
   return (
@@ -27,6 +29,7 @@ export function ConfirmDialog({
       open={open}
       onClose={onClose}
       title={title}
+      {...(width !== undefined ? { width } : {})}
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>Annuler</Button>

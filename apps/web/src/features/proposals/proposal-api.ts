@@ -42,6 +42,7 @@ export interface Quote {
 
 export type LinePricing = { unitPriceCents: number } | { dependsOn: string; byChoice: Record<string, number> };
 export interface DefLine {
+  /** `description` : HTML assaini par le serveur (liste blanche), 20 000 caractères au plus. */
   key: string; label: string; description?: string; kind: 'REQUIRED' | 'OPTIONAL' | 'SETUP' | 'INFO'; unit: string;
   recurrence: 'ONE_TIME' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'INFO';
   quantity?: { default: number | string; min: number; max?: number; maxFrom?: string; linkedTo?: string; editableByClient: boolean };
@@ -197,7 +198,7 @@ export const proposalAdminApi = {
     apiPost<unknown>(`${A}/templates/${encodeURIComponent(slug)}/grid-lines`, b),
   linkLineToGrid: (slug: string, key: string, itemCode: string) =>
     apiPost<unknown>(`${A}/templates/${encodeURIComponent(slug)}/lines/${encodeURIComponent(key)}/grid`, { itemCode }),
-  updateLine: (slug: string, key: string, b: { label?: string; pricing?: LinePricing; priceSource?: string }) =>
+  updateLine: (slug: string, key: string, b: { label?: string; pricing?: LinePricing; priceSource?: string; description?: string | null }) =>
     apiPatch<unknown>(`${A}/templates/${encodeURIComponent(slug)}/lines/${encodeURIComponent(key)}`, b),
   library: () => apiGet<{ items: LibraryItem[] }>(`${A}/library`),
   createLibraryItem: (b: { key: string; title: string; folder: string; body: string; requiresLegalReview?: boolean }) => apiPost<LibraryItem>(`${A}/library`, b),

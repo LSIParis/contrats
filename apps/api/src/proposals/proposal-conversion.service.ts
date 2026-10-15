@@ -118,8 +118,10 @@ export class ProposalConversionService {
         // Barème initial = PricingSnapshot (avant le texte : l'annexe « grille
         // tarifaire » se rend depuis le barème du contrat).
         const sched = snapshot.engineSchedule as unknown as EngineSchedule;
-        const def = snapshot.definition as { lines?: { key: string; indexation?: { index: string; a: number; b: number } }[] };
+        const def = snapshot.definition as { lines?: { key: string; description?: string; indexation?: { index: string; a: number; b: number } }[] };
         const indexed = new Map((def.lines ?? []).filter((l) => l.indexation).map((l) => [l.key, l.indexation!]));
+        // Description (HTML déjà assaini à l'écriture de la définition) reprise sur la ligne du barème.
+        const described = new Map((def.lines ?? []).filter((l) => l.description).map((l) => [l.key, l.description!]));
         const validFrom = startDate ? iso(startDate) : sched.validFrom;
         const scheduleId = uuidv7();
         await tx.pricingSchedule.create({
@@ -144,7 +146,7 @@ export class ProposalConversionService {
             }
             return {
               id: uuidv7(), tenantId, customerId, scheduleId, lineKey: l.id, sortOrder: i, articleCode: l.code,
-              label: l.label, unit: l.unit, kind: l.kind, mode: l.mode, recurrence: l.recurrence ?? null,
+              label: l.label, description: described.get(l.id) ?? null, unit: l.unit, kind: l.kind, mode: l.mode, recurrence: l.recurrence ?? null,
               vatRatePercent: l.vatRatePercent, quantitySource: 'FIXED' as const,
               quantity: l.kind === 'DISCOUNT' ? null : l.quantity && l.quantity.source === 'FIXED' ? l.quantity.value : '1',
               providerArticleCode: null, unitPrice: l.unitPrice ?? null, params: params as object,

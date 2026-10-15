@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, errorText } from '../../lib/api.js';
 import { formatDecimal, formatDecimalEuros } from '../../lib/money.js';
@@ -14,6 +14,7 @@ import { ErrorNote, RegionCard } from '../../ui/region-card.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Table } from '../../ui/table.js';
 import { useToast } from '../../ui/toast.js';
+import { HtmlBlock } from '../structure/html-field.js';
 import { KIND_LABELS, MODE_LABELS, SCHEDULE_STATUS, fmtDay } from './labels.js';
 import { OverridesCard } from './overrides-card.js';
 import { PriceAtCard } from './price-at-card.js';
@@ -208,17 +209,24 @@ function LinesTable({ schedule }: { schedule: ScheduleView }) {
       head={<tr><th>Ligne</th><th>Type</th><th>Mode</th><th>Quantité</th><th>Prix</th><th>TVA</th><th>Révision</th></tr>}
     >
       {schedule.lines.map((l) => (
-        <tr key={l.lineKey}>
-          <td>{l.label}<span className="block text-xs text-ink-faint">{l.articleCode} · {l.lineKey}</span></td>
-          <td>{KIND_LABELS[l.kind] ?? l.kind}</td>
-          <td>{MODE_LABELS[l.mode] ?? l.mode}</td>
-          <td className="tabular-nums">
-            {l.kind === 'DISCOUNT' ? '—' : l.quantitySource === 'PROVIDER' ? `fournie (${l.providerArticleCode ?? ''})` : `${formatDecimal(l.quantity ?? '1', { minFraction: 0 })} ${l.unit}`}
-          </td>
-          <td className="tabular-nums">{describeLinePrice(l)}</td>
-          <td className="tabular-nums">{formatDecimal(l.vatRatePercent, { minFraction: 0 })} %</td>
-          <td>{l.revision ? `${l.revision.indexCode} au ${fmtDay(l.revision.revisionDate)} (a ${l.revision.a}, b ${l.revision.b})` : '—'}</td>
-        </tr>
+        <Fragment key={l.lineKey}>
+          <tr className={l.description ? '[&>td]:!border-b-0' : undefined}>
+            <td>{l.label}<span className="block text-xs text-ink-faint">{l.articleCode} · {l.lineKey}</span></td>
+            <td>{KIND_LABELS[l.kind] ?? l.kind}</td>
+            <td>{MODE_LABELS[l.mode] ?? l.mode}</td>
+            <td className="tabular-nums">
+              {l.kind === 'DISCOUNT' ? '—' : l.quantitySource === 'PROVIDER' ? `fournie (${l.providerArticleCode ?? ''})` : `${formatDecimal(l.quantity ?? '1', { minFraction: 0 })} ${l.unit}`}
+            </td>
+            <td className="tabular-nums">{describeLinePrice(l)}</td>
+            <td className="tabular-nums">{formatDecimal(l.vatRatePercent, { minFraction: 0 })} %</td>
+            <td>{l.revision ? `${l.revision.indexCode} au ${fmtDay(l.revision.revisionDate)} (a ${l.revision.a}, b ${l.revision.b})` : '—'}</td>
+          </tr>
+          {l.description && (
+            <tr aria-label={`Description de ${l.label}`}>
+              <td colSpan={7} className="!pl-6 !pt-0 text-ink-muted"><HtmlBlock html={l.description} className="text-xs" /></td>
+            </tr>
+          )}
+        </Fragment>
       ))}
     </Table>
   );

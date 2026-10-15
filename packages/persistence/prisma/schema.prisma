@@ -1783,6 +1783,8 @@ model PricingLine {
   sortOrder           Int                   @default(0) @map("sort_order")
   articleCode         String                @map("article_code")
   label               String
+  /// Description HTML assainie (migration 35), affichée sous la ligne.
+  description         String?
   unit                String
   kind                PricingLineKind
   mode                PricingLineMode

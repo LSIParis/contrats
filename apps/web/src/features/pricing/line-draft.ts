@@ -1,4 +1,5 @@
 import { decimalFromInput, decimalToInput } from '../../lib/money.js';
+import { emptyHtml, HTML_MAX } from '../structure/html-field.js';
 import type { IndexLookup, LineInput, LineKind, PricingMode, Recurrence, TierMode } from './types.js';
 
 /**
@@ -13,6 +14,8 @@ export interface LineDraft {
   lineKey: string;
   articleCode: string;
   label: string;
+  /** HTML ('' = aucune description). */
+  description: string;
   unit: string;
   kind: LineKind;
   mode: PricingMode;
@@ -46,7 +49,7 @@ export interface LineDraft {
 
 export function emptyDraft(n: number): LineDraft {
   return {
-    lineKey: `ligne-${n}`, articleCode: '', label: '', unit: 'mois', kind: 'FLAT_MONTHLY', mode: 'MANUAL', recurrence: '',
+    lineKey: `ligne-${n}`, articleCode: '', label: '', description: '', unit: 'mois', kind: 'FLAT_MONTHLY', mode: 'MANUAL', recurrence: '',
     vatRatePercent: '20', quantitySource: 'FIXED', quantity: '1', providerArticleCode: '', unitPrice: '',
     tierMode: 'GRADUATED', tiers: [{ upTo: '', unitPrice: '' }], priceRuleId: '', adjustmentRuleIds: [],
     expression: '', basePrice: '', variables: [], indexVariables: [],
@@ -59,7 +62,7 @@ export function draftFromLine(l: LineInput, n = 0): LineDraft {
   const d = emptyDraft(n);
   return {
     ...d,
-    lineKey: l.lineKey, articleCode: l.articleCode, label: l.label, unit: l.unit, kind: l.kind, mode: l.mode,
+    lineKey: l.lineKey, articleCode: l.articleCode, label: l.label, description: l.description ?? '', unit: l.unit, kind: l.kind, mode: l.mode,
     recurrence: l.recurrence ?? '', vatRatePercent: decimalToInput(l.vatRatePercent),
     quantitySource: l.quantitySource ?? 'FIXED', quantity: decimalToInput(l.quantity ?? (l.quantitySource === 'PROVIDER' ? '' : '1')),
     providerArticleCode: l.providerArticleCode ?? '', unitPrice: decimalToInput(l.unitPrice),
@@ -110,6 +113,10 @@ export function lineFromDraft(d: LineDraft): { line: LineInput } | { errors: str
     vatRatePercent: decimal(d.vatRatePercent, 'taux de TVA', { required: true, maxFraction: 2 }) ?? '',
   };
   if (d.recurrence) line.recurrence = d.recurrence;
+  // Remplacement complet de la version : une description absente est effacée.
+  const description = emptyHtml(d.description);
+  if (description.length > HTML_MAX) errors.push(`${who} : description de 20 000 caractères au plus.`);
+  if (description) line.description = description;
 
   if (!isDiscount) {
     line.quantitySource = d.quantitySource;

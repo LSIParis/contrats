@@ -54,7 +54,7 @@ export class ProposalAdminController {
     @CurrentSession() s: Session,
     @Param('slug') slug: string,
     @Param('key') key: string,
-    @Body(new ZodPipe(UpdateTemplateLineSchema)) body: { label?: string; pricing?: unknown; priceSource?: string },
+    @Body(new ZodPipe(UpdateTemplateLineSchema)) body: { label?: string; pricing?: unknown; priceSource?: string; description?: string | null },
   ) {
     assertCan(s, 'proposals.library.manage');
     return this.admin.updateLine(scope, slug, key, body, new Date());

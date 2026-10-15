@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiRequestError, errorText } from '../../lib/api.js';
 import { decimalFromInput, decimalToInput, formatDecimal } from '../../lib/money.js';
@@ -13,6 +13,7 @@ import { Select } from '../../ui/select.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Table } from '../../ui/table.js';
 import { useToast } from '../../ui/toast.js';
+import { emptyHtml, HTML_MAX, HtmlBlock, HtmlField } from '../structure/html-field.js';
 import { contractKindsApi, type ItemInput } from './api.js';
 import { euros, fmtDay, GRID_RECURRENCES, PRICE_UNITS, recurrenceLabel, todayIso, unitLabel } from './labels.js';
 import type { CommitmentTermRow, ContractKindRow, DurationPrice, GridItem, GridRecurrence, GridVariant, ImportReport, PriceUnitCode } from './types.js';
@@ -104,36 +105,45 @@ export function GridPanel({ kind, canManage }: { kind: ContractKindRow; canManag
           }
         >
           {items.map((i) => (
-            <tr key={i.id}>
-              <td className="whitespace-nowrap font-mono">
-                {i.code}
-                {i.archivedAt && <span className="ml-1.5"><Badge tone="muted">Archivé</Badge></span>}
-              </td>
-              <td>{i.label}{i.description && <span className="block text-xs text-ink-faint">{i.description}</span>}</td>
-              <td>{unitLabel(i.unit)}</td>
-              <td>{recurrenceLabel(i.recurrence)}</td>
-              <td className="tabular-nums">{formatDecimal(i.vatRatePercent, { minFraction: 0 })} %</td>
-              {terms.map((t) => <PriceCell key={t.id} variant={activeVariant(i, t.months)} />)}
-              {canManage && (
-                <td>
-                  <span className="inline-flex flex-wrap gap-1.5">
-                    {!i.archivedAt && (
-                      <Button type="button" size="sm" variant="ghost" aria-label={`Modifier les prix de ${i.code}`} onClick={() => setPricing(i)}>Modifier les prix</Button>
-                    )}
-                    <Button type="button" size="sm" variant="ghost" aria-label={`Modifier ${i.code}`} onClick={() => setEditing(i)}>Modifier</Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={i.archivedAt ? 'ghost' : 'danger-ghost'}
-                      aria-label={`${i.archivedAt ? 'Désarchiver' : 'Archiver'} ${i.code}`}
-                      onClick={() => { toggle.reset(); setToggling(i); }}
-                    >
-                      {i.archivedAt ? 'Désarchiver' : 'Archiver'}
-                    </Button>
-                  </span>
+            <Fragment key={i.id}>
+              <tr className={i.description ? '[&>td]:!border-b-0' : undefined}>
+                <td className="whitespace-nowrap font-mono">
+                  {i.code}
+                  {i.archivedAt && <span className="ml-1.5"><Badge tone="muted">Archivé</Badge></span>}
                 </td>
+                <td>{i.label}</td>
+                <td>{unitLabel(i.unit)}</td>
+                <td>{recurrenceLabel(i.recurrence)}</td>
+                <td className="tabular-nums">{formatDecimal(i.vatRatePercent, { minFraction: 0 })} %</td>
+                {terms.map((t) => <PriceCell key={t.id} variant={activeVariant(i, t.months)} />)}
+                {canManage && (
+                  <td>
+                    <span className="inline-flex flex-wrap gap-1.5">
+                      {!i.archivedAt && (
+                        <Button type="button" size="sm" variant="ghost" aria-label={`Modifier les prix de ${i.code}`} onClick={() => setPricing(i)}>Modifier les prix</Button>
+                      )}
+                      <Button type="button" size="sm" variant="ghost" aria-label={`Modifier ${i.code}`} onClick={() => setEditing(i)}>Modifier</Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={i.archivedAt ? 'ghost' : 'danger-ghost'}
+                        aria-label={`${i.archivedAt ? 'Désarchiver' : 'Archiver'} ${i.code}`}
+                        onClick={() => { toggle.reset(); setToggling(i); }}
+                      >
+                        {i.archivedAt ? 'Désarchiver' : 'Archiver'}
+                      </Button>
+                    </span>
+                  </td>
+                )}
+              </tr>
+              {i.description && (
+                <tr aria-label={`Description de ${i.code}`}>
+                  <td colSpan={5 + terms.length + (canManage ? 1 : 0)} className="!pl-6 !pt-0 text-ink-muted">
+                    <HtmlBlock html={i.description} className="text-xs" />
+                  </td>
+                </tr>
               )}
-            </tr>
+            </Fragment>
           ))}
         </Table>
       )}
@@ -226,9 +236,8 @@ function ItemFields({ uid, f, setF }: { uid: string; f: ItemForm; setF: (p: Part
       <Field label="Libellé" htmlFor={`${uid}-label`}>
         <Input id={`${uid}-label`} value={f.label} onChange={(e) => setF({ label: e.target.value })} />
       </Field>
-      <Field label="Description" htmlFor={`${uid}-desc`}>
-        <Input id={`${uid}-desc`} value={f.description} onChange={(e) => setF({ description: e.target.value })} />
-      </Field>
+      <HtmlField label="Description" value={f.description} onChange={(description) => setF({ description })}
+        hint="Texte mis en forme ou HTML (titres, listes, tableaux, liens…), affiché sous le code." />
       <div className="grid grid-cols-3 gap-3">
         <Field label="Unité" htmlFor={`${uid}-unit`}>
           <Select id={`${uid}-unit`} value={f.unit} onChange={(e) => setF({ unit: e.target.value as PriceUnitCode })}>
@@ -270,6 +279,7 @@ function CreateItemDialog({ kind, terms, onClose }: { kind: ContractKindRow; ter
   function submit() {
     const vat = decimalFromInput(f.vat, { maxFraction: 2 });
     if (!vat) return setFormError('TVA : pourcentage invalide.');
+    if (emptyHtml(f.description).length > HTML_MAX) return setFormError('Description : 20 000 caractères au plus.');
     const prices: DurationPrice[] = [];
     for (const t of terms) {
       const r = rows[t.months];
@@ -286,7 +296,7 @@ function CreateItemDialog({ kind, terms, onClose }: { kind: ContractKindRow; ter
     setFormError(undefined);
     m.mutate({
       label: f.label.trim(),
-      ...(f.description.trim() ? { description: f.description.trim() } : {}),
+      ...(emptyHtml(f.description) ? { description: emptyHtml(f.description) } : {}),
       unit: f.unit, recurrence: f.recurrence, vatRatePercent: vat,
       ...(effectiveFrom ? { effectiveFrom } : {}),
       ...(prices.length ? { prices } : {}),
@@ -297,6 +307,7 @@ function CreateItemDialog({ kind, terms, onClose }: { kind: ContractKindRow; ter
       open
       title={`Nouveau code — ${kind.label}`}
       confirmLabel="Créer le code"
+      width={860}
       disabled={!f.label.trim()}
       onConfirm={submit}
       onClose={onClose}
@@ -406,7 +417,9 @@ function EditItemDialog({ kindId, item, onClose }: { kindId: string; item: GridI
     if (!vat) return setFormError('TVA : pourcentage invalide.');
     const b: ItemInput = {};
     if (f.label.trim() !== item.label) b.label = f.label.trim();
-    if (f.description.trim() !== (item.description ?? '')) b.description = f.description.trim() || null;
+    const description = emptyHtml(f.description);
+    if (description.length > HTML_MAX) return setFormError('Description : 20 000 caractères au plus.');
+    if (description !== (item.description ?? '')) b.description = description || null;
     if (f.unit !== item.unit) b.unit = f.unit;
     if (f.recurrence !== item.recurrence) b.recurrence = f.recurrence;
     if (!sameDecimal(vat, item.vatRatePercent)) b.vatRatePercent = vat;
@@ -419,6 +432,7 @@ function EditItemDialog({ kindId, item, onClose }: { kindId: string; item: GridI
       open
       title={`Modifier ${item.code}`}
       confirmLabel="Enregistrer"
+      width={860}
       disabled={!f.label.trim()}
       onConfirm={submit}
       onClose={onClose}
@@ -480,6 +494,7 @@ function ImportDialog({ kind, terms, onClose }: { kind: ContractKindRow; terms: 
           <p className="my-1 break-all font-mono text-xs">code;libelle;description;unite;periodicite;tva;{cols.join(';')};{cols.map((c) => `achat_${c}`).join(';')}</p>
           <ul className="list-disc pl-5">
             <li>code vide = nouveau code (numéro attribué automatiquement) ;</li>
+            <li>description : texte ou HTML mis en forme (titres, listes, tableaux, liens…), assaini à l’enregistrement ; mettre la cellule entre guillemets si elle contient « ; » ;</li>
             <li>unité et périodicité : libellé (« par utilisateur », « mensuelle ») ou code (PER_USER, MONTHLY) ;</li>
             <li>cellule de prix vide = durée non proposée ; colonne absente = durée inchangée ; colonnes achat_… facultatives.</li>
           </ul>

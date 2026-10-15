@@ -35,6 +35,11 @@ export function RichText({ label, value, onChange }: { label: string; value: str
         <button type="button" className={tb} aria-label="Italique" onClick={() => editor?.chain().focus().toggleItalic().run()}><i>I</i></button>
         <button type="button" className={tb} onClick={() => editor?.chain().focus().toggleBulletList().run()}>• Liste</button>
         <button type="button" className={tb} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>1. Liste</button>
+        <button type="button" className={tb} onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}>Titre</button>
+        <button type="button" className={tb} onClick={() => editor?.chain().focus().toggleBlockquote().run()}>Citation</button>
+        {/* Noms « Défaire / Refaire » : « Annuler » est déjà le bouton de fermeture des dialogues. */}
+        <button type="button" className={tb} aria-label="Défaire" title="Annuler la dernière modification (Ctrl+Z)" onClick={() => editor?.chain().focus().undo().run()}>↶</button>
+        <button type="button" className={tb} aria-label="Refaire" title="Rétablir (Ctrl+Y)" onClick={() => editor?.chain().focus().redo().run()}>↷</button>
       </div>
       <div className="prose max-w-none rounded border border-line-strong bg-surface px-3 py-2 text-sm">
         <EditorContent editor={editor} />

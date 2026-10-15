@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Input } from '../../../ui/input.js';
+import { HtmlBlock } from '../../structure/html-field.js';
 import type { Bucket, DefLine, PublicView, Quote, Selection } from './public-api.js';
 import { formatEuros } from './public-api.js';
 
@@ -73,23 +74,23 @@ export function PricingTable({
             <div className="flex flex-col gap-2">
               <span className="text-xs+ font-button text-ink-muted">Options</span>
               {optional.map((l) => (
-                <label key={l.key} className="flex cursor-pointer items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={selection.selectedOptions.includes(l.key)}
-                    onChange={(e) => {
-                      const next = e.target.checked
-                        ? [...selection.selectedOptions, l.key]
-                        : selection.selectedOptions.filter((k) => k !== l.key);
-                      void send({ selectedOptions: next });
-                    }}
-                  />
-                  <span>
-                    {l.label}
-                    {l.description && <span className="block text-xs text-ink-faint">{l.description}</span>}
-                  </span>
-                </label>
+                <div key={l.key} className="flex flex-col gap-1">
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={selection.selectedOptions.includes(l.key)}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...selection.selectedOptions, l.key]
+                          : selection.selectedOptions.filter((k) => k !== l.key);
+                        void send({ selectedOptions: next });
+                      }}
+                    />
+                    <span>{l.label}</span>
+                  </label>
+                  {l.description && <HtmlBlock html={l.description} className="pl-6 text-xs text-ink-muted" />}
+                </div>
               ))}
             </div>
           )}
@@ -132,14 +133,22 @@ export function PricingTable({
           <tbody>
             {quote.lines.map((l) => {
               const special = l.recurrence === 'DISCOUNT' || l.recurrence === 'MINIMUM';
+              const description = definition.lines.find((d) => d.key === l.key)?.description;
               return (
-                <tr key={l.key} className="border-b border-line last:border-0">
-                  <td className="py-2 pr-3">{l.label}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : l.quantity}</td>
-                  <td className="py-2 pr-3 text-ink-muted">{special ? '' : l.unit}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : `${l.priceFrom ? 'à partir de ' : ''}${formatEuros(l.unitPriceCents)}`}</td>
-                  <td className="py-2 text-right tabular-nums">{formatEuros(l.totalHtCents)}</td>
-                </tr>
+                <Fragment key={l.key}>
+                  <tr className={description ? '' : 'border-b border-line last:border-0'}>
+                    <td className="py-2 pr-3">{l.label}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : l.quantity}</td>
+                    <td className="py-2 pr-3 text-ink-muted">{special ? '' : l.unit}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : `${l.priceFrom ? 'à partir de ' : ''}${formatEuros(l.unitPriceCents)}`}</td>
+                    <td className="py-2 text-right tabular-nums">{formatEuros(l.totalHtCents)}</td>
+                  </tr>
+                  {description && (
+                    <tr aria-label={`Description de ${l.label}`} className="border-b border-line last:border-0">
+                      <td colSpan={5} className="pb-2 pl-4 pr-3 text-ink-muted"><HtmlBlock html={description} className="text-xs" /></td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>

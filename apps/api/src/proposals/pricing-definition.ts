@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HtmlDescription, sanitizeDescription } from '../common/html-description.js';
 import type {
   ProposalChoice,
   ProposalPricingDefinition,
@@ -34,7 +35,8 @@ const Line = z
   .object({
     key: Key,
     label: z.string().min(1).max(300),
-    description: z.string().max(1000).optional(),
+    /** HTML assaini (13-types-contrats.md §3) ; vide = absente. */
+    description: HtmlDescription.optional().transform((v) => v ?? undefined),
     kind: z.enum(['REQUIRED', 'OPTIONAL', 'SETUP', 'INFO']),
     unit: z.string().min(1).max(60),
     recurrence: z.enum(['ONE_TIME', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'INFO']),
@@ -307,4 +309,22 @@ export function validateInDefinition(
   const c = def.choices.find((x) => x.key === target.key);
   if (!c || c.priceStatus !== 'TO_VALIDATE') return null;
   return { ...def, choices: def.choices.map((x) => (x.key === c.key ? { ...x, priceStatus: 'VALIDATED' as const } : x)) };
+}
+
+/**
+ * Descriptions de lignes assainies À LA LECTURE : les définitions enregistrées
+ * avant les descriptions HTML (13-types-contrats.md §3) n'étaient pas filtrées,
+ * et l'interface les affiche désormais en HTML.
+ */
+export function withSanitizedDescriptions(def: ProposalPricingDefinition): ProposalPricingDefinition {
+  return {
+    ...def,
+    lines: def.lines.map((l) => {
+      if (!l.description) return l;
+      const clean = sanitizeDescription(l.description);
+      if (clean === l.description) return l;
+      const { description: _d, ...rest } = l;
+      return clean ? { ...rest, description: clean } : rest;
+    }),
+  };
 }

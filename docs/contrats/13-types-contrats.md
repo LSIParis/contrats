@@ -63,6 +63,16 @@ Garanties portées par la base :
   de prix est une nouvelle ligne datée ; prix en vigueur à une date D = plus grande date
   d'effet ≤ D, puis dernière saisie. Les prix futurs sont possibles (affichés « → X € au … »).
 
+**Descriptions** (codes de la grille, lignes de modèles de propositions et de propositions,
+lignes de barème) : texte **riche en HTML** (éditeur avec mode « HTML source »), 20 000
+caractères au plus, affiché sur une ligne pleine largeur sous l'élément (écrans, page
+publique, PDF de la proposition). Le HTML est **assaini à l'écriture** avec la liste
+blanche des contrats (titres, paragraphes, gras/italique, listes, citations, liens
+http/https/mailto, tableaux simples ; ni script, ni style, ni attribut d'événement), et
+de nouveau à la lecture des propositions (données antérieures). Il suit la ligne : copie
+depuis la grille, conversion d'une proposition en barème de contrat (colonne
+`pricing_lines.description`, migration 35).
+
 Une durée **non proposée** pour un code n'a pas de version (ou une version archivée) :
 elle n'apparaît pas à la sélection. La remettre en vente réactive la **même** version,
 avec le même code. Unités : `PRICE_UNITS` de `@lsi/domain` (par utilisateur, par poste,
@@ -139,6 +149,7 @@ Détails :
 
 ## 8. Exploitation
 
+- Migration 35 additive (`pricing_lines.description`) ; retour arrière : `prisma/rollback/00000000000035_descriptions_lignes.down.sql` (à jouer avant celui de la 34).
 - Migration 34 additive ; retour arrière : `prisma/rollback/00000000000034_types_contrats.down.sql`
   (destructif, à jouer en propriétaire puis `migrate deploy` ; testé montée → descente → montée).
 - Seed : `pnpm seed:contract-kinds` (propriétaire de la base, `SEED_TENANT_SLUG`, défaut `lsi`).

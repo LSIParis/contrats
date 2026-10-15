@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HtmlDescription } from '../common/html-description.js';
 import { DECLINE_REASON_CODES } from '@lsi/domain';
 
 /**
@@ -169,6 +170,8 @@ export const UpdateTemplateLineSchema = z
       ])
       .optional(),
     priceSource: z.string().trim().min(3).max(300).optional(),
+    /** HTML assaini ; null = retirer la description. */
+    description: HtmlDescription.nullable().optional(),
   })
   .strict();
 

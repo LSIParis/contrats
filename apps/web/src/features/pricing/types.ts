@@ -33,6 +33,8 @@ export interface LineInput {
   lineKey: string;
   articleCode: string;
   label: string;
+  /** HTML assaini par le serveur (liste blanche), 20 000 caractères au plus ; absent ou null = aucune. */
+  description?: string | null;
   unit: string;
   kind: LineKind;
   mode: PricingMode;

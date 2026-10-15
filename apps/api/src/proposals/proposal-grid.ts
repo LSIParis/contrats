@@ -87,7 +87,7 @@ export function buildGridLine(
   return {
     key: opts.key,
     label: item.label,
-    ...(item.description ? { description: item.description.slice(0, 1000) } : {}),
+    ...(item.description ? { description: item.description } : {}),
     kind,
     unit: unitLabel(item.unit),
     recurrence,

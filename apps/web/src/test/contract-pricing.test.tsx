@@ -151,6 +151,24 @@ test('édition d’un brouillon : PUT du barème complet au format de l’API', 
   });
 });
 
+test('édition d’un brouillon : description HTML d’une ligne envoyée dans le PUT', async () => {
+  const user = userEvent.setup();
+  const calls = mockApi(routes([
+    ['PUT', `${BASE}/schedules/3`, (b) => ({ ...sched(3, 'DRAFT', '2026-09-15', null), ...(b as object) })],
+  ]), { userId: 'u-am', roles: ['ACCOUNT_MANAGER'] });
+  renderWithClient(<ContractPricing contractId={K} />);
+  await user.click(await screen.findByRole('button', { name: 'Modifier la version 3' }));
+  const editor = await screen.findByRole('region', { name: 'Version 3 (brouillon) — édition' });
+  const line1 = within(editor).getByRole('group', { name: 'Ligne 1 — Infogérance' });
+  await user.click(within(line1).getByRole('button', { name: 'Ajouter une description' }));
+  await user.click(within(line1).getByRole('button', { name: 'HTML source' }));
+  await user.type(within(line1).getByRole('textbox', { name: 'Description — ligne 1 (HTML source)' }), '<p><strong>Inclus</strong> : astreinte</p>');
+  await user.click(within(editor).getByRole('button', { name: 'Enregistrer le brouillon' }));
+  await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
+  const body = calls.find((c) => c.method === 'PUT')!.body as { lines: Array<Record<string, unknown>> };
+  expect(body.lines[0]!.description).toBe('<p><strong>Inclus</strong> : astreinte</p>');
+});
+
 test('ajout d’une ligne en paliers dans le brouillon', async () => {
   const user = userEvent.setup();
   const calls = mockApi(routes([
