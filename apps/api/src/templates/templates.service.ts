@@ -37,10 +37,10 @@ export class TemplatesService {
       const t = await this.load(tx, id);
       const versions = await tx.contractTemplateVersion.findMany({
         where: { templateId: id }, orderBy: { versionNumber: 'asc' },
-        select: { id: true, versionNumber: true, isImmutable: true, publishedAt: true, createdAt: true },
+        select: { id: true, versionNumber: true, isImmutable: true, publishedAt: true, effectiveFrom: true, createdAt: true },
       });
       const cur = t.currentVersionId
-        ? await tx.contractTemplateVersion.findUnique({ where: { id: t.currentVersionId }, select: { id: true, versionNumber: true, bodyHtml: true, variablesSchema: true, isImmutable: true, publishedAt: true } })
+        ? await tx.contractTemplateVersion.findUnique({ where: { id: t.currentVersionId }, select: { id: true, versionNumber: true, bodyHtml: true, variablesSchema: true, isImmutable: true, publishedAt: true, effectiveFrom: true } })
         : null;
       return { id: t.id, name: t.name, category: t.category, status: t.status, currentVersion: cur, versions };
     });
@@ -85,7 +85,7 @@ export class TemplatesService {
     });
   }
 
-  async publish(scope: Scope, id: string, now: Date, userId: string) {
+  async publish(scope: Scope, id: string, now: Date, userId: string, effectiveFrom?: string) {
     return withScope(scope, async (tx) => {
       const t = await this.load(tx, id);
       if (t.status === 'DEPRECATED') throw new ConflictException({ code: 'DEPRECATED', detail: 'Un modèle déprécié ne peut pas être publié.' });
@@ -96,7 +96,7 @@ export class TemplatesService {
       // provenance (publishedAt/publishedByUserId) d'une version figée.
       if (t.status === 'PUBLISHED' && cur.isImmutable) return { ok: true as const };
       if (cur.bodyHtml.trim() === '') throw new BadRequestException('Corps vide : rien à publier.');
-      await tx.contractTemplateVersion.update({ where: { id: cur.id }, data: { isImmutable: true, publishedAt: now, publishedByUserId: userId } });
+      await tx.contractTemplateVersion.update({ where: { id: cur.id }, data: { isImmutable: true, publishedAt: now, publishedByUserId: userId, effectiveFrom: effectiveFrom ? new Date(`${effectiveFrom}T00:00:00Z`) : null } });
       await tx.contractTemplate.update({ where: { id }, data: { status: 'PUBLISHED', updatedAt: now } });
       return { ok: true as const };
     });

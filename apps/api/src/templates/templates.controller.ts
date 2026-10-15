@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Res } from '@nestjs/common';
+import { z } from 'zod';
 import type { FastifyReply } from 'fastify';
 import { sendFile } from '../common/http-io.js';
 import type { Scope } from '@lsi/persistence';
@@ -9,6 +10,11 @@ import { slugifyFilename } from '../documents/filename.js';
 import { TemplatesService } from './templates.service.js';
 import { CreateTemplateDto } from './dto/create-template.dto.js';
 import { SaveTemplateContentDto } from './dto/save-template-content.dto.js';
+import { ZodPipe } from '../common/zod-pipe.js';
+import { IsoDate } from '../pricing/pricing.schemas.js';
+
+/** Date d'effet du texte publié (13-types-contrats.md §5) ; absente = dès la publication. */
+const PublishSchema = z.object({ effectiveFrom: IsoDate.optional() }).strict().optional();
 
 
 @Controller('v1/templates')
@@ -36,8 +42,8 @@ export class TemplatesController {
   }
 
   @Post(':id/publish')
-  publish(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string) {
-    assertCan(s, 'templates.manage'); return this.templates.publish(scope, id, new Date(), s.userId);
+  publish(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(PublishSchema)) body: z.infer<typeof PublishSchema>) {
+    assertCan(s, 'templates.manage'); return this.templates.publish(scope, id, new Date(), s.userId, body?.effectiveFrom);
   }
 
   @Post(':id/deprecate')

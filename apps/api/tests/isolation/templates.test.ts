@@ -62,6 +62,16 @@ describe('bibliothèque de modèles', () => {
     expect(d.body.status).toBe('PUBLISHED');
     expect(d.body.currentVersion.isImmutable).toBe(true);
     expect(d.body.currentVersion.publishedAt).not.toBeNull();
+    expect(d.body.currentVersion.effectiveFrom).toBeNull();
+  });
+
+  test('publication avec date d\'effet du texte (13-types-contrats.md §5)', async () => {
+    const id = await newTemplate();
+    await req('sess-admin', 'put', `/v1/templates/${id}/content`).send({ bodyHtml: '<p>Corps</p>' }).expect(200);
+    await req('sess-admin', 'post', `/v1/templates/${id}/publish`).send({ effectiveFrom: '2027-01-01' }).expect(201);
+    const d = await req('sess-admin', 'get', `/v1/templates/${id}`).expect(200);
+    expect(new Date(d.body.currentVersion.effectiveFrom).toISOString().slice(0, 10)).toBe('2027-01-01');
+    await req('sess-admin', 'post', `/v1/templates/${id}/publish`).send({ effectiveFrom: '01/01/2027' }).expect(400);
   });
 
   test('ré-édition après publication crée une nouvelle version DRAFT (v+1)', async () => {
