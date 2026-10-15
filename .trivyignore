@@ -11,11 +11,3 @@
 # migration suivie dans RESTITUTION.md.
 CVE-2026-6270 exp:2026-12-31
 
-# tar 6.2.1 embarqué par pnpm 9.15.9 (/usr/local/lib/node_modules/pnpm/dist) :
-# déni de service à la DÉCOMPRESSION d'une archive piégée. Non atteignable dans
-# l'image : pnpm n'y sert que de lanceur (`pnpm --filter … exec`, commandes de
-# la stack Portainer et du job migrate) et n'y extrait aucune archive — les
-# dépendances sont installées à la construction, depuis le lockfile figé.
-# Correctif définitif : lanceurs `node` directs dans la stack (sans pnpm dans
-# l'image d'exécution) ou pnpm 10, suivi dans RESTITUTION.md.
-CVE-2026-59873 exp:2026-12-31

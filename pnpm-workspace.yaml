@@ -1,3 +1,25 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+
+# pnpm 10 n'exécute plus les scripts d'installation des dépendances sans
+# autorisation explicite. Autorisés : ceux qui produisent un binaire ou du code
+# (moteurs Prisma, swc, esbuild, extension native de msgpackr).
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - '@swc/core'
+  - esbuild
+  - msgpackr-extract
+  - prisma
+# Ignorés sciemment : messages (opencollective, html-to-docx), vérification de
+# version (protobufjs), liaisons natives optionnelles de ssh2 (testcontainers),
+# déjà en échec sans compilateur dans l'image, et @prisma/client : sans schéma
+# à sa portée, son postinstall génère un client vide qui écrase celui produit
+# par le postinstall de @lsi/persistence (prisma generate).
+ignoredBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@turbodocx/html-to-docx'
+  - cpu-features
+  - protobufjs
+  - ssh2

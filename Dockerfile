@@ -49,7 +49,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 # corepack est absent/instable selon les images : pnpm via npm, version figée
 # (alignée sur "packageManager" du package.json racine).
-RUN npm install -g pnpm@9.15.9 && npm cache clean --force
+RUN npm install -g pnpm@10.34.6 && npm cache clean --force
 
 # ---- manifestes -------------------------------------------------------
 # On extrait TOUS les package.json du workspace (apps/*, packages/*), sans
