@@ -230,6 +230,37 @@ export class PriceGridService {
     });
   }
 
+  /**
+   * Un code de base et ses versions PROPOSÉES à `on` (prix en vigueur), lu
+   * dans la transaction de l'appelant : ce qu'un document copie quand il
+   * reprend une ligne de grille pour plusieurs durées (propositions).
+   */
+  async itemForDocument(tx: Tx, itemCode: string, on: string) {
+    const item = await tx.priceGridItem.findFirst({
+      where: { code: itemCode },
+      include: {
+        kind: true,
+        variants: {
+          where: { archivedAt: null, term: { archivedAt: null } },
+          include: { term: true, prices: { where: { effectiveFrom: { lte: dayToDate(on) } }, orderBy: [{ effectiveFrom: 'desc' }, { id: 'desc' }], take: 1 } },
+        },
+      },
+    });
+    if (!item) throw new NotFoundException(`Code tarif ${itemCode} introuvable`);
+    if (item.archivedAt || item.kind.archivedAt) {
+      throw new ConflictException({ code: 'VARIANT_UNAVAILABLE', message: `Le code ${itemCode} n'est plus proposé.` });
+    }
+    const byMonths = new Map<number, { code: string; unitPrice: string; effectiveFrom: string }>();
+    for (const v of item.variants) {
+      const p = v.prices[0];
+      if (p) byMonths.set(v.term.months, { code: v.code, unitPrice: dec(p.unitPrice)!, effectiveFrom: isoDay(p.effectiveFrom) });
+    }
+    return {
+      code: item.code, label: item.label, description: item.description, unit: item.unit, recurrence: item.recurrence,
+      vatRatePercent: dec(item.vatRatePercent)!, kind: { id: item.kind.id, prefix: item.kind.prefix, label: item.kind.label }, byMonths,
+    };
+  }
+
   // --- CSV --------------------------------------------------------------------
 
   async exportCsv(scope: Scope, kindId: string, now: Date): Promise<{ filename: string; body: string }> {

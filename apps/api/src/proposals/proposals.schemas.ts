@@ -188,3 +188,24 @@ export const TermsSchema = z.object({ title: z.string().trim().min(3).max(200), 
 export const ContractTemplateSlugSchema = z
   .object({ slug: z.string().regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/).max(64).nullable() })
   .strict();
+
+/** Ligne ajoutée depuis la grille tarifaire (13-types-contrats.md §7). */
+export const GridLineSchema = z
+  .object({
+    itemCode: z.string().regex(/^[A-Z0-9]{2,6}-\d{4,}$/, 'code de base attendu, ex. « M365-0003 »'),
+    kind: z.enum(['REQUIRED', 'OPTIONAL', 'SETUP']).optional(),
+    quantity: z.number().int().min(0).max(100_000).optional(),
+  })
+  .strict();
+export type GridLineBody = z.infer<typeof GridLineSchema>;
+
+/** Durées d'engagement proposées ; `switchGridLines` = bascule confirmée des lignes de grille. */
+export const CommitmentsSchema = z
+  .object({
+    months: z.array(z.number().int().min(0).max(99)).min(1).max(10),
+    defaultMonths: z.number().int().min(0).max(99),
+    switchGridLines: z.boolean(),
+  })
+  .strict()
+  .refine((b) => b.months.includes(b.defaultMonths), 'la durée par défaut doit faire partie des durées proposées');
+export type CommitmentsBody = z.infer<typeof CommitmentsSchema>;

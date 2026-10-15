@@ -242,6 +242,16 @@ CREATE INDEX price_grid_prices_variant_idx ON price_grid_prices (variant_id, eff
 ALTER TABLE contract_template_versions ADD COLUMN effective_from date;
 
 -- ===========================================================================
+-- 6 bis. Lignes de modèle de proposition issues de la grille
+-- ===========================================================================
+
+-- Référence COPIÉE ({ itemCode, variants: { valeurDuChoix: code }, vatRatePercent,
+-- on }), validée par l'API (pricing-definition.ts). Les prix copiés restent
+-- dans `pricing` : la grille peut changer sans toucher le modèle.
+ALTER TABLE proposal_template_pricing_lines ADD COLUMN grid jsonb
+  CHECK (grid IS NULL OR jsonb_typeof(grid) = 'object');
+
+-- ===========================================================================
 -- 7. RLS et droits
 -- ===========================================================================
 

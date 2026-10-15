@@ -23,6 +23,7 @@ DROP FUNCTION IF EXISTS app_assign_price_grid_item_code();
 DROP FUNCTION IF EXISTS app_guard_contract_kind();
 
 ALTER TABLE contract_template_versions DROP COLUMN IF EXISTS effective_from;
+ALTER TABLE proposal_template_pricing_lines DROP COLUMN IF EXISTS grid;
 
 DELETE FROM _prisma_migrations WHERE migration_name = '00000000000034_types_contrats';
 

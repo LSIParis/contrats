@@ -2289,6 +2289,8 @@ model ProposalTemplatePricingLine {
   setupLineKey        String?             @map("setup_line_key")
   /// { index: "SYNTEC", a, b }
   indexation          Json?
+  /// Référence copiée de la grille tarifaire (migration 34) : { itemCode, variants, vatRatePercent, on }.
+  grid                Json?
 
   template ProposalTemplate @relation(fields: [templateId, tenantId], references: [id, tenantId], map: "proposal_template_pricing_lines_template_fk", onDelete: Cascade, onUpdate: NoAction)
 

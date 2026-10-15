@@ -50,6 +50,15 @@ const Line = z
     setupLineKey: Key.optional(),
     indexation: z.object({ index: z.literal('SYNTEC'), a: z.number().min(0).max(1), b: z.number().min(0).max(1) }).strict().optional(),
     group: z.enum(['RECURRING', 'SETUP', 'OPTIONS', 'YEARLY', 'OUT_OF_SCOPE']),
+    grid: z
+      .object({
+        itemCode: z.string().regex(/^[A-Z0-9]{2,6}-\d{4,}$/),
+        variants: z.record(z.string(), z.string().regex(/^[A-Z0-9]{2,6}-\d{4,}-E\d{2}$/)),
+        vatRatePercent: z.string().regex(/^\d{1,3}(\.\d{1,2})?$/),
+        on: z.iso.date(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -65,11 +74,13 @@ const Choice = z
             label: z.string().min(1).max(200),
             description: z.string().max(500).optional(),
             default: z.boolean().optional(),
-            commitmentMonths: z.number().int().positive().max(120).optional(),
+            // 0 = sans engagement (13-types-contrats.md).
+            commitmentMonths: z.number().int().nonnegative().max(120).optional(),
           })
           .strict(),
       )
-      .min(2)
+      // Une seule option possible : proposition à durée unique (ex. « Sans engagement »).
+      .min(1)
       .max(10),
     editableByClient: z.boolean(),
     priceStatus: PriceStatus.optional(),
@@ -128,11 +139,20 @@ export const PricingDefinitionSchema = z
         const got = Object.keys(l.pricing.byChoice).sort().join(',');
         if (!c || expected !== got) ctx.addIssue({ code: 'custom', message: `ligne ${l.key} : byChoice doit couvrir exactement les valeurs du choix` });
       }
+      if (l.grid) {
+        const want = 'byChoice' in l.pricing ? Object.keys(l.pricing.byChoice).sort().join(',') : '*';
+        if (Object.keys(l.grid.variants).sort().join(',') !== want) {
+          ctx.addIssue({ code: 'custom', message: `ligne ${l.key} : codes de grille à donner pour chaque prix (${want})` });
+        }
+        if (Object.values(l.grid.variants).some((v) => !v.startsWith(`${l.grid!.itemCode}-E`))) {
+          ctx.addIssue({ code: 'custom', message: `ligne ${l.key} : versions d'un autre code que ${l.grid.itemCode}` });
+        }
+      }
     }
     for (const c of d.choices) {
       if (c.options.filter((o) => o.default).length !== 1) ctx.addIssue({ code: 'custom', message: `choix ${c.key} : exactement une option par défaut` });
     }
-    if (d.choices.filter((c) => c.options.some((o) => o.commitmentMonths)).length !== 1) {
+    if (d.choices.filter((c) => c.options.some((o) => o.commitmentMonths !== undefined)).length !== 1) {
       ctx.addIssue({ code: 'custom', message: 'un et un seul choix doit porter la durée d’engagement' });
     }
   });
@@ -145,7 +165,7 @@ export function templateDefinition(t: {
   lines: readonly {
     key: string; label: string; description: string | null; kind: string; unit: string; recurrence: string; group: string;
     quantity: unknown; pricing: unknown; priceFrom: boolean; priceStatus: string; priceStatusByChoice: unknown;
-    priceSource: string; setupLineKey: string | null; indexation: unknown; position: number;
+    priceSource: string; setupLineKey: string | null; indexation: unknown; position: number; grid?: unknown;
   }[];
 }): ProposalPricingDefinition {
   const lines = [...t.lines]
@@ -168,6 +188,7 @@ export function templateDefinition(t: {
       if (l.priceStatusByChoice) line.priceStatusByChoice = l.priceStatusByChoice;
       if (l.setupLineKey) line.setupLineKey = l.setupLineKey;
       if (l.indexation) line.indexation = l.indexation;
+      if (l.grid) line.grid = l.grid;
       return line as unknown as ProposalPricingLine;
     });
   return {
