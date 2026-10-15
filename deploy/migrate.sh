@@ -46,14 +46,20 @@ SQL
 # jamais un modèle modifié dans l'interface. Un fichier invalide ou un cas de
 # contrôle chiffré en échec fait échouer CE job : app et worker ne démarrent
 # pas (service_completed_successfully) et le déploiement est annulé.
+# Scripts TypeScript des seeds : `tsx` est une dépendance de DÉVELOPPEMENT,
+# absente de l'image ; même chargeur que l'application (SWC, @lsi/api).
+run_ts() {
+  pnpm --filter @lsi/api exec node --import @swc-node/register/esm-register "$@"
+}
+
 if [ "${SEED_PROPOSAL_TEMPLATES:-false}" = "true" ]; then
   echo "→ Seed des modèles de proposition (tenant ${SEED_TENANT_SLUG:-lsi})…"
-  pnpm --filter @lsi/persistence exec tsx prisma/seed.ts --only=propositions
+  run_ts ../../packages/persistence/prisma/seed.ts --only=propositions
   # Types de contrats prédéfinis et durées d'engagement (13-types-contrats.md) :
   # même nature (référentiel du tenant), même drapeau — déjà transmis au job
   # par le compose. Idempotent, ne modifie jamais un type existant.
   echo "→ Seed des types de contrats et durées d'engagement…"
-  pnpm --filter @lsi/persistence exec tsx src/seed/contract-kinds.ts
+  run_ts ../../packages/persistence/src/seed/contract-kinds.ts
 fi
 
 echo "✓ Migrations appliquées et mots de passe de rôles renouvelés."
