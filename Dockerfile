@@ -41,12 +41,15 @@ FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d
 WORKDIR /app
 # Prisma a besoin d'openssl ; ca-certificates pour les appels HTTPS sortants
 # (DocuSeal, Perplexity, Anthropic). curl pour le HEALTHCHECK.
+# upgrade : correctifs Debian publiés après le digest épinglé (ex. perl-base
+# CVE-2026-13221, bloquant au scan Trivy tant que l'image node n'est pas rebâtie).
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends openssl ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 # corepack est absent/instable selon les images : pnpm via npm, version figée
 # (alignée sur "packageManager" du package.json racine).
-RUN npm install -g pnpm@9.15.9 && npm cache clean --force
+RUN npm install -g pnpm@10.34.6 && npm cache clean --force
 
 # ---- manifestes -------------------------------------------------------
 # On extrait TOUS les package.json du workspace (apps/*, packages/*), sans
