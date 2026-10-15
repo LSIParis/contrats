@@ -1,4 +1,5 @@
 import type { ProposalPricingDefinition, ProposalQuote } from '@lsi/pricing';
+import { sanitizeDescription } from '../common/html-description.js';
 
 /**
  * Vues JSON du tableau de prix : ce que l'interface affiche, SANS aucun
@@ -37,7 +38,8 @@ export function publicDefinitionView(def: ProposalPricingDefinition) {
     lines: def.lines.map((l) => ({
       key: l.key,
       label: l.label,
-      description: l.description ?? null,
+      // Assainie au rendu aussi : des définitions antérieures aux descriptions HTML n'étaient pas filtrées.
+      description: l.description ? sanitizeDescription(l.description) || null : null,
       kind: l.kind,
       unit: l.unit,
       recurrence: l.recurrence,

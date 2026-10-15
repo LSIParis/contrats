@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { GRID_RECURRENCE_CODES, MAX_COMMITMENT_MONTHS, PRICE_UNIT_CODES } from '@lsi/domain';
 import { Dec6, IsoDate, Percent } from '../pricing/pricing.schemas.js';
+import { HtmlDescription } from '../common/html-description.js';
 
 /**
  * Schémas Zod des types de contrats et grilles tarifaires
@@ -56,7 +57,8 @@ export type SetPrices = z.infer<typeof SetPricesSchema>;
 
 const ItemFields = {
   label: Label,
-  description: Description.optional(),
+  /** HTML assaini (balises de mise en forme), 20 000 caractères au plus. */
+  description: HtmlDescription.nullable().optional(),
   unit: z.enum(PRICE_UNIT_CODES),
   recurrence: z.enum(GRID_RECURRENCE_CODES),
   vatRatePercent: Percent,

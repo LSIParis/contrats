@@ -9,6 +9,7 @@ import {
 } from '@lsi/domain';
 import { formatCents, type ProposalQuote, type QuotedLine } from '@lsi/pricing';
 import { markdownToHtml } from './markdown.js';
+import { sanitizeDescription } from '../common/html-description.js';
 
 /**
  * Contenu d'une proposition : blocs typés, valeurs de fusion, rendu HTML
@@ -273,10 +274,15 @@ export function renderSections(
 
 const euros = (cents: bigint) => `${formatCents(cents).replace('.', ',')} €`;
 
-/** Tableau de prix (HTML) : lignes retenues, tarifs affichés, totaux séparés HT / TVA / TTC. */
-export function pricingTableHtml(quote: ProposalQuote): string {
+/**
+ * Tableau de prix (HTML) : lignes retenues, tarifs affichés, totaux séparés
+ * HT / TVA / TTC. Description d'une ligne (HTML, `definition`) : sous le
+ * libellé, assainie de nouveau au rendu (défense en profondeur).
+ */
+export function pricingTableHtml(quote: ProposalQuote, definition?: { lines: readonly { key: string; description?: string | undefined }[] }): string {
+  const descriptions = new Map((definition?.lines ?? []).filter((l) => l.description).map((l) => [l.key, sanitizeDescription(l.description!)]));
   const row = (l: QuotedLine) =>
-    `<tr><td>${esc(l.label)}</td><td>${l.recurrence === 'DISCOUNT' || l.recurrence === 'MINIMUM' ? '' : esc(String(l.quantity))}</td>` +
+    `<tr><td>${esc(l.label)}${descriptions.get(l.key) ? `<div class="description">${descriptions.get(l.key)}</div>` : ''}</td><td>${l.recurrence === 'DISCOUNT' || l.recurrence === 'MINIMUM' ? '' : esc(String(l.quantity))}</td>` +
     `<td>${esc(l.unit)}</td><td>${l.priceFrom ? 'à partir de ' : ''}${euros(l.unitPriceCents)}</td><td>${euros(l.totalHtCents)}</td></tr>`;
   const bucket = (label: string, b: { htCents: bigint; vatCents: bigint; ttcCents: bigint }) =>
     b.htCents === 0n ? '' : `<tr><th>${esc(label)}</th><td>${euros(b.htCents)} HT</td><td>${euros(b.vatCents)} TVA</td><td>${euros(b.ttcCents)} TTC</td></tr>`;

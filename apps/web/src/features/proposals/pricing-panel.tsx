@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { errorMessage } from '../../lib/api.js';
@@ -7,10 +7,12 @@ import { allows } from '../../lib/permissions.js';
 import type { Me } from '../../lib/queries.js';
 import { Badge } from '../../ui/badge.js';
 import { Button } from '../../ui/button.js';
+import { ConfirmDialog } from '../../ui/confirm-dialog.js';
 import { Input } from '../../ui/input.js';
 import { ErrorNote } from '../../ui/region-card.js';
 import { Select } from '../../ui/select.js';
 import { useToast } from '../../ui/toast.js';
+import { emptyHtml, HTML_MAX, HtmlBlock, HtmlField } from '../structure/html-field.js';
 import {
   proposalsApi, type Bucket, type DefLine, type PendingValidation, type PricingDefinition, type ProposalDetail, type SelectionBody,
 } from './proposal-api.js';
@@ -175,22 +177,30 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
             {quote.lines.map((l) => {
               const special = l.recurrence === 'DISCOUNT' || l.recurrence === 'MINIMUM';
               const src = lineStatus(l.key)?.priceSource;
+              const description = lineStatus(l.key)?.description;
               return (
-                <tr key={l.key} className="border-b border-line last:border-0">
-                  <td className="py-2 pr-3">
-                    {l.label}
-                    {gridCode(l.key) && <div className="font-mono text-xs text-ink-faint">{gridCode(l.key)}</div>}
-                  </td>
-                  <td className="py-2 pr-3 text-ink-muted">{RECURRENCE_LABELS[l.recurrence] ?? l.recurrence}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : l.quantity}</td>
-                  <td className="py-2 pr-3 text-ink-muted">{special ? '' : l.unit}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : <span>{l.priceFrom ? 'à partir de ' : ''}{c(l.unitPriceCents)}</span>}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums"><span>{c(l.totalHtCents)}</span></td>
-                  <td className="py-2">
-                    {l.priceStatus === 'TO_VALIDATE' ? <Badge tone="warn">À valider</Badge> : <Badge tone="success">Validé</Badge>}
-                    {src && <span className="ml-2 text-xs text-ink-faint">{src}</span>}
-                  </td>
-                </tr>
+                <Fragment key={l.key}>
+                  <tr className={description ? '' : 'border-b border-line last:border-0'}>
+                    <td className="py-2 pr-3">
+                      {l.label}
+                      {gridCode(l.key) && <div className="font-mono text-xs text-ink-faint">{gridCode(l.key)}</div>}
+                    </td>
+                    <td className="py-2 pr-3 text-ink-muted">{RECURRENCE_LABELS[l.recurrence] ?? l.recurrence}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : l.quantity}</td>
+                    <td className="py-2 pr-3 text-ink-muted">{special ? '' : l.unit}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : <span>{l.priceFrom ? 'à partir de ' : ''}{c(l.unitPriceCents)}</span>}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums"><span>{c(l.totalHtCents)}</span></td>
+                    <td className="py-2">
+                      {l.priceStatus === 'TO_VALIDATE' ? <Badge tone="warn">À valider</Badge> : <Badge tone="success">Validé</Badge>}
+                      {src && <span className="ml-2 text-xs text-ink-faint">{src}</span>}
+                    </td>
+                  </tr>
+                  {description && (
+                    <tr aria-label={`Description de ${l.label}`} className="border-b border-line last:border-0">
+                      <td colSpan={7} className="pb-2 pl-4 pr-3 text-ink-muted"><HtmlBlock html={description} className="text-xs" /></td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
@@ -243,7 +253,18 @@ function Totals({ totals, months }: { totals: ProposalDetail['quote']['totals'];
 
 type Draft = Record<string, string>;
 
-/** Édition de la définition : prix unitaires (par formule), remises, ajout d'une ligne. Envoi de la définition COMPLÈTE. */
+/** Ligne avec sa description (HTML) : absente quand vide. */
+const withDescription = (l: DefLine, html: string): DefLine => {
+  const { description: _old, ...rest } = l;
+  const d = emptyHtml(html);
+  return d ? { ...rest, description: d } : rest;
+};
+
+/**
+ * Édition de la définition : prix unitaires (par formule), remises, descriptions
+ * (HTML) des lignes, ajout d'une ligne. Envoi de la définition COMPLÈTE ; une
+ * description modifiée seule ne change aucun prix.
+ */
 function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition; proposalId: string; onDone: (d?: ProposalDetail) => void }) {
   const toast = useToast();
   const initial: Draft = {};
@@ -253,8 +274,10 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
   }
   for (const r of def.rules) if (r.type === 'DISCOUNT_PERCENT') initial[`rule:${r.key}`] = String(r.percent).replace('.', ',');
   const [values, setValues] = useState<Draft>(initial);
+  const [descs, setDescs] = useState<Draft>(() => Object.fromEntries(def.lines.map((l) => [l.key, l.description ?? ''])));
+  const [describing, setDescribing] = useState<{ line: DefLine; html: string } | null>(null);
   const [adding, setAdding] = useState(false);
-  const [nl, setNl] = useState({ label: '', unit: '', kind: 'REQUIRED', recurrence: 'MONTHLY', price: '', qDefault: '1', qMin: '1', qMax: '', editable: true });
+  const [nl, setNl] = useState({ label: '', unit: '', kind: 'REQUIRED', recurrence: 'MONTHLY', price: '', qDefault: '1', qMin: '1', qMax: '', editable: true, description: '' });
   const [error, setError] = useState<string | undefined>();
 
   const save = useMutation({
@@ -272,7 +295,9 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
       return v;
     };
     try {
-      const lines: DefLine[] = def.lines.map((l) => {
+      const lines: DefLine[] = def.lines.map((line) => {
+        const l = withDescription(line, descs[line.key] ?? '');
+        if (emptyHtml(descs[line.key]).length > HTML_MAX) throw new Error(`Description trop longue : ${l.label} (20 000 caractères au plus).`);
         if ('unitPriceCents' in l.pricing) return { ...l, pricing: { unitPriceCents: cents(`line:${l.key}`, l.label) } };
         const byChoice = Object.fromEntries(Object.keys(l.pricing.byChoice).map((v) => [v, cents(`line:${l.key}:${v}`, `${l.label} (${v})`)]));
         return { ...l, pricing: { dependsOn: l.pricing.dependsOn, byChoice } };
@@ -289,6 +314,8 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
         if (price === undefined) throw new Error('Nouvelle ligne : prix invalide.');
         const min = Number(nl.qMin), dflt = Number(nl.qDefault), max = nl.qMax.trim() ? Number(nl.qMax) : undefined;
         if (![min, dflt].every(Number.isInteger) || (max !== undefined && !Number.isInteger(max))) throw new Error('Nouvelle ligne : quantités entières attendues.');
+        const description = emptyHtml(nl.description);
+        if (description.length > HTML_MAX) throw new Error('Nouvelle ligne : description de 20 000 caractères au plus.');
         const setup = nl.kind === 'SETUP';
         const recurrence = (setup ? 'ONE_TIME' : nl.recurrence) as DefLine['recurrence'];
         const group: DefLine['group'] = setup ? 'SETUP' : nl.kind === 'OPTIONAL' ? 'OPTIONS' : recurrence === 'YEARLY' ? 'YEARLY' : 'RECURRING';
@@ -296,7 +323,7 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
         let key = nl.label.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56) || 'ligne';
         for (let n = 2, base = key; taken.has(key); n++) key = `${base}-${n}`;
         lines.push({
-          key, label: nl.label.trim(), kind: nl.kind as DefLine['kind'], unit: nl.unit.trim(), recurrence, group,
+          key, label: nl.label.trim(), ...(description ? { description } : {}), kind: nl.kind as DefLine['kind'], unit: nl.unit.trim(), recurrence, group,
           quantity: { default: dflt, min, ...(max !== undefined ? { max } : {}), editableByClient: nl.editable },
           pricing: { unitPriceCents: price }, priceStatus: 'TO_VALIDATE', priceSource: 'Saisie commerciale',
         });
@@ -334,6 +361,33 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
         ))}
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs+ font-button text-ink-muted">Descriptions des lignes (affichées sous chaque ligne, sans effet sur les prix)</span>
+        <ul className="flex flex-col gap-1">
+          {def.lines.map((l) => (
+            <li key={l.key} className="flex flex-wrap items-center gap-2 text-sm">
+              <span>{l.label}</span>
+              <span className="text-xs text-ink-faint">{emptyHtml(descs[l.key]) ? 'description renseignée' : 'aucune description'}</span>
+              <Button size="sm" variant="ghost" aria-label={`Description — ${l.label}`} onClick={() => setDescribing({ line: l, html: descs[l.key] ?? '' })}>Description</Button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {describing && (
+        <ConfirmDialog
+          open
+          width={860}
+          title={`Description — ${describing.line.label}`}
+          confirmLabel="Appliquer"
+          onConfirm={() => { setDescs((d) => ({ ...d, [describing.line.key]: describing.html })); setDescribing(null); }}
+          onClose={() => setDescribing(null)}
+          disabled={emptyHtml(describing.html).length > HTML_MAX}
+        >
+          <HtmlField label="Description" value={describing.html} onChange={(html) => setDescribing((x) => (x ? { ...x, html } : x))} />
+          <p className="text-13 text-ink-muted">Appliquée au brouillon ; enregistrée avec « Enregistrer les prix ».</p>
+        </ConfirmDialog>
+      )}
+
       {!adding ? (
         <div><Button size="sm" variant="ghost" onClick={() => setAdding(true)}>Ajouter une ligne</Button></div>
       ) : (
@@ -365,6 +419,9 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" checked={nl.editable} onChange={(e) => setNl({ ...nl, editable: e.target.checked })} /> Quantité modifiable par le client
           </label>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <HtmlField label="Description (facultative)" value={nl.description} onChange={(v) => setNl((x) => ({ ...x, description: v }))} />
+          </div>
         </div>
       )}
 

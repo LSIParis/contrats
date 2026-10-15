@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiRequestError, errorMessage } from '../../../lib/api.js';
@@ -19,6 +19,7 @@ import { Table } from '../../../ui/table.js';
 import { useToast } from '../../../ui/toast.js';
 import { proposalAdminApi, type DefLine, type LibraryItem, type LinePricing } from '../proposal-api.js';
 import { GridPicker } from '../../contract-kinds/grid-picker.js';
+import { emptyHtml, HTML_MAX, HtmlBlock, HtmlField } from '../../structure/html-field.js';
 import { ACCEPTANCE_MODE_LABELS, formatDateTime, PRICE_SCOPE_LABELS, RECURRENCE_LABELS, SECTION_KIND_LABELS } from '../proposal-labels.js';
 
 /**
@@ -154,28 +155,35 @@ export function ProposalTemplateDetailPage() {
           head={<tr><th scope="col">Ligne</th><th scope="col">Type</th><th scope="col">Périodicité</th><th scope="col">Unité</th><th scope="col">Prix HT</th><th scope="col">Statut</th><th scope="col"><span className="sr-only">Action</span></th></tr>}
         >
           {def.lines.map((l) => (
-            <tr key={l.key}>
-              <td>
-                {l.label}
-                {l.grid && <span className="block font-mono text-xs text-ink-faint">{l.grid.itemCode}</span>}
-                {l.priceSource && <span className="block text-xs text-ink-faint">{l.priceSource}</span>}
-              </td>
-              <td>{l.kind === 'OPTIONAL' ? 'Option' : l.kind === 'SETUP' ? 'Mise en service' : l.kind === 'INFO' ? 'Hors forfait' : 'Obligatoire'}</td>
-              <td>{RECURRENCE_LABELS[l.recurrence] ?? l.recurrence}</td>
-              <td>{l.unit}</td>
-              <td className="tabular-nums">{linePrice(l, def.choices)}</td>
-              <td>{l.priceStatus === 'TO_VALIDATE' || Object.values(l.priceStatusByChoice ?? {}).includes('TO_VALIDATE') ? <Badge tone="warn">À valider</Badge> : <Badge tone="success">Validé</Badge>}</td>
-              <td className="text-right">
-                {canManage && (
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="secondary" aria-label={`Modifier le prix de ${l.label}`} onClick={() => setLine(l)}>Modifier</Button>
-                    {l.recurrence !== 'INFO' && (
-                      <Button size="sm" variant="secondary" aria-label={`Rattacher ${l.label} à la grille`} onClick={() => { grid.reset(); setGridTarget(l.key); }}>Grille</Button>
-                    )}
-                  </div>
-                )}
-              </td>
-            </tr>
+            <Fragment key={l.key}>
+              <tr className={l.description ? '[&>td]:!border-b-0' : undefined}>
+                <td>
+                  {l.label}
+                  {l.grid && <span className="block font-mono text-xs text-ink-faint">{l.grid.itemCode}</span>}
+                  {l.priceSource && <span className="block text-xs text-ink-faint">{l.priceSource}</span>}
+                </td>
+                <td>{l.kind === 'OPTIONAL' ? 'Option' : l.kind === 'SETUP' ? 'Mise en service' : l.kind === 'INFO' ? 'Hors forfait' : 'Obligatoire'}</td>
+                <td>{RECURRENCE_LABELS[l.recurrence] ?? l.recurrence}</td>
+                <td>{l.unit}</td>
+                <td className="tabular-nums">{linePrice(l, def.choices)}</td>
+                <td>{l.priceStatus === 'TO_VALIDATE' || Object.values(l.priceStatusByChoice ?? {}).includes('TO_VALIDATE') ? <Badge tone="warn">À valider</Badge> : <Badge tone="success">Validé</Badge>}</td>
+                <td className="text-right">
+                  {canManage && (
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="secondary" aria-label={`Modifier le prix de ${l.label}`} onClick={() => setLine(l)}>Modifier</Button>
+                      {l.recurrence !== 'INFO' && (
+                        <Button size="sm" variant="secondary" aria-label={`Rattacher ${l.label} à la grille`} onClick={() => { grid.reset(); setGridTarget(l.key); }}>Grille</Button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+              {l.description && (
+                <tr aria-label={`Description de ${l.label}`}>
+                  <td colSpan={7} className="!pl-6 !pt-0 text-ink-muted"><HtmlBlock html={l.description} className="text-xs" /></td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </Table>
         {canManage && (
@@ -282,6 +290,8 @@ function TemplateMeta({ slug, t, canManage, onSaved }: { slug: string; t: Record
   );
 }
 
+type LineUpdate = Parameters<typeof proposalAdminApi.updateLine>[2];
+
 function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
   slug: string; line: DefLine; choices: { key: string; options: { value: string; label: string }[] }[]; onClose: () => void; onSaved: () => void;
 }) {
@@ -292,9 +302,10 @@ function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
   );
   const [label, setLabel] = useState(line.label);
   const [source, setSource] = useState(line.priceSource ?? '');
+  const [description, setDescription] = useState(line.description ?? '');
   const [error, setError] = useState<string | undefined>();
   const save = useMutation({
-    mutationFn: (b: { label?: string; pricing?: LinePricing; priceSource?: string }) => proposalAdminApi.updateLine(slug, line.key, b),
+    mutationFn: (b: LineUpdate) => proposalAdminApi.updateLine(slug, line.key, b),
     onSuccess: onSaved,
   });
   const submit = () => {
@@ -305,10 +316,13 @@ function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
       cents[k] = c;
     }
     const pricing: LinePricing = byChoice ? { dependsOn: byChoice.dependsOn, byChoice: cents } : { unitPriceCents: cents['']! };
-    const b: { label?: string; pricing?: LinePricing; priceSource?: string } = {};
+    const b: LineUpdate = {};
     if (JSON.stringify(pricing) !== JSON.stringify(line.pricing)) b.pricing = pricing;
     if (label.trim() !== line.label) b.label = label.trim();
     if (source.trim() && source.trim() !== (line.priceSource ?? '')) b.priceSource = source.trim();
+    const desc = emptyHtml(description);
+    if (desc.length > HTML_MAX) return setError('Description : 20 000 caractères au plus.');
+    if (desc !== (line.description ?? '')) b.description = desc || null;
     setError(undefined);
     if (Object.keys(b).length === 0) return onClose();
     save.mutate(b);
@@ -318,6 +332,7 @@ function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
       open
       onClose={onClose}
       title={`Prix de « ${line.label} »`}
+      width={860}
       footer={<><Button variant="secondary" onClick={onClose}>Annuler</Button><Button onClick={submit} disabled={save.isPending}>Enregistrer le prix</Button></>}
     >
       <div className="flex flex-col gap-3 text-sm">
@@ -340,6 +355,7 @@ function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
           <label htmlFor="ligne-source" className="text-xs+ font-button text-ink-muted">Source du prix</label>
           <Input id="ligne-source" value={source} onChange={(e) => setSource(e.target.value)} />
         </div>
+        <HtmlField label="Description" value={description} onChange={setDescription} hint="Affichée sous la ligne (sans effet sur le prix ni sur sa validation)." />
         <ErrorNote>{error ?? errorMessage(save.error)}</ErrorNote>
       </div>
     </Modal>

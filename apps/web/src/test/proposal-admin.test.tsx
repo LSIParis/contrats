@@ -94,6 +94,32 @@ test('modèle : prix modifié (repasse « à valider ») et option « la proposi
   await waitFor(() => expect(api.find('PATCH', '/v1/proposal-admin/templates/infogerance')[0]?.body).toEqual({ signedProposalIsContract: true }));
 });
 
+test('modèle : description HTML d’une ligne (affichée sous la ligne, envoyée seule si modifiée)', async () => {
+  const user = userEvent.setup();
+  const tpl = {
+    ...TEMPLATE,
+    definition: { ...TEMPLATE.definition, lines: [{ ...TEMPLATE.definition.lines[0]!, description: '<p><strong>Supervision</strong> incluse</p>' }, TEMPLATE.definition.lines[1]!] },
+  };
+  const api = mount('/proposal-admin/templates/infogerance', ['MSP_ADMIN'], {
+    'GET /v1/proposal-admin/templates/infogerance': tpl,
+    'PATCH /v1/proposal-admin/templates/infogerance/lines/poste': tpl,
+  });
+  const lines = await screen.findByRole('table', { name: 'Lignes de prix du modèle' });
+  const desc = within(lines).getByRole('row', { name: 'Description de Poste de travail' });
+  expect(within(desc).getByText('Supervision').tagName).toBe('STRONG');
+  await user.click(within(lines).getByRole('button', { name: 'Modifier le prix de Poste de travail' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Prix de « Poste de travail »' });
+  await user.click(within(dialog).getByRole('button', { name: 'HTML source' }));
+  const source = within(dialog).getByRole('textbox', { name: 'Description (HTML source)' });
+  expect(source).toHaveValue('<p><strong>Supervision</strong> incluse</p>');
+  await user.clear(source);
+  await user.type(source, '<p>Supervision <em>24/7</em></p>');
+  await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le prix' }));
+  await waitFor(() => expect(api.find('PATCH', '/v1/proposal-admin/templates/infogerance/lines/poste')[0]?.body).toEqual({
+    description: '<p>Supervision <em>24/7</em></p>',
+  }));
+});
+
 test('bibliothèque : dossiers, versions, relecture juridique, création et nouvelle version', async () => {
   const user = userEvent.setup();
   const item = { id: 'l-1', key: 'presentation', title: 'Qui sommes-nous', folder: 'Présentation', body: 'LSI Maintenance, MSP à Aix.', requiresLegalReview: false, version: 3, seedVersion: 1, userModifiedAt: null, updatedAt: '2026-09-01T00:00:00Z' };

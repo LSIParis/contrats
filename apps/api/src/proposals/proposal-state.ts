@@ -8,7 +8,7 @@ import {
   type ReadinessIssue,
   type SectionWithBlocks,
 } from './proposal-content.js';
-import { templateDefinition, withTemplateValidations } from './pricing-definition.js';
+import { templateDefinition, withSanitizedDescriptions, withTemplateValidations } from './pricing-definition.js';
 import type { ReadinessCounters } from './proposal-transition.js';
 
 /**
@@ -127,7 +127,7 @@ export function computeState(
   opts: { templateDefinition?: ProposalPricingDefinition | null; selection?: SelectionInput; expiryDay?: string | null } = {},
 ): ComputedState {
   const { proposal, version, recipients } = loaded;
-  const definition = withTemplateValidations(version.pricingDefinition as ProposalPricingDefinition, opts.templateDefinition ?? null);
+  const definition = withSanitizedDescriptions(withTemplateValidations(version.pricingDefinition as ProposalPricingDefinition, opts.templateDefinition ?? null));
   const selection = opts.selection ?? selectionOf(loaded.latestSelection);
   const mergeContext = (proposal.mergeContext ?? {}) as Record<string, unknown>;
   const quote = quoteProposal(

@@ -6,6 +6,7 @@ import {
   type PriceUnitCode,
 } from '@lsi/domain';
 import { csvCell } from '../proposals/proposal-reporting.service.js';
+import { MAX_DESCRIPTION_LENGTH, sanitizeDescription } from '../common/html-description.js';
 
 /**
  * Import / export CSV de la grille d'un type de contrat
@@ -19,7 +20,8 @@ import { csvCell } from '../proposals/proposal-reporting.service.js';
  *  - unité et périodicité : libellé (« par utilisateur », « mensuelle ») ou
  *    code (PER_USER, MONTHLY) ;
  *  - une colonne `Edd` absente = durée inchangée ; une CELLULE vide = version
- *    non proposée pour cette durée ; `achat_Edd` facultatif.
+ *    non proposée pour cette durée ; `achat_Edd` facultatif ;
+ *  - `description` : texte ou HTML (balises de mise en forme), assaini.
  *
  * Toutes les erreurs sont collectées (ligne + motif) : le fichier se corrige
  * en une fois, rien n'est écrit tant qu'il en reste.
@@ -163,6 +165,9 @@ export function parseGridCsv(content: Buffer, knownMonths: ReadonlySet<number>, 
     const vat = normDecimal(cell('tva'));
     if (!PERCENT.test(vat) || Number(vat) > 100) errors.push({ line, message: `TVA « ${cell('tva')} » invalide (pourcentage, ex. 20 ou 5,5).` });
 
+    const description = sanitizeDescription(cell('description'));
+    if (description.length > MAX_DESCRIPTION_LENGTH) errors.push({ line, message: `Description trop longue (au plus ${MAX_DESCRIPTION_LENGTH} caractères).` });
+
     const prices = new Map<number, { unitPrice: string | null; purchasePrice: string | null }>();
     for (const [months, c] of priceCols) {
       const p = normDecimal(cells[c.price] ?? '');
@@ -174,7 +179,7 @@ export function parseGridCsv(content: Buffer, knownMonths: ReadonlySet<number>, 
     }
     if (errors.length > before) continue;
     rows.push({
-      line, code, label, description: cell('description') || null, unit: unit!, recurrence: recurrence!, vatRatePercent: vat, prices,
+      line, code, label, description: description || null, unit: unit!, recurrence: recurrence!, vatRatePercent: vat, prices,
     });
   }
   return { rows, errors };

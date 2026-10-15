@@ -36,6 +36,7 @@ export function gridFields(v: VariantSnapshot): Partial<LineDraft> {
   return {
     articleCode: v.code,
     label: v.label,
+    description: v.description ?? '',
     unit: unitLabel(v.unit),
     ...kindOf(v),
     mode: 'MANUAL',

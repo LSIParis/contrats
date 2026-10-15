@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest, errorText } from '../../lib/api.js';
 import { Button } from '../../ui/button.js';
@@ -9,6 +9,7 @@ import { ErrorNote } from '../../ui/region-card.js';
 import { Select } from '../../ui/select.js';
 import { Spinner } from '../../ui/spinner.js';
 import { Table } from '../../ui/table.js';
+import { HtmlBlock } from '../structure/html-field.js';
 import { contractKindsApi } from './api.js';
 import { euros, recurrenceLabel, unitLabel } from './labels.js';
 import type { VariantSnapshot } from './types.js';
@@ -76,17 +77,29 @@ export function GridPicker({
       </div>
       {error ? <ErrorNote>{errorText(error)}</ErrorNote> : null}
       {search.isLoading ? <Spinner /> : search.error ? <ErrorNote>{errorText(search.error)}</ErrorNote> : (
-        <Table head={['Code', 'Libellé', 'Durée', 'Prix HT', 'Unité', 'TVA', '']} caption="Codes tarifs proposés">
+        <Table
+          head={<tr><th>Code</th><th>Libellé</th><th>Durée</th><th className="!text-right">Prix HT</th><th>Unité</th><th>TVA</th><th><span className="sr-only">Action</span></th></tr>}
+          caption="Codes tarifs proposés"
+        >
           {search.data?.items.length ? search.data.items.map((v) => (
-            <tr key={v.code}>
-              <td className="font-mono text-xs">{v.code}</td>
-              <td>{v.label}<div className="text-xs text-ink-muted">{v.kind.label}</div></td>
-              <td>{v.termLabel}</td>
-              <td className="text-right">{euros(v.unitPrice)}<div className="text-xs text-ink-muted">{recurrenceLabel(v.recurrence)}</div></td>
-              <td>{unitLabel(v.unit)}</td>
-              <td>{v.vatRatePercent} %</td>
-              <td><Button size="sm" variant="secondary" disabled={pending} onClick={() => onPick(v)}>Choisir</Button></td>
-            </tr>
+            <Fragment key={v.code}>
+              <tr className={v.description ? '[&>td]:!border-b-0' : undefined}>
+                <td className="font-mono text-xs">{v.code}</td>
+                <td>{v.label}<div className="text-xs text-ink-muted">{v.kind.label}</div></td>
+                <td>{v.termLabel}</td>
+                <td className="text-right">{euros(v.unitPrice)}<div className="text-xs text-ink-muted">{recurrenceLabel(v.recurrence)}</div></td>
+                <td>{unitLabel(v.unit)}</td>
+                <td>{v.vatRatePercent} %</td>
+                <td><Button size="sm" variant="secondary" disabled={pending} onClick={() => onPick(v)}>Choisir</Button></td>
+              </tr>
+              {v.description && (
+                <tr aria-label={`Description de ${v.code}`}>
+                  <td colSpan={7} className="!pl-6 !pt-0 text-ink-muted">
+                    <HtmlBlock html={v.description} className="line-clamp-3 text-xs" />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           )) : (
             <tr><td colSpan={7} className="text-ink-muted">Aucun code proposé pour ces critères.</td></tr>
           )}
