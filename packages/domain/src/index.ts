@@ -31,3 +31,4 @@ export * from './proposal/numbering.js';
 export * from './proposal/follow-ups.js';
 export * from './proposal/tracking.js';
 export * from './proposal/payment-provider.port.js';
+export * from './price-grid/price-grid.js';

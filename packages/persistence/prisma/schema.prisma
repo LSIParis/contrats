@@ -387,6 +387,10 @@ model Tenant {
   apiCalls     ApiCallLog[]
   pricingRules PricingRule[]
 
+  // Types de contrats et grilles par durée d'engagement (migration 34)
+  contractKinds   ContractKind[]
+  commitmentTerms CommitmentTerm[]
+
   // Lot 9 — propositions (classe « tenant »)
   contentLibraryItems ContentLibraryItem[]
   proposalTerms       ProposalTerms[]
@@ -568,6 +572,8 @@ model ContractTemplate {
 
   tenant   Tenant                    @relation(fields: [tenantId], references: [id])
   versions ContractTemplateVersion[]
+  /// Types de contrats dont c'est le contenu contractuel (migration 34).
+  contractKinds ContractKind[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, slug], map: "contract_templates_slug_key")
@@ -592,6 +598,8 @@ model ContractTemplateVersion {
   defaultAnnexes    Json     @default("[]") @map("default_annexes")
   /// Barème par défaut (lignes @lsi/pricing), repris par la tarification.
   defaultPricing    Json     @default("[]") @map("default_pricing")
+  /// Date d'effet du texte (migration 34). NULL = dès la publication.
+  effectiveFrom     DateTime? @map("effective_from") @db.Date
 
   template  ContractTemplate @relation(fields: [templateId, tenantId], references: [id, tenantId], onDelete: Cascade)
   contracts Contract[]
@@ -1599,6 +1607,137 @@ model PricingRule {
 
   @@unique([tenantId, code], map: "pricing_rules_code_key")
   @@map("pricing_rules")
+}
+
+// ===========================================================================
+// Types de contrats et grilles tarifaires par durée d'engagement
+// (migration 34, docs/contrats/13-types-contrats.md) — classe « tenant »
+// ===========================================================================
+
+/// Type de contrat (Maintenance, Microsoft 365…). Prédéfini (seed, `systemKey`)
+/// ou créé par l'utilisateur : même mécanisme. Préfixe figé dès qu'un code
+/// l'utilise ; un type prédéfini ne se supprime pas (triggers, migration 34).
+/// Nommé « kind » : l'énumération ContractType (MAIN/AMENDMENT) existe déjà.
+model ContractKind {
+  id                 String    @id @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  /// Clé stable du seed (« MAINTENANCE »…) ; NULL pour un type utilisateur.
+  systemKey          String?   @map("system_key")
+  isSystem           Boolean   @default(false) @map("is_system")
+  /// ^[A-Z0-9]{2,6}$, unique par tenant.
+  prefix             String
+  label              String
+  description        String?
+  sortOrder          Int       @default(0) @map("sort_order")
+  /// Contenu contractuel (modèle de contrat versionné, clauses, annexes).
+  contractTemplateId String?   @map("contract_template_id") @db.Uuid
+  /// Dernier numéro de code de base attribué (trigger) ; ne recule jamais.
+  lastItemNumber     Int       @default(0) @map("last_item_number")
+  archivedAt         DateTime? @map("archived_at")
+  createdByUserId    String?   @map("created_by_user_id") @db.Uuid
+  updatedByUserId    String?   @map("updated_by_user_id") @db.Uuid
+  createdAt          DateTime  @map("created_at")
+  updatedAt          DateTime  @map("updated_at")
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contractTemplate ContractTemplate? @relation(fields: [contractTemplateId, tenantId], references: [id, tenantId], map: "contract_kinds_template_fk", onDelete: NoAction, onUpdate: NoAction)
+  items            PriceGridItem[]
+
+  @@unique([tenantId, prefix], map: "contract_kinds_prefix_key")
+  @@unique([tenantId, systemKey], map: "contract_kinds_system_key_key")
+  @@unique([id, tenantId], map: "contract_kinds_scope_key")
+  @@map("contract_kinds")
+}
+
+/// Durée d'engagement (0 = sans engagement). `months` figé : il est dans les codes.
+model CommitmentTerm {
+  id         String    @id @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  months     Int
+  label      String
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @map("created_at")
+  updatedAt  DateTime  @map("updated_at")
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  variants PriceGridVariant[]
+
+  @@unique([tenantId, months], map: "commitment_terms_months_key")
+  @@unique([id, tenantId], map: "commitment_terms_scope_key")
+  @@map("commitment_terms")
+}
+
+/// Code de base {PREFIXE}-{NNNN}. Numéro et code attribués par la base
+/// (trigger) ; jamais supprimé (DELETE révoqué), archivé.
+model PriceGridItem {
+  id              String            @id @db.Uuid
+  tenantId        String            @map("tenant_id") @db.Uuid
+  contractKindId  String            @map("contract_kind_id") @db.Uuid
+  number          Int
+  code            String
+  label           String
+  description     String?
+  /// Code d'unité du référentiel @lsi/domain (PRICE_UNITS).
+  unit            String
+  /// MONTHLY, YEARLY ou ONE_OFF (CHECK).
+  recurrence      PricingRecurrence
+  vatRatePercent  Decimal           @map("vat_rate_percent") @db.Decimal(5, 2)
+  sortOrder       Int               @default(0) @map("sort_order")
+  archivedAt      DateTime?         @map("archived_at")
+  createdByUserId String?           @map("created_by_user_id") @db.Uuid
+  updatedByUserId String?           @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime          @map("created_at")
+  updatedAt       DateTime          @map("updated_at")
+
+  kind     ContractKind       @relation(fields: [contractKindId, tenantId], references: [id, tenantId], map: "price_grid_items_kind_fk", onDelete: NoAction, onUpdate: NoAction)
+  variants PriceGridVariant[]
+
+  @@unique([tenantId, code], map: "price_grid_items_code_key")
+  @@unique([contractKindId, number], map: "price_grid_items_number_key")
+  @@unique([id, tenantId], map: "price_grid_items_scope_key")
+  @@index([tenantId, contractKindId], map: "price_grid_items_kind_idx")
+  @@map("price_grid_items")
+}
+
+/// Version d'un code de base pour une durée : {PREFIXE}-{NNNN}-E{DD} (trigger).
+/// Absente ou archivée = non proposée pour cette durée.
+model PriceGridVariant {
+  id               String    @id @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  itemId           String    @map("item_id") @db.Uuid
+  commitmentTermId String    @map("commitment_term_id") @db.Uuid
+  code             String
+  archivedAt       DateTime? @map("archived_at")
+  createdByUserId  String?   @map("created_by_user_id") @db.Uuid
+  createdAt        DateTime  @map("created_at")
+  updatedAt        DateTime  @map("updated_at")
+
+  item   PriceGridItem    @relation(fields: [itemId, tenantId], references: [id, tenantId], map: "price_grid_variants_item_fk", onDelete: NoAction, onUpdate: NoAction)
+  term   CommitmentTerm   @relation(fields: [commitmentTermId, tenantId], references: [id, tenantId], map: "price_grid_variants_term_fk", onDelete: NoAction, onUpdate: NoAction)
+  prices PriceGridPrice[]
+
+  @@unique([tenantId, code], map: "price_grid_variants_code_key")
+  @@unique([itemId, commitmentTermId], map: "price_grid_variants_term_key")
+  @@unique([id, tenantId], map: "price_grid_variants_scope_key")
+  @@map("price_grid_variants")
+}
+
+/// Prix d'une version à partir d'une date d'effet. APPEND-ONLY : en vigueur à
+/// D = plus grande date d'effet <= D, puis dernière saisie (id uuidv7).
+model PriceGridPrice {
+  id              String   @id @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  variantId       String   @map("variant_id") @db.Uuid
+  effectiveFrom   DateTime @map("effective_from") @db.Date
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(20, 6)
+  purchasePrice   Decimal? @map("purchase_price") @db.Decimal(20, 6)
+  enteredByUserId String?  @map("entered_by_user_id") @db.Uuid
+  createdAt       DateTime @map("created_at")
+
+  variant PriceGridVariant @relation(fields: [variantId, tenantId], references: [id, tenantId], map: "price_grid_prices_variant_fk", onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([variantId, effectiveFrom(sort: Desc), id(sort: Desc)], map: "price_grid_prices_variant_idx")
+  @@map("price_grid_prices")
 }
 
 /// Version datée du barème d'un contrat. Deux versions engagées (non DRAFT)
