@@ -22,6 +22,10 @@ import {
   ReplySchema,
   ResendSchema,
   SelectionSchema,
+  GridLineSchema,
+  CommitmentsSchema,
+  type GridLineBody,
+  type CommitmentsBody,
   UpdateProposalSchema,
   ValidatePriceSchema,
   type CreateProposal,
@@ -105,6 +109,20 @@ export class ProposalsController {
   pricing(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     assertCan(s, 'proposals.write');
     return this.proposals.putPricing(scope, id, body, new Date());
+  }
+
+  /** Ligne copiée depuis la grille tarifaire (code, libellé, prix par durée, TVA). */
+  @Post(':id/pricing/grid-lines')
+  addGridLine(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(GridLineSchema)) body: GridLineBody) {
+    assertCan(s, 'proposals.write');
+    return this.proposals.addGridLine(scope, id, body, new Date());
+  }
+
+  /** Durées d'engagement proposées, avec bascule éventuelle des lignes de grille. */
+  @Put(':id/pricing/commitments')
+  commitments(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(CommitmentsSchema)) body: CommitmentsBody) {
+    assertCan(s, 'proposals.write');
+    return this.proposals.setCommitments(scope, id, body, new Date());
   }
 
   @Put(':id/selection')

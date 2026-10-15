@@ -1,9 +1,12 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { appendAudit, uuidv7, withScope, type Scope } from '@lsi/persistence';
 import { listPendingValidations, type PendingValidation } from '@lsi/pricing';
 import { sha256Hex } from './proposal-content.js';
 import { templateDefinition } from './pricing-definition.js';
 import { actorOf } from './proposals.service.js';
+import { PriceGridService } from '../contract-kinds/price-grid.service.js';
+import { todayParis } from '../pricing/pricing-snapshot.js';
+import { buildGridLine, GridLineError, gridLineKey } from './proposal-grid.js';
 
 /**
  * Administration du module (brief §12.9 « admin gère modèles, bibliothèque,
@@ -16,6 +19,8 @@ import { actorOf } from './proposals.service.js';
  */
 @Injectable()
 export class ProposalAdminService {
+  constructor(private readonly grid: PriceGridService) {}
+
   // -------------------------------------------------------------------------
   // Modèles
   // -------------------------------------------------------------------------
@@ -93,6 +98,58 @@ export class ProposalAdminService {
       return { id: t.id, line };
     });
     await this.audit(scope, 'proposal_template.line_update', before.id, { slug, key, before: { label: before.line.label, pricing: before.line.pricing }, after: body }, now);
+    return this.template(scope, slug);
+  }
+
+  /**
+   * Rattache une ligne du modèle à un code de la grille tarifaire
+   * (13-types-contrats.md §7) : prix par durée d'engagement copiés depuis
+   * les versions du code, VALIDÉS (la grille est tenue par l'administrateur).
+   * Clé, libellé, nature, quantité et groupe de la ligne sont conservés.
+   */
+  async linkLineToGrid(scope: Scope, slug: string, key: string, itemCode: string, now: Date) {
+    const on = todayParis(now);
+    const before = await withScope(scope, async (tx) => {
+      const t = await this.templateOrThrow(tx, scope, slug);
+      const line = t.lines.find((l: any) => l.key === key);
+      if (!line) throw new NotFoundException('Ligne introuvable');
+      const item = await this.grid.itemForDocument(tx, itemCode, on);
+      const built = gridLine(() => buildGridLine(templateDefinition(t), item, { key, on }));
+      if (line.recurrence !== built.recurrence) {
+        throw new UnprocessableEntityException({ code: 'RECURRENCE_MISMATCH', message: `Périodicité du code ${itemCode} (${built.recurrence}) différente de celle de la ligne (${line.recurrence}).` });
+      }
+      await tx.proposalTemplatePricingLine.update({
+        where: { id: line.id },
+        data: { pricing: built.pricing as object, grid: built.grid as object, priceStatus: 'VALIDATED', priceStatusByChoice: undefined, priceSource: built.priceSource! },
+      });
+      await tx.proposalTemplate.update({ where: { id: t.id }, data: { userModifiedAt: now, updatedAt: now } });
+      return { id: t.id, line };
+    });
+    await this.audit(scope, 'proposal_template.line_grid', before.id, { slug, key, itemCode, before: { pricing: before.line.pricing, grid: before.line.grid ?? null } }, now);
+    return this.template(scope, slug);
+  }
+
+  /** Nouvelle ligne du modèle copiée depuis la grille tarifaire, placée en fin de tableau. */
+  async addGridLine(scope: Scope, slug: string, body: { itemCode: string; kind?: 'REQUIRED' | 'OPTIONAL' | 'SETUP'; quantity?: number }, now: Date) {
+    const on = todayParis(now);
+    const created = await withScope(scope, async (tx) => {
+      const t = await this.templateOrThrow(tx, scope, slug);
+      const def = templateDefinition(t);
+      const item = await this.grid.itemForDocument(tx, body.itemCode, on);
+      const l = gridLine(() => buildGridLine(def, item, { key: gridLineKey(def, item.code), kind: body.kind, quantity: body.quantity, on }));
+      const position = t.lines.reduce((m: number, x: any) => Math.max(m, x.position), 0) + 1;
+      await tx.proposalTemplatePricingLine.create({
+        data: {
+          id: uuidv7(), tenantId: scope.tenantId, templateId: t.id, position, key: l.key, label: l.label,
+          description: l.description ?? null, kind: l.kind, unit: l.unit, recurrence: l.recurrence, group: l.group,
+          quantity: l.quantity as object, pricing: l.pricing as object, priceFrom: false, priceStatus: 'VALIDATED',
+          priceSource: l.priceSource!, grid: l.grid as object,
+        },
+      });
+      await tx.proposalTemplate.update({ where: { id: t.id }, data: { userModifiedAt: now, updatedAt: now } });
+      return { id: t.id, key: l.key };
+    });
+    await this.audit(scope, 'proposal_template.line_add_grid', created.id, { slug, key: created.key, itemCode: body.itemCode }, now);
     return this.template(scope, slug);
   }
 
@@ -258,5 +315,14 @@ export class ProposalAdminService {
       tenantId: scope.tenantId, customerId: null, actorUserId: actorOf(scope), actorKind: scope.actorKind, actorIp: null,
       actorUserAgent: null, action, resourceType: action.split('.')[0] ?? 'proposal_template', resourceId, after, requestId: null, occurredAt: now,
     });
+  }
+}
+
+function gridLine<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof GridLineError) throw new UnprocessableEntityException({ code: e.code, message: e.message, details: e.details });
+    throw e;
   }
 }

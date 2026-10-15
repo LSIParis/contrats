@@ -27,6 +27,8 @@ export const PERMISSIONS = {
   /** Abonnements aux webhooks sortants (URL, secret HMAC, relivraison). */
   'webhooks.manage': ['MSP_ADMIN'],
   'pricing.rules.manage': ['MSP_ADMIN'],
+  /** Types de contrats, durées d'engagement et grilles tarifaires. */
+  'pricing.grid.manage': ['MSP_ADMIN'],
   'pricing.indexes.manage': ['MSP_ADMIN'],
   /** Seconde validation d'une dérogation tarifaire au-delà du seuil. */
   'pricing.override.approve': ['MSP_ADMIN'],

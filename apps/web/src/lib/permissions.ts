@@ -22,6 +22,8 @@ const PERMISSIONS = {
   'pricing.simulate': ['MSP_ADMIN', 'ACCOUNT_MANAGER', 'LEGAL_REVIEWER'],
   'pricing.override.approve': ['MSP_ADMIN'],
   'pricing.rules.manage': ['MSP_ADMIN'],
+  /** Types de contrats, durées d'engagement et grilles tarifaires. */
+  'pricing.grid.manage': ['MSP_ADMIN'],
   'pricing.indexes.manage': ['MSP_ADMIN'],
   'apiClients.manage': ['MSP_ADMIN'],
   'webhooks.manage': ['MSP_ADMIN'],

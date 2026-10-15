@@ -18,6 +18,7 @@ const SECTION_TITLES: Array<[prefix: string, title: string]> = [
   ['/library', 'Bibliothèque de clauses'],
   ['/settings', 'Paramètres'],
   ['/pricing', 'Tarification'],
+  ['/contract-kinds', 'Types de contrats'],
   ['/proposal-admin', 'Propositions'],
   ['/proposals', 'Propositions'],
 ];
@@ -32,6 +33,7 @@ export function AppShell() {
   const roles = me.data?.roles ?? [];
   const isAdmin = roles.includes('MSP_ADMIN');
   const canTemplates = isAdmin || roles.includes('LEGAL_REVIEWER');
+  const canKinds = canDo(me.data, 'pricing.simulate') || allows(me.data, 'pricing.grid.manage');
 
   return (
     <Shell
@@ -46,9 +48,10 @@ export function AppShell() {
             <NavItem to="/library" icon="book">Bibliothèque de clauses</NavItem>
           )}
           {canDo(me.data, 'pricing.simulate') && <NavItem to="/pricing" icon="tag">Tarification</NavItem>}
-          {(isAdmin || canTemplates) && (
+          {(isAdmin || canTemplates || canKinds) && (
             <NavSection label="Administration">
               {canTemplates && <NavItem to="/templates" icon="book">Modèles</NavItem>}
+              {canKinds && <NavItem to="/contract-kinds" icon="tag">Types de contrats</NavItem>}
               {isAdmin && <NavItem to="/users" icon="users">Utilisateurs</NavItem>}
               {isAdmin && <NavItem to="/audit" icon="clipboard">Audit</NavItem>}
               {isAdmin && <NavItem to="/settings" icon="settings">Paramètres</NavItem>}

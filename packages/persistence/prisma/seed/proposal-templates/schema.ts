@@ -106,7 +106,8 @@ export const Choice = z.object({
         description: z.string().optional(),
         default: z.boolean().default(false),
         /** Mois d'engagement correspondant, si le choix porte la durée. */
-        commitmentMonths: z.number().int().positive().optional(),
+        // 0 = sans engagement (13-types-contrats.md).
+        commitmentMonths: z.number().int().nonnegative().optional(),
       }),
     )
     .min(2),

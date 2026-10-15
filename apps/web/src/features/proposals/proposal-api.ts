@@ -48,6 +48,8 @@ export interface DefLine {
   pricing: LinePricing; priceFrom?: boolean; priceStatus: 'VALIDATED' | 'TO_VALIDATE';
   priceStatusByChoice?: Record<string, 'VALIDATED' | 'TO_VALIDATE'>; priceSource?: string; setupLineKey?: string;
   indexation?: unknown; group: 'RECURRING' | 'SETUP' | 'OPTIONS' | 'YEARLY' | 'OUT_OF_SCOPE';
+  /** Ligne copiée de la grille tarifaire : code de base, version par valeur du choix d'engagement. */
+  grid?: { itemCode: string; variants: Record<string, string>; vatRatePercent: string; on: string };
 }
 export interface DefChoice {
   key: string; label: string; editableByClient: boolean; priceStatus?: 'VALIDATED' | 'TO_VALIDATE'; note?: string;
@@ -137,6 +139,10 @@ export const proposalsApi = {
   putSections: (pid: string, sections: Section[]) => apiPut<ProposalDetail>(`${id(pid)}/sections`, { sections }),
   putPricing: (pid: string, def: PricingDefinition) => apiPut<ProposalDetail>(`${id(pid)}/pricing`, def),
   select: (pid: string, b: SelectionBody) => apiPut<ProposalDetail>(`${id(pid)}/selection`, b),
+  addGridLine: (pid: string, b: { itemCode: string; kind?: 'REQUIRED' | 'OPTIONAL' | 'SETUP'; quantity?: number }) =>
+    apiPost<ProposalDetail>(`${id(pid)}/pricing/grid-lines`, b),
+  setCommitments: (pid: string, b: { months: number[]; defaultMonths: number; switchGridLines: boolean }) =>
+    apiPut<ProposalDetail>(`${id(pid)}/pricing/commitments`, b),
   addRecipient: (pid: string, b: RecipientBody) => apiPost<ProposalDetail>(`${id(pid)}/recipients`, b),
   removeRecipient: async (pid: string, rid: string) => {
     await apiDelete(`${id(pid)}/recipients/${encodeURIComponent(rid)}`);
@@ -187,6 +193,10 @@ export const proposalAdminApi = {
   templates: () => apiGet<{ items: TemplateSummary[] }>(`${A}/templates`),
   template: (slug: string) => apiGet<TemplateDetail>(`${A}/templates/${encodeURIComponent(slug)}`),
   updateTemplate: (slug: string, b: Record<string, unknown>) => apiPatch<unknown>(`${A}/templates/${encodeURIComponent(slug)}`, b),
+  addGridLine: (slug: string, b: { itemCode: string; kind?: 'REQUIRED' | 'OPTIONAL' | 'SETUP' }) =>
+    apiPost<unknown>(`${A}/templates/${encodeURIComponent(slug)}/grid-lines`, b),
+  linkLineToGrid: (slug: string, key: string, itemCode: string) =>
+    apiPost<unknown>(`${A}/templates/${encodeURIComponent(slug)}/lines/${encodeURIComponent(key)}/grid`, { itemCode }),
   updateLine: (slug: string, key: string, b: { label?: string; pricing?: LinePricing; priceSource?: string }) =>
     apiPatch<unknown>(`${A}/templates/${encodeURIComponent(slug)}/lines/${encodeURIComponent(key)}`, b),
   library: () => apiGet<{ items: LibraryItem[] }>(`${A}/library`),

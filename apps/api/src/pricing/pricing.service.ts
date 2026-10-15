@@ -31,6 +31,8 @@ import {
 } from './pricing-snapshot.js';
 import type { QuoteBody, SimulateBody } from './pricing.schemas.js';
 import { QUANTITY_PROVIDER } from './quantity-provider.js';
+import { PriceGridService } from '../contract-kinds/price-grid.service.js';
+import { PRICE_UNITS } from '@lsi/domain';
 
 /**
  * `priceAt(contractId, date)` — la signature du brief (§5), côté application.
@@ -66,6 +68,7 @@ export class PricingService {
   constructor(
     private readonly config: TenantConfigService,
     @Inject(QUANTITY_PROVIDER) private readonly quantities: QuantityProvider,
+    private readonly grid: PriceGridService,
   ) {}
 
   /** Paramètres `pricing.*` du tenant, au format du moteur. */
@@ -194,7 +197,9 @@ export class PricingService {
    *  1. le barème du contrat fait foi s'il porte l'article (révision et
    *     dérogations comprises) — contrat désigné, ou UNIQUE contrat du client
    *     portant l'article à la date (plusieurs → 409, préciser `contractId`) ;
-   *  2. sinon, la grille du catalogue du tenant (règle GRID portant l'article ;
+   *  2. sinon, un code de version de la grille tarifaire des types de contrats
+   *     (`M365-0003-E12`, 13-types-contrats.md) : prix en vigueur à la date ;
+   *  3. sinon, la grille du catalogue du tenant (règle GRID portant l'article ;
    *     plusieurs → 409, préciser `ruleCode`).
    * Barème éphémère d'une ligne, puis le MÊME priceAt.
    */
@@ -206,6 +211,7 @@ export class PricingService {
         const fromContract = await this.quoteFromContract(scope, contractId, body, date);
         if (fromContract) return fromContract;
       }
+      if (!body.ruleCode && /^[A-Z0-9]{2,6}-\d{4,}-E\d{2}$/.test(body.articleCode)) return this.quoteFromPriceGrid(scope, body, date);
       return this.quoteFromCatalog(scope, body, date);
     });
   }
@@ -271,6 +277,29 @@ export class PricingService {
       date,
       line: json.lines[0],
       totals: json.totals,
+    };
+  }
+
+  private async quoteFromPriceGrid(scope: Scope, body: QuoteBody, date: string) {
+    const v = await this.grid.resolve(scope, body.articleCode, date, new Date());
+    const settings = await this.engineSettings(scope);
+    const line: PricingLine = {
+      id: 'quote',
+      code: v.code,
+      label: v.label,
+      unit: PRICE_UNITS.find((u) => u.code === v.unit)?.label ?? v.unit,
+      mode: 'MANUAL',
+      vatRatePercent: v.vatRatePercent,
+      quantity: { source: 'FIXED', value: body.quantity },
+      unitPrice: v.unitPrice,
+      // Comme une ligne de proposition : ponctuel = frais de mise en service.
+      ...(v.recurrence === 'ONE_OFF' ? { kind: 'SETUP_FEE' as const } : { kind: 'UNIT' as const, recurrence: v.recurrence as 'MONTHLY' | 'YEARLY' }),
+    };
+    const result = priceAt({ schedules: [{ id: 'quote', validFrom: date, validTo: date, currency: 'EUR', lines: [line] }], settings }, date);
+    const json = toJsonSafe(result);
+    return {
+      source: 'GRID' as const, articleCode: v.code, gridItemCode: v.itemCode, commitmentMonths: v.months, priceEffectiveFrom: v.effectiveFrom,
+      quantity: body.quantity, date, line: json.lines[0], totals: json.totals,
     };
   }
 

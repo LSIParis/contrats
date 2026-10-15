@@ -68,6 +68,22 @@ export interface ProposalPricingLine {
   readonly setupLineKey?: string | undefined;
   readonly indexation?: { readonly index: 'SYNTEC'; readonly a: number; readonly b: number } | undefined;
   readonly group: ProposalLineGroup;
+  /** Ligne issue de la grille tarifaire d'un type de contrat (13-types-contrats.md). */
+  readonly grid?: ProposalGridRef | undefined;
+}
+
+/**
+ * Référence COPIÉE à l'ajout d'une ligne depuis la grille : code de base et
+ * code de version retenu pour chaque valeur du choix d'engagement (`*` pour
+ * un prix unique). Les prix copiés sont dans `pricing` ; la grille peut
+ * changer ensuite sans toucher la proposition.
+ */
+export interface ProposalGridRef {
+  readonly itemCode: string;
+  readonly variants: Readonly<Record<string, string>>;
+  readonly vatRatePercent: string;
+  /** Date (« AAAA-MM-JJ ») des prix de grille copiés. */
+  readonly on: string;
 }
 
 export interface ProposalChoiceOption {
@@ -236,7 +252,7 @@ function configure(def: ProposalPricingDefinition, sel: ProposalSelectionInput):
   for (const k of Object.keys(sel.choices ?? {})) {
     if (!def.choices.some((c) => c.key === k)) errors.push(`choix inconnu : ${k}`);
   }
-  const commitmentChoice = def.choices.find((c) => c.options.some((o) => o.commitmentMonths));
+  const commitmentChoice = def.choices.find((c) => c.options.some((o) => o.commitmentMonths !== undefined));
   const commitmentMonths = commitmentChoice?.options.find((o) => o.value === choices[commitmentChoice.key])?.commitmentMonths ?? 0;
 
   const byKey = new Map(def.lines.map((l) => [l.key, l]));
@@ -328,11 +344,23 @@ const centsToEuroString = (cents: number | bigint): string => {
   return `${neg ? '-' : ''}${abs / 100n}.${String(abs % 100n).padStart(2, '0')}`;
 };
 
-/** Ligne du moteur correspondant à une ligne de proposition retenue. */
-function toEngineLine(l: ProposalPricingLine, qty: number, priceCents: number, vat: string): PricingLine {
+/** Code de grille de la version retenue (choix d'engagement courant), sinon undefined. */
+export function gridVariantCode(l: ProposalPricingLine, choices: Readonly<Record<string, string>>): string | undefined {
+  if (!l.grid) return undefined;
+  if ('unitPriceCents' in l.pricing) return l.grid.variants['*'];
+  const v = choices[l.pricing.dependsOn];
+  return v === undefined ? undefined : l.grid.variants[v];
+}
+
+/**
+ * Ligne du moteur correspondant à une ligne de proposition retenue. Code
+ * article : le code de grille de la version retenue (repris au barème du
+ * contrat à la conversion), sinon la clé de la ligne.
+ */
+function toEngineLine(l: ProposalPricingLine, qty: number, priceCents: number, vat: string, code?: string): PricingLine {
   const base = {
     id: l.key,
-    code: l.key,
+    code: code ?? l.key,
     label: l.label,
     unit: l.unit,
     mode: 'MANUAL' as const,
@@ -406,12 +434,12 @@ export function quoteProposal(
   for (const l of def.lines) {
     const q = cfg.included.get(l.key) ?? 0;
     if (l.kind === 'INFO' || q === 0) continue;
-    engineLines.push(toEngineLine(l, q, unitPriceCents(l, cfg.choices) as number, vat));
+    engineLines.push(toEngineLine(l, q, unitPriceCents(l, cfg.choices) as number, vat, gridVariantCode(l, cfg.choices)));
   }
   for (const l of def.lines) {
     if (l.kind !== 'INFO') continue;
     const p = unitPriceCents(l, cfg.choices);
-    if (p !== undefined) engineLines.push(toEngineLine(l, 0, p, vat));
+    if (p !== undefined) engineLines.push(toEngineLine(l, 0, p, vat, gridVariantCode(l, cfg.choices)));
   }
   for (const r of def.rules) {
     if (r.type !== 'DISCOUNT_PERCENT' || !cfg.included.has(r.when)) continue;

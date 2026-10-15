@@ -1,8 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { nextProposalSequence, uuidv7, withScope, type Scope } from '@lsi/persistence';
 import { allowedProposalEvents, formatProposalNumber, type ProposalEvent } from '@lsi/domain';
 import type { ProposalPricingDefinition } from '@lsi/pricing';
 import { TenantConfigService } from '../tenant/tenant-config.service.js';
+import { PriceGridService } from '../contract-kinds/price-grid.service.js';
+import { todayParis } from '../pricing/pricing-snapshot.js';
+import { buildGridLine, changeCommitments, commitmentChoiceOf, GridLineError, gridLineKey, validateGridPrices, type GridItemForDocument } from './proposal-grid.js';
 import { enforcePriceStatuses, PricingDefinitionSchema, templateDefinition, validateInDefinition } from './pricing-definition.js';
 import { sha256Hex, SectionsInputSchema, type SectionInput } from './proposal-content.js';
 import {
@@ -81,7 +84,10 @@ export function actorOf(scope: Scope): string | null {
 
 @Injectable()
 export class ProposalsService {
-  constructor(private readonly config: TenantConfigService) {}
+  constructor(
+    private readonly config: TenantConfigService,
+    private readonly grid: PriceGridService,
+  ) {}
 
   /** Module derrière `contrats.proposals.enabled` (brief §12, règle 4) : désactivé = inexistant. */
   async assertEnabled(scope: Scope): Promise<void> {
@@ -357,6 +363,72 @@ export class ProposalsService {
       await this.refreshSummary(tx, id, settings, now);
       return this.detail(tx, id, settings, now);
     });
+  }
+
+  /**
+   * Ajoute une ligne depuis la grille tarifaire (13-types-contrats.md §7) :
+   * code, libellé, prix par durée d'engagement et TVA COPIÉS dans la version.
+   */
+  async addGridLine(scope: Scope, id: string, body: { itemCode: string; kind?: 'REQUIRED' | 'OPTIONAL' | 'SETUP'; quantity?: number }, now: Date) {
+    await this.assertEnabled(scope);
+    const settings = await this.settings(scope);
+    const on = todayParis(now);
+    return withScope(scope, async (tx) => {
+      const loaded = await this.editable(tx, id);
+      const prev = loaded.version.pricingDefinition as ProposalPricingDefinition;
+      const item = await this.grid.itemForDocument(tx, body.itemCode, on);
+      const line = gridOrHttp(() => buildGridLine(prev, item, { key: gridLineKey(prev, item.code), kind: body.kind, quantity: body.quantity, on }));
+      await this.saveDefinition(tx, loaded, { ...prev, lines: [...prev.lines, line] }, new Map([[item.code, item]]));
+      await this.refreshSummary(tx, id, settings, now);
+      return this.detail(tx, id, settings, now);
+    });
+  }
+
+  /**
+   * Durées d'engagement proposées. `switchGridLines` (confirmé par
+   * l'utilisateur) : les lignes de grille basculent vers les versions et prix
+   * des durées retenues ; sinon seules les nouvelles durées sont lues dans la grille.
+   */
+  async setCommitments(scope: Scope, id: string, body: { months: number[]; defaultMonths: number; switchGridLines: boolean }, now: Date) {
+    await this.assertEnabled(scope);
+    const settings = await this.settings(scope);
+    const on = todayParis(now);
+    return withScope(scope, async (tx) => {
+      const loaded = await this.editable(tx, id);
+      const prev = loaded.version.pricingDefinition as ProposalPricingDefinition;
+      const terms = await tx.commitmentTerm.findMany({ where: { months: { in: body.months } } });
+      const items = new Map<string, GridItemForDocument>();
+      for (const code of new Set(prev.lines.flatMap((l) => (l.grid ? [l.grid.itemCode] : [])))) {
+        items.set(code, await this.grid.itemForDocument(tx, code, on).catch(() => ({
+          code, label: code, description: null, unit: 'PER_UNIT', recurrence: 'MONTHLY' as const, vatRatePercent: '0', byMonths: new Map(),
+        })));
+      }
+      const next = gridOrHttp(() => changeCommitments(prev, { ...body, on }, new Map(terms.map((t: { months: number; label: string }) => [t.months, t.label])), items));
+      await this.saveDefinition(tx, loaded, next, items);
+      // Configuration courante sur une durée retirée : retour à la durée par défaut.
+      const choice = commitmentChoiceOf(next);
+      const current = (loaded.latestSelection?.choices as Record<string, string> | undefined)?.[choice.key];
+      if (current !== undefined && !choice.options.some((o) => o.value === current)) {
+        const reloaded = await loadProposal(tx, id);
+        const sel = selectionOf(reloaded.latestSelection);
+        const { [choice.key]: _drop, ...choices } = sel.choices ?? {};
+        const state = computeState(reloaded, settings, now, { templateDefinition: await loadTemplateDefinition(tx, reloaded.proposal.templateId), selection: { ...sel, choices } });
+        await recordSelection(tx, reloaded, state, { actorKind: 'INTERNAL', userId: actorOf(scope), recipientId: null }, now);
+      }
+      await this.refreshSummary(tx, id, settings, now);
+      return this.detail(tx, id, settings, now);
+    });
+  }
+
+  /** Enregistre une définition modifiée : validation, statuts « à valider », prix de grille validés. */
+  private async saveDefinition(tx: any, loaded: LoadedProposal, next: ProposalPricingDefinition, items: ReadonlyMap<string, GridItemForDocument>) {
+    const parsed = PricingDefinitionSchema.safeParse(next);
+    if (!parsed.success) throw new BadRequestException({ statusCode: 400, message: parsed.error.issues.map((i) => `${i.path.join('.')} : ${i.message}`) });
+    const def = validateGridPrices(
+      enforcePriceStatuses(parsed.data as ProposalPricingDefinition, loaded.version.pricingDefinition as ProposalPricingDefinition),
+      items,
+    );
+    await tx.proposalVersion.update({ where: { id: loaded.version.id }, data: { pricingDefinition: def as object } });
   }
 
   /** Validation d'un prix « à valider » du tableau d'une proposition (administrateur, audité par l'intercepteur). */
@@ -713,4 +785,16 @@ export { domainError };
 /** État IA des sections d'une version (à conserver lors d'une réécriture). */
 function aiStateOf(sections: readonly any[]): Map<string, { pending: boolean; sources: unknown }> {
   return new Map(sections.map((s) => [s.key as string, { pending: Boolean(s.aiPendingReview), sources: s.aiSources ?? null }]));
+}
+
+/** Erreurs métier des lignes de grille → 422 avec code stable et détail. */
+function gridOrHttp<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof GridLineError) {
+      throw new UnprocessableEntityException({ code: e.code, message: e.message, details: e.details });
+    }
+    throw e;
+  }
 }

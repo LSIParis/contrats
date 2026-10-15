@@ -174,3 +174,28 @@ test('contrats types : les quatre slugs attendus, association et avertissement s
   await waitFor(() => expect(api.find('PUT', '/v1/proposal-admin/contract-templates/ct-2/slug')[0]?.body).toEqual({ slug: 'supervision' }));
   expect(await within(within(required).getByRole('row', { name: /^supervision/ })).findByText(/non publié/)).toBeInTheDocument();
 });
+
+test('grille tarifaire : nouvelle ligne et rattachement d’une ligne existante (13-types-contrats.md §7)', async () => {
+  const user = userEvent.setup();
+  const variant = {
+    code: 'MNT-0001-E12', itemCode: 'MNT-0001', months: 12, termLabel: '12 mois', label: 'Poste supervisé', description: null, unit: 'PER_DEVICE',
+    recurrence: 'MONTHLY', vatRatePercent: '20', unitPrice: '45', purchasePrice: null, effectiveFrom: '2026-01-01', on: '2026-10-15',
+    kind: { id: 'k', prefix: 'MNT', label: 'Maintenance' },
+  };
+  const api = mount('/proposal-admin/templates/infogerance', ['MSP_ADMIN'], {
+    'GET /v1/contract-kinds': { items: [] },
+    'GET /v1/commitment-terms': { items: [] },
+    'GET /v1/price-grid/variants': { on: '2026-10-15', items: [variant] },
+    'POST /v1/proposal-admin/templates/infogerance/grid-lines': TEMPLATE,
+    'POST /v1/proposal-admin/templates/infogerance/lines/poste/grid': TEMPLATE,
+  });
+  await user.click(await screen.findByRole('button', { name: 'Ajouter depuis la grille tarifaire' }));
+  let dialog = await screen.findByRole('dialog', { name: 'Ajouter une ligne depuis la grille tarifaire' });
+  await user.click(within(await within(dialog).findByRole('row', { name: /MNT-0001-E12/ })).getByRole('button', { name: 'Choisir' }));
+  await waitFor(() => expect(api.find('POST', '/v1/proposal-admin/templates/infogerance/grid-lines')[0]?.body).toEqual({ itemCode: 'MNT-0001' }));
+
+  await user.click(screen.getByRole('button', { name: 'Rattacher Poste de travail à la grille' }));
+  dialog = await screen.findByRole('dialog', { name: 'Rattacher la ligne à un code de la grille' });
+  await user.click(within(await within(dialog).findByRole('row', { name: /MNT-0001-E12/ })).getByRole('button', { name: 'Choisir' }));
+  await waitFor(() => expect(api.find('POST', '/v1/proposal-admin/templates/infogerance/lines/poste/grid')[0]?.body).toEqual({ itemCode: 'MNT-0001' }));
+});

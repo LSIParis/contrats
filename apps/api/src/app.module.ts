@@ -53,6 +53,9 @@ import { PricingSchedulesService } from './pricing/schedules.service.js';
 import { PriceOverridesService } from './pricing/overrides.service.js';
 import { PriceIndexesService } from './pricing/indexes.service.js';
 import { PricingRulesService } from './pricing/rules.service.js';
+import { ContractKindsController } from './contract-kinds/contract-kinds.controller.js';
+import { ContractKindsService } from './contract-kinds/contract-kinds.service.js';
+import { PriceGridService } from './contract-kinds/price-grid.service.js';
 import { PricingEvents } from './pricing/pricing-events.js';
 import { ManualQuantityProvider, QUANTITY_PROVIDER } from './pricing/quantity-provider.js';
 import { CsvIndexConnector, INDEX_CONNECTORS } from './pricing/index-connector.js';
@@ -183,6 +186,7 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     SigningController,
     PricingController,
     PricingCatalogController,
+    ContractKindsController,
     TemplatesController,
     AiDraftingController,
     ContractAiController,
@@ -235,6 +239,9 @@ import { BullMqProposalJobQueue, NoOpProposalJobQueue, PROPOSAL_JOB_QUEUE } from
     PriceOverridesService,
     PriceIndexesService,
     PricingRulesService,
+    // Types de contrats et grilles par durée d'engagement (13-types-contrats.md).
+    ContractKindsService,
+    PriceGridService,
     PricingEvents,
     { provide: QUANTITY_PROVIDER, useClass: ManualQuantityProvider },
     // Connecteurs d'import d'indices : aucun n'ouvre le réseau.

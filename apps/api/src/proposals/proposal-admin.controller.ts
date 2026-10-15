@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put } from '@nestjs/common';
 import type { Scope } from '@lsi/persistence';
+import { z } from 'zod';
 import { CurrentScope, CurrentSession } from '../auth/current-scope.decorator.js';
 import { assertCan } from '../auth/permissions.js';
 import type { Session } from '../auth/session.service.js';
@@ -13,7 +14,11 @@ import {
   UpdateTemplateLineSchema,
   UpdateTemplateSchema,
   ValidatePendingSchema,
+  GridLineSchema,
+  type GridLineBody,
 } from './proposals.schemas.js';
+
+const GridLinkSchema = z.object({ itemCode: GridLineSchema.shape.itemCode }).strict();
 
 /**
  * Administration du module Propositions (brief §12.9 : l'admin gère modèles,
@@ -53,6 +58,26 @@ export class ProposalAdminController {
   ) {
     assertCan(s, 'proposals.library.manage');
     return this.admin.updateLine(scope, slug, key, body, new Date());
+  }
+
+  /** Rattache une ligne du modèle à un code de la grille tarifaire (prix par durée copiés). */
+  @Post('templates/:slug/lines/:key/grid')
+  linkLineToGrid(
+    @CurrentScope() scope: Scope,
+    @CurrentSession() s: Session,
+    @Param('slug') slug: string,
+    @Param('key') key: string,
+    @Body(new ZodPipe(GridLinkSchema)) body: { itemCode: string },
+  ) {
+    assertCan(s, 'proposals.library.manage');
+    return this.admin.linkLineToGrid(scope, slug, key, body.itemCode, new Date());
+  }
+
+  /** Nouvelle ligne du modèle depuis la grille tarifaire. */
+  @Post('templates/:slug/grid-lines')
+  addGridLine(@CurrentScope() scope: Scope, @CurrentSession() s: Session, @Param('slug') slug: string, @Body(new ZodPipe(GridLineSchema)) body: GridLineBody) {
+    assertCan(s, 'proposals.library.manage');
+    return this.admin.addGridLine(scope, slug, body, new Date());
   }
 
   /** « Prix à valider » : lignes, règles, sections et choix TO_VALIDATE de tous les modèles. */

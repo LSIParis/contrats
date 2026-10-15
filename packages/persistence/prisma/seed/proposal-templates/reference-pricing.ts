@@ -84,7 +84,7 @@ export function evaluate(t: ProposalTemplateSeed, sel: Selection = {}): Evaluati
   for (const c of t.pricing.choices)
     if (!c.options.some((o) => o.value === choices[c.key])) errors.push(`valeur invalide pour ${c.key} : ${choices[c.key]}`);
 
-  const commitmentChoice = t.pricing.choices.find((c) => c.options.some((o) => o.commitmentMonths))!;
+  const commitmentChoice = t.pricing.choices.find((c) => c.options.some((o) => o.commitmentMonths !== undefined))!;
   const commitmentMonths =
     commitmentChoice.options.find((o) => o.value === choices[commitmentChoice.key])?.commitmentMonths ?? 0;
 

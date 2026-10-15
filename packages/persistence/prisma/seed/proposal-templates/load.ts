@@ -112,9 +112,9 @@ export function crossCheck(t: ProposalTemplateSeed, library: Map<string, Library
     if (defaults !== 1) issues.push(`choix ${c.key} : exactement une option par défaut attendue (${defaults})`);
     for (const d of duplicates(c.options.map((o) => o.value))) issues.push(`choix ${c.key} : valeur en double ${d}`);
   }
-  const commitmentChoices = t.pricing.choices.filter((c) => c.options.some((o) => o.commitmentMonths));
+  const commitmentChoices = t.pricing.choices.filter((c) => c.options.some((o) => o.commitmentMonths !== undefined));
   if (commitmentChoices.length !== 1) issues.push(`un et un seul choix doit porter la durée d'engagement`);
-  else if (commitmentChoices[0]!.options.some((o) => !o.commitmentMonths))
+  else if (commitmentChoices[0]!.options.some((o) => o.commitmentMonths === undefined))
     issues.push(`choix ${commitmentChoices[0]!.key} : chaque option doit préciser commitmentMonths`);
 
   const checkLineRef = (ctx: string, key: string | undefined, kind?: PricingLine["kind"]) => {
