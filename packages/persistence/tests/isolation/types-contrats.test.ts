@@ -189,17 +189,17 @@ describe('retour arrière de la migration 34', () => {
     run('pnpm exec prisma migrate deploy');
     run(`pnpm exec prisma db execute --url "${url}" --file prisma/rollback/00000000000034_types_contrats.down.sql`);
     const probe = new PrismaClient({ datasourceUrl: url.toString() });
-    const [{ n }] = await probe.$queryRawUnsafe<{ n: bigint }[]>(
+    const [first] = await probe.$queryRawUnsafe<{ n: bigint }[]>(
       `SELECT count(*) AS n FROM information_schema.tables WHERE table_name IN ('contract_kinds', 'price_grid_items')`,
     );
-    expect(Number(n)).toBe(0);
+    expect(Number(first!.n)).toBe(0);
     await probe.$disconnect();
     run('pnpm exec prisma migrate deploy');
     const again = new PrismaClient({ datasourceUrl: url.toString() });
-    const [{ m }] = await again.$queryRawUnsafe<{ m: bigint }[]>(
+    const [second] = await again.$queryRawUnsafe<{ m: bigint }[]>(
       `SELECT count(*) AS m FROM information_schema.tables WHERE table_name IN ('contract_kinds', 'price_grid_items')`,
     );
-    expect(Number(m)).toBe(2);
+    expect(Number(second!.m)).toBe(2);
     await again.$disconnect();
   }, 120_000);
 });

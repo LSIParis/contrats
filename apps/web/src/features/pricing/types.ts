@@ -201,8 +201,12 @@ export interface PricingRuleRow {
 }
 
 export interface QuoteResult {
-  source: 'CONTRACT' | 'CATALOG';
+  /** GRID : code de version de la grille tarifaire des types de contrats. */
+  source: 'CONTRACT' | 'CATALOG' | 'GRID';
   contractId?: string;
+  gridItemCode?: string;
+  commitmentMonths?: number;
+  priceEffectiveFrom?: string;
   scheduleVersion?: number | null;
   ruleCode?: string;
   articleCode: string;

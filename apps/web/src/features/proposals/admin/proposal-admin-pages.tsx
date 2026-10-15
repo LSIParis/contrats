@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { errorMessage } from '../../../lib/api.js';
+import { ApiRequestError, errorMessage } from '../../../lib/api.js';
 import { centsToEurosInput, eurosToCents, formatCents } from '../../../lib/money.js';
 import { allows } from '../../../lib/permissions.js';
 import { useMe } from '../../../lib/queries.js';
@@ -18,6 +18,7 @@ import { Spinner } from '../../../ui/spinner.js';
 import { Table } from '../../../ui/table.js';
 import { useToast } from '../../../ui/toast.js';
 import { proposalAdminApi, type DefLine, type LibraryItem, type LinePricing } from '../proposal-api.js';
+import { GridPicker } from '../../contract-kinds/grid-picker.js';
 import { ACCEPTANCE_MODE_LABELS, formatDateTime, PRICE_SCOPE_LABELS, RECURRENCE_LABELS, SECTION_KIND_LABELS } from '../proposal-labels.js';
 
 /**
@@ -110,6 +111,22 @@ export function ProposalTemplateDetailPage() {
   const canManage = allows(me.data, 'proposals.library.manage');
   const q = useQuery({ queryKey: ['proposal-template', slug], queryFn: () => proposalAdminApi.template(slug) });
   const [line, setLine] = useState<DefLine | null>(null);
+  // Grille tarifaire : null = fermé ; 'new' = nouvelle ligne ; sinon clé de la ligne à rattacher.
+  const [gridTarget, setGridTarget] = useState<string | null>(null);
+  const toast = useToast();
+  const grid = useMutation({
+    mutationFn: ({ target, itemCode }: { target: string; itemCode: string }) =>
+      target === 'new' ? proposalAdminApi.addGridLine(slug, { itemCode }) : proposalAdminApi.linkLineToGrid(slug, target, itemCode),
+    onSuccess: (_d, v) => {
+      setGridTarget(null);
+      toast.show(v.target === 'new' ? `Ligne ${v.itemCode} ajoutée depuis la grille.` : `Ligne rattachée à ${v.itemCode} : prix repris de la grille.`, 'success');
+      refresh();
+    },
+  });
+  const gridError = (e: unknown) => {
+    const d = e instanceof ApiRequestError ? (e.body as { details?: string[] }).details : undefined;
+    return e ? new Error([errorMessage(e), ...(d ?? [])].filter(Boolean).join(' — ')) : undefined;
+  };
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['proposal-template', slug] });
     void qc.invalidateQueries({ queryKey: ['proposal-templates'] });
@@ -138,16 +155,34 @@ export function ProposalTemplateDetailPage() {
         >
           {def.lines.map((l) => (
             <tr key={l.key}>
-              <td>{l.label}{l.priceSource && <span className="block text-xs text-ink-faint">{l.priceSource}</span>}</td>
+              <td>
+                {l.label}
+                {l.grid && <span className="block font-mono text-xs text-ink-faint">{l.grid.itemCode}</span>}
+                {l.priceSource && <span className="block text-xs text-ink-faint">{l.priceSource}</span>}
+              </td>
               <td>{l.kind === 'OPTIONAL' ? 'Option' : l.kind === 'SETUP' ? 'Mise en service' : l.kind === 'INFO' ? 'Hors forfait' : 'Obligatoire'}</td>
               <td>{RECURRENCE_LABELS[l.recurrence] ?? l.recurrence}</td>
               <td>{l.unit}</td>
               <td className="tabular-nums">{linePrice(l, def.choices)}</td>
               <td>{l.priceStatus === 'TO_VALIDATE' || Object.values(l.priceStatusByChoice ?? {}).includes('TO_VALIDATE') ? <Badge tone="warn">À valider</Badge> : <Badge tone="success">Validé</Badge>}</td>
-              <td className="text-right">{canManage && <Button size="sm" variant="secondary" aria-label={`Modifier le prix de ${l.label}`} onClick={() => setLine(l)}>Modifier</Button>}</td>
+              <td className="text-right">
+                {canManage && (
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="secondary" aria-label={`Modifier le prix de ${l.label}`} onClick={() => setLine(l)}>Modifier</Button>
+                    {l.recurrence !== 'INFO' && (
+                      <Button size="sm" variant="secondary" aria-label={`Rattacher ${l.label} à la grille`} onClick={() => { grid.reset(); setGridTarget(l.key); }}>Grille</Button>
+                    )}
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </Table>
+        {canManage && (
+          <div className="mt-3">
+            <Button size="sm" variant="secondary" onClick={() => { grid.reset(); setGridTarget('new'); }}>Ajouter depuis la grille tarifaire</Button>
+          </div>
+        )}
         {def.rules.length > 0 && (
           <ul className="mt-3 list-disc pl-5 text-13 text-ink-muted">
             {def.rules.map((r) => <li key={r.key}>{r.type} — {String(r.label ?? r.message ?? r.key)}{typeof r.percent === 'number' ? ` (${r.percent} %)` : ''}{typeof r.amountCents === 'number' ? ` (${formatCents(String(r.amountCents))})` : ''}</li>)}
@@ -169,6 +204,14 @@ export function ProposalTemplateDetailPage() {
         </ol>
       </Card>
 
+      <GridPicker
+        open={gridTarget !== null}
+        onClose={() => setGridTarget(null)}
+        title={gridTarget === 'new' ? 'Ajouter une ligne depuis la grille tarifaire' : 'Rattacher la ligne à un code de la grille'}
+        pending={grid.isPending}
+        error={gridError(grid.error)}
+        onPick={(v) => grid.mutate({ target: gridTarget!, itemCode: v.itemCode })}
+      />
       {line && <LinePriceDialog slug={slug} line={line} choices={def.choices} onClose={() => setLine(null)} onSaved={() => { setLine(null); refresh(); }} />}
     </AdminFrame>
   );

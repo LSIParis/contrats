@@ -11,12 +11,14 @@ import { ErrorNote, RegionCard } from '../../ui/region-card.js';
 import { TotalsList } from './pricing-result.js';
 import { fmtDay } from './labels.js';
 import type { PricingRuleRow, QuoteResult } from './types.js';
+import { GridPicker } from '../contract-kinds/grid-picker.js';
 
 /**
  * Devis rapide (`POST /v1/pricing/quote`, 04 §17.6) : prix d'un article pour
  * une quantité et une date. Le barème du contrat fait foi s'il porte
- * l'article (contrat désigné, ou unique contrat du client) ; sinon la grille
- * du catalogue. Même service que la future route publique.
+ * l'article (contrat désigné, ou unique contrat du client) ; sinon un code de
+ * version de la grille tarifaire (« M365-0003-E12 », choisi dans la grille) ;
+ * sinon la grille du catalogue. Même service que la future route publique.
  */
 export function QuotePanel() {
   const uid = useId();
@@ -25,6 +27,7 @@ export function QuotePanel() {
   const grids = (rules.data?.items ?? []).filter((r) => r.type === 'GRID' && !r.archivedAt);
   const [f, setF] = useState({ articleCode: '', quantity: '', date: '', customerId: '', contractId: '', ruleCode: '', vat: '' });
   const [formError, setFormError] = useState<string>();
+  const [picking, setPicking] = useState(false);
   const m = useMutation({ mutationFn: (body: unknown) => apiRequest<QuoteResult>('POST', '/v1/pricing/quote', body) });
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -51,8 +54,11 @@ export function QuotePanel() {
   return (
     <RegionCard title="Devis rapide">
       <form noValidate onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label="Code article" htmlFor={`${uid}-art`}>
-          <Input id={`${uid}-art`} value={f.articleCode} onChange={set('articleCode')} />
+        <Field label="Code article" htmlFor={`${uid}-art`} hint="Ou un code de la grille tarifaire.">
+          <div className="flex gap-2">
+            <Input id={`${uid}-art`} value={f.articleCode} onChange={set('articleCode')} />
+            <Button type="button" size="sm" variant="secondary" onClick={() => setPicking(true)}>Grille</Button>
+          </div>
         </Field>
         <Field label="Quantité" htmlFor={`${uid}-qty`}>
           <Input id={`${uid}-qty`} inputMode="decimal" value={f.quantity} onChange={set('quantity')} />
@@ -91,6 +97,11 @@ export function QuotePanel() {
                 Barème du contrat — version {r.scheduleVersion ?? '?'}{' '}
                 {r.contractId && <Link className="text-primary hover:underline" to={`/contracts/${r.contractId}?onglet=tarification`}>(voir le contrat)</Link>}
               </>
+            ) : r.source === 'GRID' ? (
+              <>
+                Grille tarifaire — {r.gridItemCode}, {r.commitmentMonths === 0 ? 'sans engagement' : `engagement ${r.commitmentMonths} mois`}
+                {r.priceEffectiveFrom ? `, prix en vigueur depuis le ${fmtDay(r.priceEffectiveFrom)}` : ''}
+              </>
             ) : (
               <>Catalogue du tenant — règle {r.ruleCode}</>
             )}
@@ -102,6 +113,12 @@ export function QuotePanel() {
           <TotalsList totals={r.totals} />
         </div>
       )}
+      <GridPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        title="Choisir un code de la grille tarifaire"
+        onPick={(v) => { setF((s) => ({ ...s, articleCode: v.code })); setPicking(false); }}
+      />
     </RegionCard>
   );
 }

@@ -54,7 +54,6 @@ export function GridTools({ detail, onDetail }: { detail: ProposalDetail; onDeta
   useEffect(() => {
     setMonths(proposed);
     setDefaultMonths(proposedDefault);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail]);
   const changed = [...months].sort((a, b) => a - b).join(',') !== [...proposed].sort((a, b) => a - b).join(',') || defaultMonths !== proposedDefault;
   const setCommitments = useMutation({

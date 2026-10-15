@@ -193,6 +193,10 @@ export const proposalAdminApi = {
   templates: () => apiGet<{ items: TemplateSummary[] }>(`${A}/templates`),
   template: (slug: string) => apiGet<TemplateDetail>(`${A}/templates/${encodeURIComponent(slug)}`),
   updateTemplate: (slug: string, b: Record<string, unknown>) => apiPatch<unknown>(`${A}/templates/${encodeURIComponent(slug)}`, b),
+  addGridLine: (slug: string, b: { itemCode: string; kind?: 'REQUIRED' | 'OPTIONAL' | 'SETUP' }) =>
+    apiPost<unknown>(`${A}/templates/${encodeURIComponent(slug)}/grid-lines`, b),
+  linkLineToGrid: (slug: string, key: string, itemCode: string) =>
+    apiPost<unknown>(`${A}/templates/${encodeURIComponent(slug)}/lines/${encodeURIComponent(key)}/grid`, { itemCode }),
   updateLine: (slug: string, key: string, b: { label?: string; pricing?: LinePricing; priceSource?: string }) =>
     apiPatch<unknown>(`${A}/templates/${encodeURIComponent(slug)}/lines/${encodeURIComponent(key)}`, b),
   library: () => apiGet<{ items: LibraryItem[] }>(`${A}/library`),

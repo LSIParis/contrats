@@ -9,6 +9,9 @@ import { ErrorNote, RegionCard } from '../../ui/region-card.js';
 import { useToast } from '../../ui/toast.js';
 import { KIND_LABELS, LOOKUP_LABELS, MODE_LABELS, RECURRENCE_LABELS } from './labels.js';
 import { draftFromLine, emptyDraft, lineFromDraft, revisionAllowed, type LineDraft } from './line-draft.js';
+import { draftFromGrid, gridFields, linesToSwitch, switchVariantCode } from './grid-lines.js';
+import { GridPicker } from '../contract-kinds/grid-picker.js';
+import type { VariantSnapshot } from '../contract-kinds/types.js';
 import type { LineInput, LineKind, PriceIndexRow, PricingMode, PricingRuleRow, Recurrence, ScheduleView } from './types.js';
 
 /**
@@ -37,7 +40,32 @@ export function ScheduleEditor({ contractId, schedule, onClose }: { contractId: 
   const [note, setNote] = useState(schedule.note ?? '');
   const [drafts, setDrafts] = useState<LineDraft[]>(() => schedule.lines.map((l, i) => draftFromLine(l, i + 1)));
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [picking, setPicking] = useState(false);
   const title = `Version ${schedule.version} (brouillon) — édition`;
+  // Durée du barème pour la grille : vide = sans engagement (E00).
+  const commitmentN = Number(commitment.trim() || '0');
+  const gridMonths = Number.isInteger(commitmentN) && commitmentN >= 0 && commitmentN <= 99 ? commitmentN : null;
+  const toSwitch = gridMonths === null ? [] : linesToSwitch(drafts, gridMonths);
+  const switchLines = useMutation({
+    mutationFn: async (months: number) => {
+      const missing: string[] = [];
+      const found = new Map<number, VariantSnapshot>();
+      for (const i of toSwitch) {
+        const code = switchVariantCode(drafts[i]!.articleCode, months)!;
+        try {
+          found.set(i, await apiRequest<VariantSnapshot>('GET', `/v1/price-grid/variants/${encodeURIComponent(code)}?on=${encodeURIComponent(validFrom)}`));
+        } catch {
+          missing.push(code);
+        }
+      }
+      return { missing, found };
+    },
+    onSuccess: ({ missing, found }) => {
+      setDrafts((ds) => ds.map((d, i) => (found.has(i) ? { ...d, ...gridFields(found.get(i)!) } : d)));
+      if (missing.length) toast.show(`Versions non proposées (lignes inchangées) : ${missing.join(', ')}.`, 'warn');
+      else toast.show(`${found.size} ligne(s) basculée(s) : prix au ${validFrom} copiés.`, 'success');
+    },
+  });
   const datalistId = useId();
 
   const save = useMutation({
@@ -100,6 +128,17 @@ export function ScheduleEditor({ contractId, schedule, onClose }: { contractId: 
         <datalist id={`${datalistId}-indexes`}>
           {indexes.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
         </datalist>
+        {toSwitch.length > 0 && gridMonths !== null && (
+          <div role="status" className="flex flex-wrap items-center gap-3 rounded border border-warn bg-warn-bg px-3 py-2 text-13 text-warn">
+            <span>
+              {toSwitch.length} ligne(s) de la grille ne correspondent pas à l’engagement ({gridMonths === 0 ? 'sans engagement' : `${gridMonths} mois`}) :{' '}
+              {toSwitch.map((i) => drafts[i]!.articleCode).join(', ')}.
+            </span>
+            <Button type="button" size="sm" variant="warn" disabled={switchLines.isPending} onClick={() => switchLines.mutate(gridMonths)}>
+              Basculer vers les versions {gridMonths === 0 ? 'sans engagement' : `${gridMonths} mois`}
+            </Button>
+          </div>
+        )}
         {drafts.length === 0 && <p className="text-sm text-ink-faint">Aucune ligne : une version vide ne peut pas être activée.</p>}
         {drafts.map((d, i) => (
           <LineEditor
@@ -117,6 +156,7 @@ export function ScheduleEditor({ contractId, schedule, onClose }: { contractId: 
         ))}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="secondary" onClick={() => setDrafts((ds) => [...ds, emptyDraft(ds.length + 1)])}>Ajouter une ligne</Button>
+          <Button type="button" variant="secondary" onClick={() => setPicking(true)}>Ajouter depuis la grille</Button>
           <Button type="submit" disabled={save.isPending}>{save.isPending ? 'Enregistrement…' : 'Enregistrer le brouillon'}</Button>
         </div>
         {formErrors.length > 0 && (
@@ -127,6 +167,17 @@ export function ScheduleEditor({ contractId, schedule, onClose }: { contractId: 
         )}
         <ErrorNote>{errorText(save.error)}</ErrorNote>
       </form>
+      <GridPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        defaultMonths={gridMonths}
+        title="Ajouter une ligne depuis la grille tarifaire"
+        onPick={(v) => {
+          setDrafts((ds) => [...ds, draftFromGrid(v, ds.length + 1)]);
+          setPicking(false);
+          toast.show(`${v.code} ajouté : libellé, prix et TVA copiés.`, 'success');
+        }}
+      />
     </RegionCard>
   );
 }
