@@ -10,6 +10,8 @@ import { SettingsPage } from './features/settings/settings-page.js';
 import { ApiClientsPage } from './features/settings/api-clients-page.js';
 import { WebhooksPage } from './features/settings/webhooks-page.js';
 import { PricingCatalogPage } from './features/pricing/pricing-catalog-page.js';
+import { ContractKindsPage } from './features/contract-kinds/contract-kinds-page.js';
+import { ContractKindDetailPage } from './features/contract-kinds/contract-kind-detail-page.js';
 import { ContractDetailPage } from './features/contracts/contract-detail-page.js';
 import { ContractEditPage } from './features/contracts/contract-edit-page.js';
 import { VersionsPage } from './features/contracts/versions-page.js';
@@ -57,6 +59,8 @@ function InternalRoutes() {
         <Route path="/settings/api" element={<ApiClientsPage />} />
         <Route path="/settings/webhooks" element={<WebhooksPage />} />
         <Route path="/pricing" element={<PricingCatalogPage />} />
+        <Route path="/contract-kinds" element={<ContractKindsPage />} />
+        <Route path="/contract-kinds/:id" element={<ContractKindDetailPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/:id" element={<TemplateDetailPage />} />
         <Route path="/library" element={<LibraryPage />} />

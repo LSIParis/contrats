@@ -15,6 +15,7 @@ import {
   proposalsApi, type Bucket, type DefLine, type PendingValidation, type PricingDefinition, type ProposalDetail, type SelectionBody,
 } from './proposal-api.js';
 import { PRICE_SCOPE_LABELS, RECURRENCE_LABELS } from './proposal-labels.js';
+import { GridTools } from './grid-tools.js';
 
 /**
  * Tableau de prix interne (brief §12.4). AUCUN calcul de prix ici : chaque
@@ -55,6 +56,12 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
   const retained = (l: DefLine) => l.kind !== 'OPTIONAL' || quote.selectedOptions.includes(l.key);
   const adjustable = def.lines.filter((l) => l.quantity && !l.quantity.linkedTo && (l.quantity.max === undefined || l.quantity.max > l.quantity.min) && retained(l));
   const lineStatus = (key: string) => def.lines.find((l) => l.key === key);
+  /** Code de grille de la version retenue (choix d'engagement courant). */
+  const gridCode = (key: string) => {
+    const l = lineStatus(key);
+    if (!l?.grid) return undefined;
+    return 'dependsOn' in l.pricing ? l.grid.variants[quote.choices[l.pricing.dependsOn] ?? ''] : l.grid.variants['*'];
+  };
 
   return (
     <section aria-label="Tableau de prix" className="flex flex-col gap-4">
@@ -170,7 +177,10 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
               const src = lineStatus(l.key)?.priceSource;
               return (
                 <tr key={l.key} className="border-b border-line last:border-0">
-                  <td className="py-2 pr-3">{l.label}</td>
+                  <td className="py-2 pr-3">
+                    {l.label}
+                    {gridCode(l.key) && <div className="font-mono text-xs text-ink-faint">{gridCode(l.key)}</div>}
+                  </td>
                   <td className="py-2 pr-3 text-ink-muted">{RECURRENCE_LABELS[l.recurrence] ?? l.recurrence}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{special ? '' : l.quantity}</td>
                   <td className="py-2 pr-3 text-ink-muted">{special ? '' : l.unit}</td>
@@ -196,6 +206,8 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
         </div>
       )}
 
+      {draft && canWrite && <GridTools detail={detail} onDetail={onDetail} />}
+
       {draft && canWrite && !editing && (
         <div><Button variant="secondary" size="sm" onClick={() => setEditing(true)}>Modifier les prix</Button></div>
       )}
@@ -210,7 +222,8 @@ function Totals({ totals, months }: { totals: ProposalDetail['quote']['totals'];
     ['Mensuel récurrent', totals.monthly, true],
     ['Trimestriel', totals.quarterly, false],
     ['Prestations annuelles', totals.yearly, false],
-    [`Total sur ${months} mois d’engagement (hors mise en service)`, totals.commitment, true],
+    // Sans engagement (0 mois) : pas de total d'engagement à afficher.
+    ...(months > 0 ? [[`Total sur ${months} mois d’engagement (hors mise en service)`, totals.commitment, true] as [string, Bucket, boolean]] : []),
   ];
   return (
     <ul aria-label="Totaux" className="grid gap-2 rounded-lg border border-line bg-surface p-4 text-sm">
