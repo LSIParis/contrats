@@ -16,6 +16,7 @@ import { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
 import { runProposalTemplatesSeed } from '../../prisma/seed/proposal-templates/cli';
 import { seedContractTemplates } from '../seed/contract-templates.js';
+import { seedContractKinds } from '../seed/contract-kinds.js';
 
 export interface CustomerFixture {
   id: string;
@@ -202,6 +203,16 @@ export async function seedProposalContractTemplates(tenantSlug: string, database
   const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
   try {
     return await seedContractTemplates(owner, { slug: tenantSlug });
+  } finally {
+    await owner.$disconnect();
+  }
+}
+
+/** Types de contrats prédéfinis et durées d'engagement (pnpm seed:contract-kinds). */
+export async function seedContractKindsFor(tenantSlug: string, databaseUrl?: string) {
+  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  try {
+    return await seedContractKinds(owner, { slug: tenantSlug });
   } finally {
     await owner.$disconnect();
   }
