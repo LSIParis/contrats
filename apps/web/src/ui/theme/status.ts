@@ -13,14 +13,15 @@
  */
 import type { ContractStatusCode } from '../../lib/labels.js';
 import type { IconName } from '../icons.js';
-import { mint, slate, semantic } from './tokens.js';
+// Le champ `lticket` de STATUS_TONES garde l'origine historique de chaque ton.
+import { slate, semantic } from './tokens.js';
 
 export type StatusTone = 'neutral' | 'muted' | 'info' | 'success' | 'warn' | 'danger';
 
 export const STATUS_TONES: Record<StatusTone, { fg: string; bg: string; className: string; lticket: string }> = {
   neutral: { fg: slate[700], bg: slate[100], className: 'bg-slate-100 text-slate-700', lticket: '.badge (l. 287-292)' },
   muted: { fg: slate[600], bg: slate[100], className: 'bg-slate-100 text-slate-600', lticket: '.badge-p4 / .badge-count (l. 307, 576)' },
-  info: { fg: mint[800], bg: mint[50], className: 'bg-info-bg text-info', lticket: '.badge-info (l. 296)' },
+  info: { fg: semantic.info, bg: semantic.infoBg, className: 'bg-info-bg text-info', lticket: '.badge-info (l. 296)' },
   success: { fg: semantic.success, bg: semantic.successBg, className: 'bg-success-bg text-success', lticket: '.badge-ok (l. 293)' },
   warn: { fg: semantic.warn, bg: semantic.warnBg, className: 'bg-warn-bg text-warn', lticket: '.badge-warn (l. 294)' },
   danger: { fg: semantic.danger, bg: semantic.dangerBg, className: 'bg-danger-bg text-danger', lticket: '.badge-danger (l. 295)' },

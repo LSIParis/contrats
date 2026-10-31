@@ -314,7 +314,7 @@ export function proposalHtmlDocument(p: {
     .join('\n');
   return (
     `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(p.number)}</title>` +
-    `<style>body{font-family:sans-serif;font-size:10.5pt;color:#14191c}h1,h2{color:#1C3B3F}` +
+    `<style>body{font-family:sans-serif;font-size:10.5pt;color:#14191c}h1,h2{color:#0B1530}` +
     `table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #d6e4e5;padding:4px 6px;text-align:left}</style>` +
     `</head><body><h1>${esc(p.title)}</h1><p>Proposition n° ${esc(p.number)}</p>${body}</body></html>`
   );

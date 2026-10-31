@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BrandChip, LegalFooter } from '../../../ui/layout.js';
+import { LegalFooter } from '../../../ui/layout.js';
+import { Logo } from '../../../ui/logo.js';
 import { Badge } from '../../../ui/badge.js';
 import { Button, buttonClass } from '../../../ui/button.js';
 import { Icon } from '../../../ui/icons.js';
@@ -111,7 +112,7 @@ export function ProposalPublicPage() {
 function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-page">
-      <div className="border-b border-line bg-surface px-4 py-3 sm:px-7"><BrandChip /></div>
+      <div className="border-b border-line bg-surface px-4 py-3 sm:px-7"><Logo /></div>
       <main id="contenu" className="mx-auto flex w-full max-w-[900px] flex-1 flex-col gap-4 px-4 py-6 sm:px-6">{children}</main>
       <LegalFooter />
     </div>
@@ -183,7 +184,7 @@ function SectionComments({ token, sectionKey, comments, onPosted }: { token: str
       {mine.length > 0 && (
         <ul className="flex flex-col gap-2" aria-label="Questions et réponses">
           {mine.map((c) => (
-            <li key={c.id} className={`rounded px-3 py-2 text-13 ${c.authorKind === 'INTERNAL' ? 'ml-6 bg-mint-50' : 'bg-slate-50'}`}>
+            <li key={c.id} className={`rounded px-3 py-2 text-13 ${c.authorKind === 'INTERNAL' ? 'ml-6 bg-cobalt-50' : 'bg-slate-50'}`}>
               <span className="font-button">{c.authorName}</span> <span className="text-ink-faint">— {formatDate(c.createdAt)}</span>
               <p className="whitespace-pre-line">{c.body}</p>
             </li>

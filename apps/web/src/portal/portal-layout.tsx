@@ -37,7 +37,7 @@ export function PortalLayout() {
     <Shell
       sidebar={
         <Sidebar
-          appName="Espace client"
+          subtitle="Espace client"
           bottom={
             <button
               type="button"

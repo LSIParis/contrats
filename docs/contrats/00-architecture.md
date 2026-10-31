@@ -238,6 +238,7 @@ isolation → souveraineté → réversibilité).
 | V2-H73 | Une ligne de proposition dont les prix sont **exactement** ceux de la grille tarifaire est « validée » sans passer par « Prix à valider » : la grille est tenue par l'administrateur (`pricing.grid.manage`). Prix modifié à la main = « à valider ». | éviter une double validation du même prix | tout prix ajouté par un commercial reste à valider |
 | V2-H74 | Option d'engagement **0 mois = sans engagement** dans les propositions ; converti, le barème du contrat n'a pas d'engagement (`commitment_months` NULL), comme avant pour un engagement absent. Une proposition peut ne proposer qu'**une** durée. | validé par le demandeur le 2026-10-15 | interdire 0 et garder au moins deux durées |
 | V2-H75 | Une proposition reprend une ligne de la grille seulement si la TVA du code est celle de la proposition (une TVA par proposition, V2-H51) ; sinon refus explicite. | le moteur des propositions n'a qu'un taux | TVA par ligne dans les propositions |
+| V2-H76 | **Identité propre à LSI Contrats** déclinée du logo (cobalt, cuivre, nuit ; Sora et Inter), en remplacement de l'exigence « visuellement indiscernable de lticket » du brief §11. Détail : `10-charte-graphique.md`. | demandé par le demandeur le 2026-10-31 | revenir aux jetons menthe et pétrole dans `tokens.ts` et `tokens.css` |
 
 ## 7. Ce qui n'est pas dans le périmètre
 
