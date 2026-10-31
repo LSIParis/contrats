@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../shell/app-shell.js';
@@ -35,5 +35,24 @@ test('coquille : navigation nommée, entrée active signalée, titre de section,
   await waitFor(() => expect(screen.getByText('Sylvie Martin')).toBeInTheDocument());
   expect(screen.getByText('(Administrateur)')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Audit' })).toBeInTheDocument();
+  // Menu découpé en trois sections, dans cet ordre.
+  const text = nav.textContent ?? '';
+  const positions = ['Devis proposition', 'Contrat', 'Administration'].map((label) => {
+    expect(within(nav).getByText(label)).toBeInTheDocument();
+    return text.indexOf(label);
+  });
+  expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  // Chaque section commence par le tableau de bord.
+  const links = within(nav).getAllByRole('link').map((a) => a.textContent);
+  expect(links.filter((name) => name === 'Tableau de bord')).toHaveLength(3);
+  for (const label of ['Devis proposition', 'Contrat', 'Administration']) {
+    const section = within(nav).getByText(label).parentElement as HTMLElement;
+    expect(within(section).getAllByRole('link')[0]).toHaveTextContent('Tableau de bord');
+  }
+  // Paramètres : hors du menu principal, dans sa propre zone en bas de la barre latérale.
+  const settingsLink = screen.getByRole('link', { name: 'Paramètres' });
+  expect(within(nav).queryByRole('link', { name: 'Paramètres' })).not.toBeInTheDocument();
+  expect(within(screen.getByRole('navigation', { name: 'Paramètres' })).getByRole('link', { name: 'Paramètres' })).toBe(settingsLink);
+  expect(nav.compareDocumentPosition(settingsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   vi.unstubAllGlobals();
 });

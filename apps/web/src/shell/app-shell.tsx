@@ -38,23 +38,37 @@ export function AppShell() {
   return (
     <Shell
       sidebar={
-        <Sidebar appName="Contrats">
-          <NavItem to="/dashboard" icon="dash">Tableau de bord</NavItem>
-          <NavItem to="/customers" icon="building">Clients</NavItem>
-          <NavItem to="/contracts" icon="contract">Contrats</NavItem>
-          {allows(me.data, 'proposals.read') && <NavItem to="/proposals" icon="send">Propositions</NavItem>}
-          <NavItem to="/reminders" icon="bell">Rappels</NavItem>
-          {(allows(me.data, 'contracts.write') || allows(me.data, 'clauses.manage')) && (
-            <NavItem to="/library" icon="book">Bibliothèque de clauses</NavItem>
-          )}
-          {canDo(me.data, 'pricing.simulate') && <NavItem to="/pricing" icon="tag">Tarification</NavItem>}
+        <Sidebar
+          appName="Contrats"
+          bottom={
+            isAdmin && (
+              <nav aria-label="Paramètres">
+                <NavItem to="/settings" icon="settings">Paramètres</NavItem>
+              </nav>
+            )
+          }
+        >
+          <NavSection label="Devis proposition">
+            <NavItem to="/dashboard" icon="dash">Tableau de bord</NavItem>
+            <NavItem to="/customers" icon="building">Clients</NavItem>
+            {allows(me.data, 'proposals.read') && <NavItem to="/proposals" icon="send">Propositions</NavItem>}
+            {canDo(me.data, 'pricing.simulate') && <NavItem to="/pricing" icon="tag">Tarification</NavItem>}
+          </NavSection>
+          <NavSection label="Contrat">
+            <NavItem to="/dashboard" icon="dash">Tableau de bord</NavItem>
+            <NavItem to="/contracts" icon="contract">Contrats</NavItem>
+            <NavItem to="/reminders" icon="bell">Rappels</NavItem>
+            {(allows(me.data, 'contracts.write') || allows(me.data, 'clauses.manage')) && (
+              <NavItem to="/library" icon="book">Bibliothèque de clauses</NavItem>
+            )}
+          </NavSection>
           {(isAdmin || canTemplates || canKinds) && (
             <NavSection label="Administration">
+              <NavItem to="/dashboard" icon="dash">Tableau de bord</NavItem>
               {canTemplates && <NavItem to="/templates" icon="book">Modèles</NavItem>}
               {canKinds && <NavItem to="/contract-kinds" icon="tag">Types de contrats</NavItem>}
               {isAdmin && <NavItem to="/users" icon="users">Utilisateurs</NavItem>}
               {isAdmin && <NavItem to="/audit" icon="clipboard">Audit</NavItem>}
-              {isAdmin && <NavItem to="/settings" icon="settings">Paramètres</NavItem>}
               {isAdmin && <NavItem to="/proposal-admin/pending" icon="fileCheck">Prix à valider</NavItem>}
               {allows(me.data, 'proposals.library.manage') && (
                 <NavItem to="/proposal-admin/templates" icon="clipboard">Administration des propositions</NavItem>
