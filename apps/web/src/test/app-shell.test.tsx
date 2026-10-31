@@ -30,7 +30,7 @@ test('coquille : navigation nommée, entrée active signalée, titre de section,
   expect(screen.getByRole('link', { name: 'Contrats' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('link', { name: 'Aller au contenu' })).toHaveAttribute('href', '#contenu');
   expect(screen.getByRole('main')).toHaveTextContent('Fiche contrat');
-  expect(screen.getByAltText('LSI Maintenance')).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'LSI Contrats' })).toBeInTheDocument();
   // Rôles traduits, liens d'administration visibles pour un administrateur.
   await waitFor(() => expect(screen.getByText('Sylvie Martin')).toBeInTheDocument());
   expect(screen.getByText('(Administrateur)')).toBeInTheDocument();

@@ -13,7 +13,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // `.btn-secondary` (l. 220, 228)
   secondary: 'border-line-strong bg-surface text-ink hover:bg-slate-100',
   // `.btn-ghost` (l. 229-230)
-  ghost: 'border-transparent bg-transparent px-2.5 py-1.5 text-primary hover:bg-mint-50',
+  ghost: 'border-transparent bg-transparent px-2.5 py-1.5 text-primary hover:bg-cobalt-50',
   // `.btn-danger` (l. 233-234)
   danger: 'border-transparent bg-danger text-white hover:bg-danger-hover',
   // `.btn-danger-ghost` (l. 572-573)

@@ -39,7 +39,6 @@ export function AppShell() {
     <Shell
       sidebar={
         <Sidebar
-          appName="Contrats"
           bottom={
             isAdmin && (
               <nav aria-label="Paramètres">

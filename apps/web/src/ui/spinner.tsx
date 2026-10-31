@@ -9,7 +9,7 @@ export function Spinner({ label = 'Chargement…' }: { label?: string }) {
     <div role="status" className="flex items-center justify-center gap-2 px-3 py-7 text-center text-ink-muted">
       <span
         aria-hidden="true"
-        className="inline-block h-4 w-4 rounded-full border-2 border-mint-200 border-t-primary motion-safe:animate-spin"
+        className="inline-block h-4 w-4 rounded-full border-2 border-cobalt-200 border-t-primary motion-safe:animate-spin"
       />
       {label}
     </div>

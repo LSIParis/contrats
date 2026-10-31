@@ -1,16 +1,14 @@
 import type { Config } from 'tailwindcss';
-import { mint, petrol, slate, semantic, role, radius, shadow, font, layout } from './src/ui/theme/tokens';
+import { cobalt, copper, ivory, night, slate, semantic, role, radius, shadow, font, layout } from './src/ui/theme/tokens';
 
 /**
- * Tailwind aligné sur le système de design de lticket
- * (LSIParis/ticket, apps/console/src/styles.css — voir src/ui/theme/tokens.ts).
+ * Tailwind aligné sur la charte graphique (docs/contrats/10-charte-graphique.md,
+ * src/ui/theme/tokens.ts).
  *
- * - `gray` est REMPLACÉE par l'échelle slate de lticket : toutes les classes `text-gray-*`,
- *   `bg-gray-*` et la bordure par défaut prennent ainsi les neutres de lticket sans toucher
- *   aux pages.
- * - `lsi` (anciennement #0b5cad, provisoire) devient le primaire de lticket (menthe 800) et son
- *   survol (menthe 900).
- * - `rounded` = rayon des boutons/champs lticket (6 px), `rounded-lg` = rayon des cartes (10 px).
+ * - `gray` est REMPLACÉE par l'échelle slate : les classes `text-gray-*`, `bg-gray-*` et la
+ *   bordure par défaut prennent ainsi les neutres de la charte.
+ * - `lsi` est un alias du primaire (cobalt 700) et de son survol (cobalt 800).
+ * - `rounded` = rayon des boutons/champs (6 px), `rounded-lg` = rayon des cartes (10 px).
  */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -19,8 +17,10 @@ export default {
       colors: {
         gray: slate,
         slate,
-        mint,
-        petrol,
+        cobalt,
+        copper,
+        night,
+        ivory,
         lsi: { DEFAULT: role.primary, dark: role.primaryHover },
         primary: { DEFAULT: role.primary, hover: role.primaryHover },
         accent: role.accent,
@@ -33,13 +33,13 @@ export default {
         warn: { DEFAULT: semantic.warn, bg: semantic.warnBg },
         danger: { DEFAULT: semantic.danger, bg: semantic.dangerBg, hover: semantic.dangerHover },
         info: { DEFAULT: semantic.info, bg: semantic.infoBg },
-        // Messages d'erreur existants (`text-red-600`, `bg-red-600`) : rouge danger de lticket.
+        // Messages d'erreur existants (`text-red-600`, `bg-red-600`) : rouge danger de la charte.
         red: { 600: semantic.danger, 700: semantic.dangerHover },
       },
       borderColor: { DEFAULT: role.border },
       borderRadius: { DEFAULT: radius.sm, sm: radius.sm, md: radius.sm, lg: radius.md, xl: radius.lg, full: radius.full },
       boxShadow: { sm: shadow.sm, DEFAULT: shadow.md, md: shadow.lg, lg: shadow.pop, pop: shadow.pop },
-      fontFamily: { sans: [font.family], mono: [font.mono] },
+      fontFamily: { display: [font.display], sans: [font.family], mono: [font.mono] },
       fontWeight: { button: '550', title: '650', heading: '680' },
       fontSize: {
         '2xs': ['11px', '1.25'],
