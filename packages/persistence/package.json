@@ -20,8 +20,8 @@
     "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('prisma/schema.prisma')){require('child_process').execSync('prisma generate',{stdio:'inherit'})}else{console.log('postinstall @lsi/persistence : schéma Prisma absent (étape dépendances du Dockerfile), génération différée.')}\""
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "prisma": "^5.22.0",
+    "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {
