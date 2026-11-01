@@ -32,7 +32,8 @@ describe('clés, curseurs, débit', () => {
     const p = parseApiKey(k.key)!;
     expect(p.prefix).toBe(k.prefix);
     expect(hashMatches(p.secret, k.hash)).toBe(true);
-    expect(hashMatches(`${p.secret.slice(0, -1)}A`, k.hash)).toBe(false);
+    const altered = p.secret.endsWith('A') ? 'B' : 'A';
+    expect(hashMatches(`${p.secret.slice(0, -1)}${altered}`, k.hash)).toBe(false);
     expect(parseApiKey('ctr_court_x')).toBeNull();
   });
 
