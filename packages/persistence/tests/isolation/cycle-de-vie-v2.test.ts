@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import { withScope, adminScope, clientScope } from '../../src/index.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 /** Garanties des migrations 18-19 (cycle de vie v2), sous le rôle lsi_app. */
 let owner: PrismaClient;
@@ -11,7 +12,7 @@ let versionA: string;
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
   versionA = uuidv7();
   await owner.$executeRawUnsafe(`INSERT INTO contract_versions (id, tenant_id, customer_id, contract_id, version_number,

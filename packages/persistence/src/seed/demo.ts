@@ -12,8 +12,9 @@
  *
  *   SEED_TENANT_SLUG=lsi pnpm seed
  */
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
+import { createPrismaClient } from '../prisma-client.js';
 
 const SLUG = process.env.SEED_TENANT_SLUG ?? 'lsi';
 
@@ -131,7 +132,7 @@ async function main() {
     console.error('✖ Refus : NODE_ENV=production. Positionnez SEED_ALLOW_PRODUCTION=1 si c’est voulu.');
     process.exit(2);
   }
-  const db = new PrismaClient({ datasourceUrl: process.env.SEED_DATABASE_URL ?? process.env.DATABASE_URL });
+  const db = createPrismaClient(process.env.SEED_DATABASE_URL ?? process.env.DATABASE_URL);
   try {
     const r = await seedDemo(db);
     console.log(`✔ Démonstration prête pour le tenant « ${SLUG} » : ${r.customers} clients, ${r.clauses} clauses, ${r.templates} modèle(s).`);

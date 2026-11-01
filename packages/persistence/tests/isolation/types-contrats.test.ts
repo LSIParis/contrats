@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import { withScope, adminScope, clientScope } from '../../src/index.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 /**
  * Garanties de la migration 34 (types de contrats, grilles par durée) —
@@ -178,7 +178,7 @@ describe('isolation', () => {
 describe('retour arrière de la migration 34', () => {
   test('montée → descente → montée sur une base dédiée', async () => {
     const { execSync } = await import('node:child_process');
-    const owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+    const owner = createPrismaClient(process.env.DATABASE_URL);
     const db = `rollback_${Date.now()}`;
     await owner.$executeRawUnsafe(`CREATE DATABASE ${db}`);
     await owner.$disconnect();
@@ -187,15 +187,15 @@ describe('retour arrière de la migration 34', () => {
     const env = { ...process.env, DATABASE_URL: url.toString() };
     const run = (cmd: string) => execSync(cmd, { env, stdio: 'pipe' });
     run('pnpm exec prisma migrate deploy');
-    run(`pnpm exec prisma db execute --url "${url}" --file prisma/rollback/00000000000034_types_contrats.down.sql`);
-    const probe = new PrismaClient({ datasourceUrl: url.toString() });
+    run(`pnpm exec prisma db execute --file prisma/rollback/00000000000034_types_contrats.down.sql`);
+    const probe = createPrismaClient(url.toString());
     const [first] = await probe.$queryRawUnsafe<{ n: bigint }[]>(
       `SELECT count(*) AS n FROM information_schema.tables WHERE table_name IN ('contract_kinds', 'price_grid_items')`,
     );
     expect(Number(first!.n)).toBe(0);
     await probe.$disconnect();
     run('pnpm exec prisma migrate deploy');
-    const again = new PrismaClient({ datasourceUrl: url.toString() });
+    const again = createPrismaClient(url.toString());
     const [second] = await again.$queryRawUnsafe<{ m: bigint }[]>(
       `SELECT count(*) AS m FROM information_schema.tables WHERE table_name IN ('contract_kinds', 'price_grid_items')`,
     );

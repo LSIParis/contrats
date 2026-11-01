@@ -1,5 +1,6 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
 import type { Scope } from './scope.js';
+import { createPrismaClient } from './prisma-client.js';
 
 /**
  * Le client Prisma applicatif. Se connecte avec le rôle `lsi_app` :
@@ -9,9 +10,7 @@ import type { Scope } from './scope.js';
  * ailleurs est interdite par ESLint no-restricted-imports (§16.4-D) :
  * une requête émise hors de withScope() lève une exception PostgreSQL.
  */
-const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL_APP ?? process.env.DATABASE_URL,
-});
+const prisma = createPrismaClient(process.env.DATABASE_URL_APP ?? process.env.DATABASE_URL);
 
 function toPgUuidArray(ids: readonly string[]): string {
   // Les valeurs proviennent de la session serveur, jamais d'une entrée

@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from './prisma-client.js';
 
 /**
  * Résolution du scope d'un webhook. (§11.4)
@@ -24,7 +25,7 @@ let client: PrismaClient | null = null;
 function webhookClient(): PrismaClient {
   if (!client) {
     const url = process.env.DATABASE_URL_WEBHOOK ?? buildWebhookUrl();
-    client = new PrismaClient({ datasourceUrl: url });
+    client = createPrismaClient(url);
   }
   return client;
 }

@@ -12,8 +12,9 @@
  * Connexion : rôle propriétaire (SEED_DATABASE_URL, sinon DATABASE_URL), comme
  * les migrations. Tenant : SEED_TENANT_SLUG (défaut `lsi`).
  */
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
+import { createPrismaClient } from '../prisma-client.js';
 
 export const DEFAULT_COMMITMENT_TERMS: readonly { months: number; label: string }[] = [
   { months: 0, label: 'Sans engagement' },
@@ -78,7 +79,7 @@ export async function seedContractKinds(
 }
 
 async function main() {
-  const db = new PrismaClient({ datasourceUrl: process.env.SEED_DATABASE_URL ?? process.env.DATABASE_URL });
+  const db = createPrismaClient(process.env.SEED_DATABASE_URL ?? process.env.DATABASE_URL);
   try {
     const r = await seedContractKinds(db);
     console.log(`✔ Durées d'engagement créées : ${r.termsCreated.map((m) => `${m} mois`).join(', ') || 'aucune'}.`);

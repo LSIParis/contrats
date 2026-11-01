@@ -2,14 +2,15 @@ import { describe, test, expect, beforeAll } from 'vitest';
 import { resolveUserScope } from '../../src/scope-resolution.js';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import { uuidv7 } from '../../src/uuid.js';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 let fx: Fixture;
 let owner: PrismaClient;
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
 });
 

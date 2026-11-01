@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations } from '../support/fixtures.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 let owner: PrismaClient;
 
@@ -12,7 +13,7 @@ const EXEMPTES = new Set([
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
 });
 
 /**
