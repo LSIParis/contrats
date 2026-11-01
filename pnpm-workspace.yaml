@@ -23,3 +23,13 @@ ignoredBuiltDependencies:
   - cpu-features
   - protobufjs
   - ssh2
+
+# Correctifs de sécurité de dépendances indirectes, sans attendre leurs parents
+# (dépendances dans la même version majeure). À retirer quand le parent les embarque.
+overrides:
+  axios: ^1.21.0
+  follow-redirects: ^1.16.2
+  prosemirror-view: ^1.42.9
+  markdown-it@14: ^14.3.3
+  source-map-js: ^1.2.2
+  fast-uri@3: ^3.1.9
