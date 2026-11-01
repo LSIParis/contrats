@@ -42,6 +42,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Complète le scan de l'image : l'audit a relevé des failles élevées que le
+      # scan, alors bloquant sur CRITICAL seulement, laissait passer.
+      - name: Audit des dépendances de production (bloquant dès HIGH)
+        run: pnpm audit --prod --audit-level=high
+
       - name: Validation du schéma Prisma
         run: pnpm db:validate
 
@@ -128,11 +133,11 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Action épinglée par SHA : les tags de trivy-action ont été compromis en mars 2026.
-      - name: Scan de vulnérabilités (bloquant sur CRITICAL)
+      - name: Scan de vulnérabilités (bloquant dès HIGH)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: contrats:ci
           format: table
           exit-code: "1"
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
