@@ -51,7 +51,7 @@ x-app-env: &app-env
   APP_ORIGIN: ${APP_ORIGIN:-${APP_URL}}
   PORTAL_URL: ${PORTAL_URL:-${APP_URL}}
   # Nombre de sauts ou IP/CIDR du reverse proxy de confiance (X-Forwarded-*).
-  TRUST_PROXY: ${TRUST_PROXY:-1}
+  TRUST_PROXY: ${TRUST_PROXY:-false}
   # Base : rôles NON-propriétaires (RLS active). Le superutilisateur n'est
   # donné qu'au job migrate ; l'utiliser ici désactiverait le cloisonnement.
   DATABASE_URL_APP: postgresql://lsi_app:${LSI_APP_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-lsi_contrats}

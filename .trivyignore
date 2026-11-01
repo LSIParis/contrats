@@ -2,12 +2,4 @@
 # Chaque entrée : justification, et date d'expiration (exp:) qui force à la
 # réexaminer — passée cette date, le scan échoue de nouveau.
 
-# @fastify/middie 8.3.3 (dépendance de @nestjs/platform-fastify 10) :
-# contournement d'une authentification faite par MIDDLEWARE dans des portées
-# de plugins enfants. Non exploitable ici : l'application n'enregistre aucun
-# middleware (ni MiddlewareConsumer, ni app.use) ; l'authentification passe
-# exclusivement par les guards globaux (ScopeGuard, ClientPortalGuard,
-# ApiClientGuard). Correctif définitif : NestJS 11 / Fastify 5 (middie 9),
-# migration suivie dans RESTITUTION.md.
-CVE-2026-6270 exp:2026-12-31
 

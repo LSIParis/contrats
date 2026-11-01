@@ -49,11 +49,11 @@ export class PortalAuthController {
     if (!result) {
       // Lien expiré ou déjà utilisé (§14.2) : redirection visible côté front,
       // pas de JSON — le lien magique est ouvert par le navigateur (GET direct).
-      void res.redirect(302, `${appUrl}/portal/login?error=lien`);
+      void res.redirect(`${appUrl}/portal/login?error=lien`, 302);
       return;
     }
     setSessionCookie(res, result.sessionId, result.ttl);
-    void res.redirect(302, `${appUrl}/portal/contracts`);
+    void res.redirect(`${appUrl}/portal/contracts`, 302);
   }
 
   @Public()

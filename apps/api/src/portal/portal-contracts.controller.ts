@@ -61,7 +61,7 @@ export class PortalContractsController {
   @Get('contracts/:id/sign')
   async sign(@CurrentScope() scope: Scope, @Param('id', ParseUUIDPipe) id: string, @Res() res: FastifyReply) {
     const url = await this.portal.signRedirectUrl(scope, id);
-    void res.redirect(302, url);
+    void res.redirect(url, 302);
   }
 
   @Get('me')

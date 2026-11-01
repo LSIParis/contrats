@@ -97,10 +97,8 @@ approbation obligatoire des déploiements de production.
    `write:packages` de la session GitHub CLI (révocation de l'application OAuth).
 6. **Préproduction** (`staging`) à mettre en place : aujourd'hui, une fusion sur `main` publie
    l'image sans la déployer.
-7. **Novembre 2026 (avant le 2026-12-31)** : migration NestJS 11 / Fastify 5 / Prisma (les PR
-   Dependabot de versions majeures sont fermées dans ce but) et image d'exécution sans pnpm.
-   Le **passage à Node 26 LTS** est livré à part, avant cette migration (amendement du brief,
-   `00-architecture.md` V2-H71 : support jusqu'au 2029-04-30 contre 2027-04-30 pour Node 22).
+7. **Novembre 2026** : **Node 26 LTS** et **NestJS 11 / Fastify 5** livrés séparément (amendement
+   du brief, `00-architecture.md` V2-H71). Restent Prisma et l'image d'exécution sans pnpm.
 8. ~~DNS~~ : documenté (`09-exploitation.md` §5.1 : zone Cloudflare, `contrats` en *DNS only* vers le proxy `51.91.98.38`, relais WireGuard vers `10.99.0.2:3001`).
 9. **Types de contrats et grilles par durée d'engagement** (`13-types-contrats.md`, migration 34) : après déploiement, `pnpm seed:contract-kinds` (ou `SEED_PROPOSAL_TEMPLATES=true`), saisie des grilles (écran ou CSV), puis contenu contractuel de chaque type à fournir (§5).
 
@@ -133,10 +131,8 @@ approbation obligatoire des déploiements de production.
   pas de liste des liens d'accès par destinataire d'une proposition (l'historique d'envoi en tient lieu).
 - Éditeur de texte des propositions en Markdown (pas de conversion HTML ↔ Markdown avec perte).
 
-- **Vulnérabilités acceptées jusqu'au 2026-12-31** (`.trivyignore`, justifiées, le scan échoue de
-  nouveau après cette date) : `@fastify/middie` 8 (NestJS 10, aucun middleware utilisé) et `tar` 6
-  embarqué par pnpm 9 (pnpm n'y sert que de lanceur). À traiter d'ici là : **migration NestJS 11 /
-  Fastify 5**, et lanceurs `node` directs dans la stack (image d'exécution sans pnpm).
+- **Aucune vulnérabilité acceptée** dans `.trivyignore` depuis NestJS 11 / Fastify 5. Reste à
+  faire : lanceurs `node` directs dans la stack (image d'exécution sans pnpm).
 - L'image ne contient plus que les dépendances de production (outils de test et de build retirés).
 
 ## 8. Interface

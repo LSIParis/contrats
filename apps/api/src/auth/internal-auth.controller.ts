@@ -19,7 +19,7 @@ export class InternalAuthController {
   @Get('login')
   async login(@Res() res: FastifyReply) {
     const url = await this.oidc.begin();
-    void res.redirect(302, url);
+    void res.redirect(url, 302);
   }
 
   /** Retour d'Entra : valide, ouvre la session, revient sur l'app. */
@@ -35,9 +35,9 @@ export class InternalAuthController {
     if (!result) {
       // Échec : on renvoie vers l'app avec un marqueur d'erreur, pas une
       // page blanche. Redirect construit depuis une constante (pas d'entrée).
-      return res.redirect(302, `${appUrl}/login?error=auth_failed`);
+      return res.redirect(`${appUrl}/login?error=auth_failed`, 302);
     }
     setSessionCookie(res, result.sessionId, result.ttl);
-    return res.redirect(302, `${appUrl}/dashboard`);
+    return res.redirect(`${appUrl}/dashboard`, 302);
   }
 }
