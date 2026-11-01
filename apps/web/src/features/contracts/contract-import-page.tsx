@@ -215,7 +215,7 @@ export function BatchResults({ items }: { items: BatchResultItem[] }) {
             <td>
               {it.id && (
                 <Link to={`/contracts/${it.id}/import`} className="text-primary hover:underline">
-                  Valider l’import<span className="sr-only"> de {it.filename}</span>
+                  Valider l’import{' '}<span className="sr-only">de {it.filename}</span>
                 </Link>
               )}
             </td>
