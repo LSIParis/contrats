@@ -93,10 +93,15 @@ export function contentSecurityPolicy(docusealUrl = process.env.DOCUSEAL_SIGN_UR
   ].join('; ');
 }
 
-function parseTrustProxy(v: string | undefined): boolean | number | string {
+export function parseTrustProxy(v: string | undefined): boolean | string {
   if (!v || v === 'false') return false;
   if (v === 'true') return true;
-  if (/^\d+$/.test(v)) return Number(v);
+  // Fastify 5 ne fait plus confiance à aucun proxy si on lui donne un nombre de
+  // sauts, sans le signaler : `req.ip` deviendrait l'IP du proxy pour l'audit et
+  // la limitation de débit. Mieux vaut refuser de démarrer.
+  if (/^\d+$/.test(v)) {
+    throw new Error(`TRUST_PROXY=${v} : un nombre de sauts n'est plus accepté, indiquer l'IP ou le CIDR du proxy.`);
+  }
   return v; // liste d'IP / CIDR
 }
 
