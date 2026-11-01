@@ -77,7 +77,7 @@ export function ContractsPage() {
                     <StatusBadge status={c.status} />
                     {c.status === 'IMPORTED_PENDING_VALIDATION' && (
                       <Link to={`/contracts/${c.id}/import`} className="text-13 text-primary hover:underline">
-                        Valider l’import<span className="sr-only"> {c.reference}</span>
+                        Valider l’import{' '}<span className="sr-only">{c.reference}</span>
                       </Link>
                     )}
                   </span>
