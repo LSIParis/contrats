@@ -47,7 +47,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.15",
-    "@testcontainers/postgresql": "^10.28.0",
+    "@testcontainers/postgresql": "^12.2.1",
     "@testcontainers/redis": "^12.1.0",
     "@types/node": "^26.0.0",
     "@types/sanitize-html": "^2.16.2",
