@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { editorKit } from '../../ui/editor-kit';
 
 export function ContentEditor({
   initialHtml, saving, onSave, onPreview,
@@ -14,7 +15,7 @@ export function ContentEditor({
   // « Enregistrer » envoie cet état — pas besoin d'interroger l'éditeur au clic.
   const [html, setHtml] = useState(initialHtml);
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit.configure(editorKit)],
     content: initialHtml,
     onUpdate: ({ editor }) => setHtml(editor.getHTML()),
   });
