@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10.13.2",
-    "@types/node": "^22.9.0",
+    "@types/node": "^26.0.0",
     "eslint": "^9",
     "testcontainers": "^10.13.2",
     "tsx": "^4.23.15",
