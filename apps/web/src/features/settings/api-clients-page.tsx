@@ -207,7 +207,7 @@ function CreateClientDialog({ onClose, onCreated }: { onClose: () => void; onCre
         <Input id={`${uid}-desc`} value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1 text-xs+ font-button text-ink-muted">Scopes (au moins un)</legend>
+        <legend className="mb-1 text-xs-plus font-button text-ink-muted">Scopes (au moins un)</legend>
         {API_SCOPES.map(([s, d]) => (
           <label key={s} className="inline-flex items-start gap-2 text-sm">
             <input

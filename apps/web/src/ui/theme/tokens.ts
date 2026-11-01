@@ -119,7 +119,7 @@ export const font = {
   family: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   /** Échelle (px). */
-  size: { '2xs': '11px', xs: '12px', 'xs+': '12.5px', sm: '13px', base: '14px', md: '15px', lg: '17px', xl: '18px', '2xl': '22px', '3xl': '26px' },
+  size: { '2xs': '11px', xs: '12px', 'xs-plus': '12.5px', sm: '13px', base: '14px', md: '15px', lg: '17px', xl: '18px', '2xl': '22px', '3xl': '26px' },
   /** Graisses nommées (550 boutons/onglets, 650 titres, 680 en-tête de fiche). */
   weight: { regular: 400, medium: 500, button: 550, semibold: 600, title: 650, heading: 680, bold: 700 },
 } as const;

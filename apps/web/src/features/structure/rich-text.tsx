@@ -17,7 +17,7 @@ export function RichText({ label, value, onChange }: { label: string; value: str
         'aria-label': label,
         role: 'textbox',
         'aria-multiline': 'true',
-        class: 'min-h-[140px] outline-none',
+        class: 'min-h-[140px] outline-hidden',
       },
     },
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),

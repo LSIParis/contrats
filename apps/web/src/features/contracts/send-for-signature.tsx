@@ -83,7 +83,7 @@ export function SendForSignature({
             </Field>
           </div>
           <fieldset className="flex flex-col gap-1 text-sm">
-            <legend className="mb-1 text-xs+ font-button text-ink-muted">Mode de signature</legend>
+            <legend className="mb-1 text-xs-plus font-button text-ink-muted">Mode de signature</legend>
             <label className="flex items-center gap-2">
               <input type="radio" name="sig-delivery" checked={delivery === 'EMAIL'} onChange={() => setDelivery('EMAIL')} />
               Lien envoyé par e-mail à chaque signataire

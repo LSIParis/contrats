@@ -23,7 +23,7 @@ const TERMINAL = ['CONVERTED', 'DECLINED', 'WITHDRAWN'];
 function Row({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{label}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{label}</label>
       {children}
       {hint && <p className="text-xs text-ink-faint">{hint}</p>}
     </div>

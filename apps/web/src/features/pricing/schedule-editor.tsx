@@ -344,7 +344,7 @@ function LineEditor({
             </Select>
           </Field>
           <div role="group" aria-label="Ajustements (remises en cascade)" className="flex flex-col gap-1">
-            <span className="text-xs+ font-button text-ink-muted">Ajustements (remises en cascade)</span>
+            <span className="text-xs-plus font-button text-ink-muted">Ajustements (remises en cascade)</span>
             {adjustRules.length === 0 && <span className="text-13 text-ink-faint">Aucune règle de remise au catalogue.</span>}
             {adjustRules.map((r) => (
               <label key={r.code} className="inline-flex items-center gap-1.5 text-sm">

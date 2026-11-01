@@ -97,14 +97,14 @@ export function ProposalPipelinePage() {
       <Card>
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex min-w-[200px] flex-col gap-[5px]">
-            <label htmlFor="pipe-commercial" className="text-xs+ font-button text-ink-muted">Commercial</label>
+            <label htmlFor="pipe-commercial" className="text-xs-plus font-button text-ink-muted">Commercial</label>
             <Select id="pipe-commercial" value={owner} onChange={(e) => setOwner(e.target.value)}>
               <option value="">Tous les commerciaux</option>
               {owners.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </Select>
           </div>
           <div className="flex min-w-[200px] flex-col gap-[5px]">
-            <label htmlFor="pipe-modele" className="text-xs+ font-button text-ink-muted">Modèle</label>
+            <label htmlFor="pipe-modele" className="text-xs-plus font-button text-ink-muted">Modèle</label>
             <Select id="pipe-modele" value={template} onChange={(e) => setTemplate(e.target.value)}>
               <option value="">Tous les modèles</option>
               {(templates.data?.items ?? []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -209,11 +209,11 @@ export function ProposalDashboardPage() {
       <Card>
         <form onSubmit={submit} className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-[5px]">
-            <label htmlFor="tb-du" className="text-xs+ font-button text-ink-muted">Du</label>
+            <label htmlFor="tb-du" className="text-xs-plus font-button text-ink-muted">Du</label>
             <Input id="tb-du" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div className="flex flex-col gap-[5px]">
-            <label htmlFor="tb-au" className="text-xs+ font-button text-ink-muted">Au</label>
+            <label htmlFor="tb-au" className="text-xs-plus font-button text-ink-muted">Au</label>
             <Input id="tb-au" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           <Button type="submit" variant="secondary">Appliquer</Button>

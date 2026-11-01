@@ -89,7 +89,7 @@ export function NewProposalDialog({ onClose, customers, canCreateCustomer }: { o
     >
       <form id="nouvelle-proposition" onSubmit={submit} className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-xs+ font-button text-ink-muted">Destinataire commercial</legend>
+          <legend className="mb-1 text-xs-plus font-button text-ink-muted">Destinataire commercial</legend>
           <div className="flex flex-wrap gap-4 text-sm">
             <label className="inline-flex items-center gap-2">
               <input type="radio" name="type-client" checked={mode === 'existing'} onChange={() => setMode('existing')} /> Client existant
@@ -142,7 +142,7 @@ export function NewProposalDialog({ onClose, customers, canCreateCustomer }: { o
 
         {mode === 'existing' && customerId && (contacts.data?.contacts.length ?? 0) > 0 && (
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1 text-xs+ font-button text-ink-muted">Destinataires (contacts du client)</legend>
+            <legend className="mb-1 text-xs-plus font-button text-ink-muted">Destinataires (contacts du client)</legend>
             {contacts.data!.contacts.map((c) => (
               <label key={c.id} className="inline-flex items-center gap-2 text-sm">
                 <input

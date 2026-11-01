@@ -19,7 +19,7 @@ export function LibraryPicker({ onClose, onPick }: { onClose: () => void; onPick
     <Modal open onClose={onClose} title="Bibliothèque de contenus" width={720}>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="biblio-filtre" className="text-xs+ font-button text-ink-muted">Rechercher</label>
+          <label htmlFor="biblio-filtre" className="text-xs-plus font-button text-ink-muted">Rechercher</label>
           <Input id="biblio-filtre" value={filter} onChange={(e) => setFilter(e.target.value)} />
         </div>
         {q.isLoading ? <Spinner /> : q.error ? <ErrorNote>{errorMessage(q.error)}</ErrorNote> : items.length === 0 ? (

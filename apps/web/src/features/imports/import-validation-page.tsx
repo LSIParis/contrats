@@ -216,7 +216,7 @@ function InfoRow({ label, field, render }: { label: string; field: ProposedField
   return (
     <div className="border-b border-line py-2 last:border-b-0">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-xs+ font-button text-ink-muted">{label}</span>
+        <span className="text-xs-plus font-button text-ink-muted">{label}</span>
         <span className="text-sm text-ink">{field ? render(field.value) : '—'}</span>
       </div>
       <SourceInfo source={{ field }} />

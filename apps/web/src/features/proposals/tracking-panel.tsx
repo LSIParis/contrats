@@ -62,7 +62,7 @@ function TrackingBody({ t, detail, title }: { t: Tracking; detail: ProposalDetai
           <table className="w-full border-collapse text-sm">
             <caption className="mb-2 text-left text-15 font-title text-ink">Lecture par section</caption>
             <thead>
-              <tr className="border-b border-line text-left text-xs+ text-ink-muted">
+              <tr className="border-b border-line text-left text-xs-plus text-ink-muted">
                 <th scope="col" className="py-2 pr-3 font-button">Section</th><th scope="col" className="py-2 pr-3 text-right font-button">Ouvertures</th>
                 <th scope="col" className="py-2 pr-3 text-right font-button">Temps cumulé</th><th scope="col" className="py-2 font-button">Dernière lecture</th>
               </tr>

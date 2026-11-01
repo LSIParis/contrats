@@ -85,14 +85,14 @@ function ReplyBox({ proposalId, parent, sections }: { proposalId: string; parent
       {!parent && <p className="text-13 font-button text-ink">Nouveau message au client</p>}
       {!parent && sections && (
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="message-section" className="text-xs+ font-button text-ink-muted">Section concernée</label>
+          <label htmlFor="message-section" className="text-xs-plus font-button text-ink-muted">Section concernée</label>
           <Select id="message-section" className="max-w-[320px]" value={sectionKey} onChange={(e) => setSectionKey(e.target.value)}>
             <option value="">Proposition entière</option>
             {sections.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
           </Select>
         </div>
       )}
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{parent ? 'Votre réponse' : 'Message'}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{parent ? 'Votre réponse' : 'Message'}</label>
       <textarea id={id} className="min-h-[72px] w-full rounded border border-line-strong px-2.5 py-2 text-sm" value={body} onChange={(e) => setBody(e.target.value)} />
       <ErrorNote>{errorMessage(send.error)}</ErrorNote>
       <div className="flex gap-2">

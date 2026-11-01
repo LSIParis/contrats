@@ -197,7 +197,7 @@ function SectionComments({ token, sectionKey, comments, onPosted }: { token: str
         </Button>
       ) : (
         <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2">
-          <label htmlFor={id} className="text-xs+ font-button text-ink-muted">Votre question sur cette section</label>
+          <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">Votre question sur cette section</label>
           <textarea id={id} rows={3} maxLength={5000} required value={body} onChange={(e) => setBody(e.target.value)} className="w-full rounded border border-line-strong bg-surface px-2.5 py-2 text-sm" />
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={busy || !body.trim()}>Envoyer</Button>

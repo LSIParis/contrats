@@ -89,7 +89,7 @@ export function AccountChip({ name, detail }: { name: string; detail?: string })
 /** Zone de contenu (`.content`, `.content-inner`, l. 153-157). */
 export function PageContent({ children }: { children: ReactNode }) {
   return (
-    <main id="contenu" tabIndex={-1} className="flex-1 px-7 pb-10 pt-6 outline-none">
+    <main id="contenu" tabIndex={-1} className="flex-1 px-7 pb-10 pt-6 outline-hidden">
       <div className="mx-auto max-w-content">{children}</div>
     </main>
   );

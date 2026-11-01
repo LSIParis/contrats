@@ -34,7 +34,12 @@ export default {
         danger: { DEFAULT: semantic.danger, bg: semantic.dangerBg, hover: semantic.dangerHover },
         info: { DEFAULT: semantic.info, bg: semantic.infoBg },
         // Messages d'erreur existants (`text-red-600`, `bg-red-600`) : rouge danger de la charte.
-        red: { 600: semantic.danger, 700: semantic.dangerHover },
+        red: { 300: '#FCA5A5', 600: semantic.danger, 700: semantic.dangerHover },
+        // Teintes de la palette par défaut encore utilisées : valeurs de Tailwind 3,
+        // que Tailwind 4 a déplacées (les contrastes vérifiés portent sur celles-ci).
+        amber: { 600: '#D97706', 700: '#B45309' },
+        blue: { 50: '#EFF6FF', 200: '#BFDBFE' },
+        green: { 600: '#16A34A', 700: '#15803D' },
       },
       borderColor: { DEFAULT: role.border },
       borderRadius: { DEFAULT: radius.sm, sm: radius.sm, md: radius.sm, lg: radius.md, xl: radius.lg, full: radius.full },
@@ -43,7 +48,7 @@ export default {
       fontWeight: { button: '550', title: '650', heading: '680' },
       fontSize: {
         '2xs': ['11px', '1.25'],
-        'xs+': ['12.5px', '1.5'],
+        'xs-plus': ['12.5px', '1.5'],
         '13': ['13px', '1.5'],
         '15': ['15px', '1.4'],
         '17': ['17px', '1.4'],

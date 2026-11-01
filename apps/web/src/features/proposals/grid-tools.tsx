@@ -81,7 +81,7 @@ export function GridTools({ detail, onDetail }: { detail: ProposalDetail; onDeta
 
       {choice && (
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-xs+ font-button text-ink-muted">Durées proposées au client (une par défaut)</legend>
+          <legend className="text-xs-plus font-button text-ink-muted">Durées proposées au client (une par défaut)</legend>
           <div className="flex flex-wrap gap-3">
             {(terms.data?.items ?? []).map((t) => (
               <span key={t.months} className="flex items-center gap-2 rounded border border-line px-2 py-1 text-sm">
