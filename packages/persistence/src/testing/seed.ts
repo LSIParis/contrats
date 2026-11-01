@@ -12,11 +12,11 @@
  * Ces helpers écrivent avec le rôle PROPRIÉTAIRE : ils préparent l'état,
  * ils ne sont pas sous test. Le code applicatif, lui, passe par lsi_app.
  */
-import { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
 import { runProposalTemplatesSeed } from '../../prisma/seed/proposal-templates/cli';
 import { seedContractTemplates } from '../seed/contract-templates.js';
 import { seedContractKinds } from '../seed/contract-kinds.js';
+import { createPrismaClient } from '../prisma-client.js';
 
 export interface CustomerFixture {
   id: string;
@@ -53,7 +53,7 @@ export async function assignAdminRole(
   userId: string,
   databaseUrl?: string,
 ): Promise<void> {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
   const roleId = uuidv7();
   await owner.$executeRawUnsafe(`
     INSERT INTO roles (id, tenant_id, code, label)
@@ -80,7 +80,7 @@ export async function assignAdminRole(
  * d'archivage exposée par l'API à ce jour.
  */
 export async function archiveCustomer(customerId: string, databaseUrl?: string): Promise<void> {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
   await owner.$executeRawUnsafe(
     `UPDATE customers SET status = 'ARCHIVED', updated_at = now() WHERE id = '${customerId}'`,
   );
@@ -99,7 +99,7 @@ export async function archiveCustomer(customerId: string, databaseUrl?: string):
  * identiques pour tout ce qui naît dans la même fenêtre de ~65 s.
  */
 export async function seedTwoCustomers(databaseUrl?: string): Promise<TwoCustomerFixture> {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
 
   const tenantId = uuidv7();
   const amUserId = uuidv7();
@@ -190,7 +190,7 @@ export async function seedTwoCustomers(databaseUrl?: string): Promise<TwoCustome
  * Prisma) pour un tenant de test. Rôle propriétaire, comme le seed en production.
  */
 export async function seedProposalTemplates(tenantSlug: string, args: string[] = [], databaseUrl?: string) {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
   try {
     return await runProposalTemplatesSeed(owner, [`--tenant=${tenantSlug}`, ...args]);
   } finally {
@@ -200,7 +200,7 @@ export async function seedProposalTemplates(tenantSlug: string, args: string[] =
 
 /** Les quatre contrats types livrés pour les propositions (brouillons), pour un tenant de test. */
 export async function seedProposalContractTemplates(tenantSlug: string, databaseUrl?: string) {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
   try {
     return await seedContractTemplates(owner, { slug: tenantSlug });
   } finally {
@@ -210,7 +210,7 @@ export async function seedProposalContractTemplates(tenantSlug: string, database
 
 /** Types de contrats prédéfinis et durées d'engagement (pnpm seed:contract-kinds). */
 export async function seedContractKindsFor(tenantSlug: string, databaseUrl?: string) {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
   try {
     return await seedContractKinds(owner, { slug: tenantSlug });
   } finally {
@@ -227,7 +227,7 @@ export async function seedPublishedContractTemplate(
   slug: string,
   databaseUrl?: string,
 ): Promise<{ templateId: string; versionId: string }> {
-  const owner = new PrismaClient({ datasourceUrl: databaseUrl ?? process.env.DATABASE_URL });
+  const owner = createPrismaClient(databaseUrl ?? process.env.DATABASE_URL);
   const templateId = uuidv7();
   const versionId = uuidv7();
   try {

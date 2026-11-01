@@ -1,16 +1,17 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { withScope } from '../../src/scoped-client.js';
 import { adminScope } from '../../src/scope.js';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 let owner: PrismaClient;
 let fx: Fixture;
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
 });
 
@@ -248,7 +249,7 @@ describe('§12.3 — le rôle scheduler est borné', () => {
     const uri = new URL(process.env.DATABASE_URL!);
     uri.username = 'lsi_scheduler';
     uri.password = 'lsi_scheduler_test_pwd';
-    const sched = new PrismaClient({ datasourceUrl: uri.toString() });
+    const sched = createPrismaClient(uri.toString());
     return sched;
   }
 
@@ -322,7 +323,7 @@ describe('§11.4 — le rôle webhook est borné', () => {
     const uri = new URL(process.env.DATABASE_URL!);
     uri.username = 'lsi_webhook';
     uri.password = 'lsi_webhook_test_pwd';
-    const wh = new PrismaClient({ datasourceUrl: uri.toString() });
+    const wh = createPrismaClient(uri.toString());
     try {
       return await fn(wh);
     } finally {

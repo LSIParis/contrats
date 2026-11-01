@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
-import { PrismaClient } from '@prisma/client';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 export interface CustomerFixture {
   id: string;
@@ -43,7 +43,7 @@ export async function applyMigrations(): Promise<void> {
  * identiques pour tout ce qui naît dans la même fenêtre de ~65 s.
  */
 export async function seedTwoCustomers(): Promise<Fixture> {
-  const owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  const owner = createPrismaClient(process.env.DATABASE_URL);
   const now = 'now()';
 
   const tenantId = uuidv7();

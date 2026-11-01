@@ -35,7 +35,7 @@ echo "→ Rotation des mots de passe des rôles applicatifs…"
 # ⚠ Les mots de passe sont interpolés dans du SQL : ils NE DOIVENT PAS
 # contenir d'apostrophe. Recommandé : alphanumérique + symboles hors quotes,
 # ≥ 32 caractères. Générables par `openssl rand -base64 32 | tr -d '/+='`.
-cat <<SQL | pnpm --filter @lsi/persistence exec prisma db execute --url "$DATABASE_URL" --stdin
+cat <<SQL | pnpm --filter @lsi/persistence exec prisma db execute --stdin
 ALTER ROLE lsi_app       LOGIN PASSWORD '${LSI_APP_PASSWORD}';
 ALTER ROLE lsi_webhook   LOGIN PASSWORD '${LSI_WEBHOOK_PASSWORD}';
 ALTER ROLE lsi_scheduler LOGIN PASSWORD '${LSI_SCHEDULER_PASSWORD}';

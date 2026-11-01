@@ -12,12 +12,12 @@
  * fichier invalide ou un cas de contrôle en échec fait échouer le seed AVANT
  * toute écriture — donc le job de migration, donc le déploiement.
  */
-import { PrismaClient } from '@prisma/client';
 import { runProposalTemplatesSeed } from './seed/proposal-templates/cli';
+import { createPrismaClient } from '../src/prisma-client.js';
 
 const argv = process.argv.slice(2);
 const only = argv.find((a) => a.startsWith('--only='))?.split('=')[1];
-const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+const prisma = createPrismaClient(process.env.DATABASE_URL);
 
 try {
   if (!only || only === 'propositions') {

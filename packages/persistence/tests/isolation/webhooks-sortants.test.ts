@@ -1,11 +1,12 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import {
   withScope, internalScope, adminScope, clientScope, tenantSystemScope,
   publishWebhookEvent, findDueWebhookDeliveries,
 } from '../../src/index.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 /**
  * Garanties de la migration 23 (webhooks sortants) — testées EN BASE, sous
@@ -18,7 +19,7 @@ let fx2: Fixture;
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
   fx2 = await seedTwoCustomers();
 });

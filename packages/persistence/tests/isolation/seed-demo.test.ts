@@ -1,13 +1,14 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations } from '../support/fixtures.js';
 import { DEMO_CLAUSES, seedDemo } from '../../src/seed/demo.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 let owner: PrismaClient;
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
 });
 afterAll(() => owner.$disconnect());
 

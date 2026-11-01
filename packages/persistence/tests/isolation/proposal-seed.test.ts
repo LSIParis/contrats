@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import { runProposalTemplatesSeed } from '../../prisma/seed/proposal-templates/cli';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 /**
  * Seed des modèles de proposition (annexe C) sur une VRAIE base, via le dépôt
@@ -17,7 +18,7 @@ let tenantSlug: string;
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
   fx2 = await seedTwoCustomers();
   tenantSlug = (await owner.tenant.findUniqueOrThrow({ where: { id: fx.tenantId } })).slug;

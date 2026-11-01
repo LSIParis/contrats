@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import {
   withScope, internalScope, adminScope, clientScope, systemScope, tenantSystemScope, proposalLinkScope,
@@ -8,6 +8,7 @@ import {
   findProposalsToExpire,
 } from '../../src/index.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 /**
  * Garanties de la migration 31 (propositions commerciales), testées EN BASE
@@ -23,7 +24,7 @@ const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
   fx2 = await seedTwoCustomers();
 });

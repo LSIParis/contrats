@@ -18,6 +18,7 @@
 import { PrismaClient, type Prisma } from '@prisma/client';
 import { uuidv7 } from '../uuid.js';
 import { ALL_CLAUSES, CONTRACT_TEMPLATES } from './contract-templates-data.js';
+import { createPrismaClient } from '../prisma-client.js';
 
 const VAR_RE = /\{\{\s*([\w.]+)\s*\}\}/g;
 const varsOf = (html: string) => [...new Set([...html.matchAll(VAR_RE)].map((m) => m[1]!))].sort();
@@ -182,7 +183,7 @@ export async function upgradeContractTemplateClause(
 }
 
 async function main() {
-  const db = new PrismaClient({ datasourceUrl: process.env.SEED_DATABASE_URL ?? process.env.DATABASE_URL });
+  const db = createPrismaClient(process.env.SEED_DATABASE_URL ?? process.env.DATABASE_URL);
   try {
     const i = process.argv.indexOf('--upgrade');
     if (i > 0) {

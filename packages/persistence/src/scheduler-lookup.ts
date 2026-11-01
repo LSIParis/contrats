@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from './prisma-client.js';
 
 /**
  * Découverte des rappels dus. (§12.3)
@@ -18,7 +19,7 @@ let client: PrismaClient | null = null;
 function schedulerClient(): PrismaClient {
   if (!client) {
     const url = process.env.DATABASE_URL_SCHEDULER ?? buildSchedulerUrl();
-    client = new PrismaClient({ datasourceUrl: url });
+    client = createPrismaClient(url);
   }
   return client;
 }

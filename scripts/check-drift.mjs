@@ -29,10 +29,10 @@ const r = spawnSync(
   [
     'exec', 'prisma', 'migrate', 'diff',
     '--from-migrations', 'prisma/migrations',
-    '--to-schema-datamodel', 'prisma/schema.prisma',
-    '--shadow-database-url', shadow,
+    '--to-schema', 'prisma/schema.prisma',
     '--exit-code',
   ],
+  // La base shadow est lue par prisma.config.ts dans SHADOW_DATABASE_URL.
   { cwd: persistence, stdio: 'inherit', shell: process.platform === 'win32' },
 );
 if (r.status === 2) console.error('\n✖ Dérive détectée : schema.prisma et les migrations divergent (voir le diff ci-dessus).');

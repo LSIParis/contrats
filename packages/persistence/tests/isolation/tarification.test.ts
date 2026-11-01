@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { applyMigrations, seedTwoCustomers, type Fixture } from '../support/fixtures.js';
 import { withScope, internalScope, adminScope, clientScope } from '../../src/index.js';
 import { uuidv7 } from '../../src/uuid.js';
+import { createPrismaClient } from '../../src/prisma-client.js';
 
 /**
  * Garanties de la migration 21 (tarification) — testées EN BASE, sous le
@@ -15,7 +16,7 @@ let other: Fixture; // second tenant
 
 beforeAll(async () => {
   await applyMigrations();
-  owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+  owner = createPrismaClient(process.env.DATABASE_URL);
   fx = await seedTwoCustomers();
   other = await seedTwoCustomers();
 });
