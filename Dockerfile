@@ -87,6 +87,10 @@ RUN rm -rf apps/web/node_modules apps/web/src
 # ---- image finale -----------------------------------------------------
 FROM base AS runtime
 
+# npm ne sert qu'à installer pnpm (étape base) : retiré de l'image finale, avec
+# ses dépendances embarquées que le scan signale (undici, brace-expansion).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 ARG APP_VERSION=dev
 ARG GIT_SHA=unknown
 ARG SOURCE_URL=https://github.com/LSIParis/contrats
