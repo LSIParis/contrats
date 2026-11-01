@@ -33,3 +33,6 @@ overrides:
   markdown-it@14: ^14.3.3
   source-map-js: ^1.2.2
   fast-uri@3: ^3.1.9
+  # Une seule version de Fastify, celle de @lsi/api : @nestjs/platform-fastify en
+  # épingle une plus ancienne, sans les derniers correctifs de sécurité.
+  fastify: 5.12.7

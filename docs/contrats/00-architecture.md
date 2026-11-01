@@ -13,7 +13,7 @@ en production partielle. La décision (validée par le propriétaire le
 
 | Existant conservé | Complété par la passe v2 |
 |---|---|
-| Monorepo pnpm : `apps/api` (NestJS 10), `apps/web` (React 18 + Vite + TanStack Query + TipTap + Tailwind), `packages/domain`, `packages/persistence` (Prisma 5) | Adaptateur HTTP **Fastify** (`@nestjs/platform-fastify`) à la place d'Express |
+| Monorepo pnpm : `apps/api` (NestJS 11), `apps/web` (React 18 + Vite + TanStack Query + TipTap + Tailwind), `packages/domain`, `packages/persistence` (Prisma 5) | Adaptateur HTTP **Fastify** (`@nestjs/platform-fastify`) à la place d'Express |
 | Isolation tenant → **client** par RLS PostgreSQL + FK composites + `withScope()` | Même modèle, étendu à toutes les nouvelles tables |
 | Machine à états pure (`packages/domain`) | États du brief ajoutés (§3) |
 | Journal d'audit chaîné par hash, append-only (révoqué au niveau SGBD) | Inchangé |
@@ -129,7 +129,7 @@ testée exhaustivement (`tests/isolation/permissions-matrix.test.ts`).
 
 | Sujet | Choix | Justification |
 |---|---|---|
-| HTTP | NestJS 10 sur Fastify 4 | brief (Fastify) + existant (NestJS, guard global deny-by-default) |
+| HTTP | NestJS 11 sur Fastify 5 | brief (Fastify) + existant (NestJS, guard global deny-by-default) |
 | Validation | Zod 4 pour tout nouveau code ; class-validator conservé sur les DTO existants | Zod est la source de l'OpenAPI ; migrer 20 DTO existants n'apporte rien |
 | OpenAPI | `z.toJSONSchema()` (Zod 4 natif) → document 3.1 assemblé à la main, servi à `/api/v1/openapi.json`, doc navigable auto-hébergée `/api/v1/docs` | aucune dépendance CDN |
 | Client TS | `openapi-typescript` + petit wrapper `fetch` → `packages/contrats-client` (`@lsi/contrats-client`) | publiable sur GitHub Packages |
