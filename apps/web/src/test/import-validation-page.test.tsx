@@ -98,7 +98,7 @@ test('affiche l’origine hors plateforme, l’empreinte SHA-256, l’importateu
   expect(screen.getByText('EXTERNAL_WET_SIGNATURE')).toBeInTheDocument();
   expect(screen.getByText(/utilisateur u-import, le/)).toBeInTheDocument();
   // Document à gauche : original affiché, bascule vers la copie OCR.
-  expect(screen.getByTitle(/Document original : dupont-2019.pdf/)).toBeInTheDocument();
+  expect(await screen.findByTitle(/Document original : dupont-2019.pdf/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Copie OCR recherchable' }));
   expect(screen.getByTitle(/Copie OCR recherchable de dupont-2019.pdf/)).toHaveAttribute('src', '/v1/contracts/k1/import/ocr.pdf');
 });
