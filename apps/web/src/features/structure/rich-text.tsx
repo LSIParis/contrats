@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { editorKit } from '../../ui/editor-kit';
 
 /**
  * Éditeur riche (TipTap) d'un fragment HTML : clause ou annexe. Le HTML est
@@ -9,7 +10,7 @@ import StarterKit from '@tiptap/starter-kit';
  */
 export function RichText({ label, value, onChange }: { label: string; value: string; onChange: (html: string) => void }) {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit.configure(editorKit)],
     content: value,
     editorProps: {
       attributes: {
@@ -24,7 +25,7 @@ export function RichText({ label, value, onChange }: { label: string; value: str
 
   // Contenu remplacé de l'extérieur (suggestion IA reprise, annulation) : on resynchronise.
   useEffect(() => {
-    if (editor && !editor.isFocused && editor.getHTML() !== value) editor.commands.setContent(value, false);
+    if (editor && !editor.isFocused && editor.getHTML() !== value) editor.commands.setContent(value, { emitUpdate: false });
   }, [editor, value]);
 
   const tb = 'rounded border border-line-strong bg-surface px-2 py-1 text-xs text-ink hover:bg-slate-100';

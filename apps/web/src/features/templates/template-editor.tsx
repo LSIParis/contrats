@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { editorKit } from '../../ui/editor-kit';
 
 interface Props {
   initialHtml: string;
@@ -14,6 +15,7 @@ export function TemplateEditor({ initialHtml, onChange, onEmptyChange, inject }:
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
+        ...editorKit,
         heading: { levels: [1, 2, 3] },
         horizontalRule: false,
         codeBlock: false,
@@ -40,7 +42,7 @@ export function TemplateEditor({ initialHtml, onChange, onEmptyChange, inject }:
   // Injection d'un brouillon (ex. IA) : recharge le contenu quand nonce change.
   useEffect(() => {
     if (!editor || !inject) return;
-    editor.commands.setContent(inject.html);
+    editor.commands.setContent(inject.html, { emitUpdate: false });
     onChange(editor.getHTML());
     onEmptyChange?.(editor.isEmpty);
   }, [inject?.nonce]);
