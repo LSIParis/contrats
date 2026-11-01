@@ -53,7 +53,7 @@ export function PricingTable({
           <legend className="px-1 text-sm font-title text-ink">Configurez votre offre</legend>
           {definition.choices.filter((c) => c.editableByClient).map((c) => (
             <div key={c.key} role="radiogroup" aria-labelledby={`choix-${c.key}`} className="flex flex-col gap-2">
-              <span id={`choix-${c.key}`} className="text-xs+ font-button text-ink-muted">{c.label}</span>
+              <span id={`choix-${c.key}`} className="text-xs-plus font-button text-ink-muted">{c.label}</span>
               <div className="flex flex-wrap gap-2">
                 {c.options.map((o) => (
                   <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded border border-line-strong bg-surface px-3 py-2 text-sm">
@@ -72,7 +72,7 @@ export function PricingTable({
           ))}
           {optional.length > 0 && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs+ font-button text-ink-muted">Options</span>
+              <span className="text-xs-plus font-button text-ink-muted">Options</span>
               {optional.map((l) => (
                 <div key={l.key} className="flex flex-col gap-1">
                   <label className="flex cursor-pointer items-start gap-2 text-sm">
@@ -122,7 +122,7 @@ export function PricingTable({
         <table className="w-full min-w-[520px] border-collapse text-sm">
           <caption className="sr-only">Détail du prix (montants hors taxes)</caption>
           <thead>
-            <tr className="border-b border-line text-left text-xs+ text-ink-muted">
+            <tr className="border-b border-line text-left text-xs-plus text-ink-muted">
               <th scope="col" className="py-2 pr-3 font-button">Prestation</th>
               <th scope="col" className="py-2 pr-3 text-right font-button">Qté</th>
               <th scope="col" className="py-2 pr-3 font-button">Unité</th>
@@ -180,7 +180,7 @@ function QuantityInput({ line, value, onDraft, onCommit }: { line: DefLine; valu
   };
   return (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{line.label} ({line.unit})</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{line.label} ({line.unit})</label>
       <Input
         id={id}
         type="number"

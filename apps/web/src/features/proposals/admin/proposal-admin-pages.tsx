@@ -252,7 +252,7 @@ function TemplateMeta({ slug, t, canManage, onSaved }: { slug: string; t: Record
   };
   const text = (id: string, label: string, key: 'name' | 'description' | 'target' | 'validityDays') => (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{label}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{label}</label>
       <Input id={id} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
     </div>
   );
@@ -265,7 +265,7 @@ function TemplateMeta({ slug, t, canManage, onSaved }: { slug: string; t: Record
         {text('tpl-description', 'Description', 'description')}
         {text('tpl-validite', 'Validité (jours)', 'validityDays')}
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="tpl-mode" className="text-xs+ font-button text-ink-muted">Mode d’acceptation par défaut</label>
+          <label htmlFor="tpl-mode" className="text-xs-plus font-button text-ink-muted">Mode d’acceptation par défaut</label>
           <Select id="tpl-mode" value={f.acceptanceMode} onChange={(e) => setF({ ...f, acceptanceMode: e.target.value })}>
             <option value="DOCUSEAL_SIGNATURE">{ACCEPTANCE_MODE_LABELS.DOCUSEAL_SIGNATURE}</option>
             <option value="CLICK_ACCEPT">{ACCEPTANCE_MODE_LABELS.CLICK_ACCEPT}</option>
@@ -338,7 +338,7 @@ function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-warn">Un prix modifié repasse « à valider » : il devra être validé (écran « Prix à valider ») avant qu’une proposition qui le retient puisse partir. Le modèle devient propre au tenant (le seed ne le réécrira plus).</p>
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="ligne-libelle" className="text-xs+ font-button text-ink-muted">Libellé</label>
+          <label htmlFor="ligne-libelle" className="text-xs-plus font-button text-ink-muted">Libellé</label>
           <Input id="ligne-libelle" value={label} onChange={(e) => setLabel(e.target.value)} />
         </div>
         {Object.keys(values).map((k) => {
@@ -346,13 +346,13 @@ function LinePriceDialog({ slug, line, choices, onClose, onSaved }: {
           const optLabel = choice?.options.find((o) => o.value === k)?.label ?? k;
           return (
             <div key={k} className="flex flex-col gap-[5px]">
-              <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{k ? `Prix HT (€) — ${optLabel}` : 'Prix HT (€)'}</label>
+              <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{k ? `Prix HT (€) — ${optLabel}` : 'Prix HT (€)'}</label>
               <Input id={id} inputMode="decimal" value={values[k]} onChange={(e) => setValues({ ...values, [k]: e.target.value })} />
             </div>
           );
         })}
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="ligne-source" className="text-xs+ font-button text-ink-muted">Source du prix</label>
+          <label htmlFor="ligne-source" className="text-xs-plus font-button text-ink-muted">Source du prix</label>
           <Input id="ligne-source" value={source} onChange={(e) => setSource(e.target.value)} />
         </div>
         <HtmlField label="Description" value={description} onChange={setDescription} hint="Affichée sous la ligne (sans effet sur le prix ni sur sa validation)." />
@@ -429,7 +429,7 @@ function LibraryDialog({ item, onClose }: { item: LibraryItem | null; onClose: (
   const title = item ? `Modifier « ${item.title} »` : 'Nouveau contenu';
   const field = (id: string, label: string, key: 'key' | 'title' | 'folder', hint?: string) => (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{label}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{label}</label>
       <Input id={id} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
       {hint && <p className="text-xs text-ink-faint">{hint}</p>}
     </div>
@@ -447,7 +447,7 @@ function LibraryDialog({ item, onClose }: { item: LibraryItem | null; onClose: (
         {field('lib-titre', 'Titre', 'title')}
         {field('lib-dossier', 'Dossier', 'folder')}
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="lib-texte" className="text-xs+ font-button text-ink-muted">Texte (Markdown)</label>
+          <label htmlFor="lib-texte" className="text-xs-plus font-button text-ink-muted">Texte (Markdown)</label>
           <textarea id="lib-texte" className="min-h-[200px] w-full rounded border border-line-strong px-3 py-2 font-mono text-13" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
         </div>
         <label className="inline-flex items-center gap-2 text-sm">
@@ -508,11 +508,11 @@ export function TermsPage() {
         <Card title="Publier une nouvelle version">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-[5px]">
-              <label htmlFor="cgv-titre" className="text-xs+ font-button text-ink-muted">Titre de la version</label>
+              <label htmlFor="cgv-titre" className="text-xs-plus font-button text-ink-muted">Titre de la version</label>
               <Input id="cgv-titre" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="flex flex-col gap-[5px]">
-              <label htmlFor="cgv-texte" className="text-xs+ font-button text-ink-muted">Texte des CGV (Markdown)</label>
+              <label htmlFor="cgv-texte" className="text-xs-plus font-button text-ink-muted">Texte des CGV (Markdown)</label>
               <textarea id="cgv-texte" className="min-h-[240px] w-full rounded border border-line-strong px-3 py-2 font-mono text-13" value={body} onChange={(e) => setBody(e.target.value)} />
             </div>
             <div><Button disabled={title.trim().length < 3 || body.trim().length < 20} onClick={() => { publish.reset(); setConfirm(true); }}>Publier une nouvelle version</Button></div>

@@ -121,12 +121,12 @@ function AiDraftDialog({ onClose, onDone }: { onClose: () => void; onDone: (d: P
         <form id="ia-redaction" onSubmit={submit} className="flex flex-col gap-3">
           <AiPrivacyNotice provider={ai.provider} />
           <div className="flex flex-col gap-[5px]">
-            <label htmlFor="ia-notes" className="text-xs+ font-button text-ink-muted">Prise de notes</label>
+            <label htmlFor="ia-notes" className="text-xs-plus font-button text-ink-muted">Prise de notes</label>
             <textarea id="ia-notes" className="min-h-[140px] w-full rounded border border-line-strong px-3 py-2 text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} />
             <p className="text-xs text-ink-faint">20 caractères au moins : besoins, parc, enjeux exprimés par le client.</p>
           </div>
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1 text-xs+ font-button text-ink-muted">Sections à rédiger</legend>
+            <legend className="mb-1 text-xs-plus font-button text-ink-muted">Sections à rédiger</legend>
             {SECTIONS.map(([k, label]) => (
               <label key={k} className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={sections.includes(k)} onChange={(e) => setSections((s) => (e.target.checked ? SECTIONS.map(([x]) => x).filter((x) => x === k || s.includes(x)) : s.filter((x) => x !== k)))} />
@@ -141,7 +141,7 @@ function AiDraftDialog({ onClose, onDone }: { onClose: () => void; onDone: (d: P
             </label>
             {research && (
               <div className="flex flex-col gap-[5px]">
-                <label htmlFor="ia-site" className="text-xs+ font-button text-ink-muted">Site web de l’entreprise</label>
+                <label htmlFor="ia-site" className="text-xs-plus font-button text-ink-muted">Site web de l’entreprise</label>
                 <Input id="ia-site" type="url" placeholder="https://" value={website} onChange={(e) => setWebsite(e.target.value)} />
               </div>
             )}

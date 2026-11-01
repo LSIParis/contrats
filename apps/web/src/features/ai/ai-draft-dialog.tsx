@@ -84,7 +84,7 @@ export function AiDraftDialog({ contractId, provider, disabledReason, hasClauses
               <Input id="ai-type" value={contractType} maxLength={200} onChange={(e) => setContractType(e.target.value)} />
             </Field>
             <fieldset className="flex flex-col gap-1 text-sm">
-              <legend className="mb-1 text-xs+ font-button text-ink-muted">Clauses existantes</legend>
+              <legend className="mb-1 text-xs-plus font-button text-ink-muted">Clauses existantes</legend>
               <label className="flex items-center gap-2">
                 <input type="radio" name="ai-mode" value="append" checked={mode === 'append'} onChange={() => setMode('append')} />
                 Ajouter les clauses générées à la suite des clauses existantes

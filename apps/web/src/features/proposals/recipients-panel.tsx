@@ -65,7 +65,7 @@ export function RecipientsPanel({ detail, me, onDetail }: { detail: ProposalDeta
             <table className="w-full border-collapse text-sm">
               <caption className="sr-only">Destinataires de la proposition</caption>
               <thead>
-                <tr className="border-b border-line text-left text-xs+ text-ink-muted">
+                <tr className="border-b border-line text-left text-xs-plus text-ink-muted">
                   <th scope="col" className="py-2 pr-3 font-button">Nom</th><th scope="col" className="py-2 pr-3 font-button">E-mail</th>
                   <th scope="col" className="py-2 pr-3 font-button">Rôle</th><th scope="col" className="py-2 pr-3 font-button">Ordre</th>
                   <th scope="col" className="py-2 pr-3 font-button">Dernier envoi</th><th scope="col" className="py-2"><span className="sr-only">Actions</span></th>
@@ -178,7 +178,7 @@ function AddRecipient({ detail, onDetail }: { detail: ProposalDetail; onDetail: 
   };
   const input = (id: string, lbl: string, key: 'fullName' | 'email' | 'jobTitle', type = 'text') => (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{lbl}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{lbl}</label>
       <Input id={id} type={type} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
     </div>
   );
@@ -187,7 +187,7 @@ function AddRecipient({ detail, onDetail }: { detail: ProposalDetail; onDetail: 
       <p className="text-13 font-button text-ink">Ajouter un destinataire</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="dest-contact" className="text-xs+ font-button text-ink-muted">Contact du client</label>
+          <label htmlFor="dest-contact" className="text-xs-plus font-button text-ink-muted">Contact du client</label>
           <Select id="dest-contact" value={f.contactId} onChange={(e) => pick(e.target.value)}>
             <option value="">Saisie libre</option>
             {(contacts.data?.contacts ?? []).map((c) => <option key={c.id} value={c.id}>{c.firstName} {c.lastName} — {c.email}</option>)}
@@ -197,7 +197,7 @@ function AddRecipient({ detail, onDetail }: { detail: ProposalDetail; onDetail: 
         {input('dest-email', 'E-mail', 'email', 'email')}
         {input('dest-fonction', 'Fonction', 'jobTitle')}
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor="dest-role" className="text-xs+ font-button text-ink-muted">Rôle</label>
+          <label htmlFor="dest-role" className="text-xs-plus font-button text-ink-muted">Rôle</label>
           <Select id="dest-role" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as RecipientRole })}>
             <option value="SIGNER">Signataire</option>
             <option value="DECISION_MAKER">Décideur</option>

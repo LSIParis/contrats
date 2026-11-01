@@ -252,7 +252,7 @@ function CreateSubscriptionDialog({ eventTypes, onClose, onCreated }: { eventTyp
         <Input id={`${uid}-desc`} value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1 text-xs+ font-button text-ink-muted">Événements (au moins un)</legend>
+        <legend className="mb-1 text-xs-plus font-button text-ink-muted">Événements (au moins un)</legend>
         {eventTypes.map((t) => (
           <label key={t} className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" checked={types.includes(t)} onChange={(e) => setTypes((xs) => (e.target.checked ? [...xs, t] : xs.filter((x) => x !== t)))} />

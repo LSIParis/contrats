@@ -1,11 +1,16 @@
 @import './ui/theme/tokens.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@config '../tailwind.config.ts';
 
 /* Posée dans @layer base : toute classe utilitaire d'une page garde la priorité. */
 @layer base {
+  /* Valeurs par défaut que Tailwind 4 a changées et dont la charte dépend. */
+  *, ::after, ::before, ::backdrop, ::file-selector-button { border-color: var(--border); }
+  button:not(:disabled), [role='button']:not(:disabled) { cursor: pointer; }
+  input::placeholder, textarea::placeholder { color: var(--slate-400); opacity: 1; }
+  th, td { padding: 1px; }
+
   html, body, #root { height: 100%; }
   body {
     margin: 0;

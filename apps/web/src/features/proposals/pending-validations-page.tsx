@@ -91,7 +91,7 @@ export function PendingValidationsPage() {
             <table className="w-full border-collapse text-sm">
               <caption className="sr-only">Éléments à valider du modèle {name}</caption>
               <thead>
-                <tr className="border-b border-line text-left text-xs+ text-ink-muted">
+                <tr className="border-b border-line text-left text-xs-plus text-ink-muted">
                   <th scope="col" className="py-2 pr-3 font-button">Élément</th>
                   <th scope="col" className="py-2 pr-3 font-button">Nature</th>
                   <th scope="col" className="py-2 pr-3 font-button">Valeur</th>

@@ -13,7 +13,7 @@ en production partielle. La décision (validée par le propriétaire le
 
 | Existant conservé | Complété par la passe v2 |
 |---|---|
-| Monorepo pnpm : `apps/api` (NestJS 11), `apps/web` (React 18 + Vite + TanStack Query + TipTap + Tailwind), `packages/domain`, `packages/persistence` (Prisma 5) | Adaptateur HTTP **Fastify** (`@nestjs/platform-fastify`) à la place d'Express |
+| Monorepo pnpm : `apps/api` (NestJS 11), `apps/web` (React 19 + Vite + TanStack Query + TipTap + Tailwind), `packages/domain`, `packages/persistence` (Prisma 5) | Adaptateur HTTP **Fastify** (`@nestjs/platform-fastify`) à la place d'Express |
 | Isolation tenant → **client** par RLS PostgreSQL + FK composites + `withScope()` | Même modèle, étendu à toutes les nouvelles tables |
 | Machine à états pure (`packages/domain`) | États du brief ajoutés (§3) |
 | Journal d'audit chaîné par hash, append-only (révoqué au niveau SGBD) | Inchangé |

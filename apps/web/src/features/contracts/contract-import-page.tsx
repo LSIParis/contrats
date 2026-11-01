@@ -195,7 +195,7 @@ export function BatchResults({ items }: { items: BatchResultItem[] }) {
   const ok = items.filter((i) => i.id).length;
   return (
     <section aria-labelledby="batch-results-title" className="flex flex-col gap-3">
-      <h2 id="batch-results-title" ref={headingRef} tabIndex={-1} className="outline-none">
+      <h2 id="batch-results-title" ref={headingRef} tabIndex={-1} className="outline-hidden">
         Résultat de l’import : {ok} importé(s), {items.length - ok} refusé(s)
       </h2>
       <Table caption="Résultat par fichier" head={<tr><th>Fichier</th><th>Résultat</th><th>Action</th></tr>}>

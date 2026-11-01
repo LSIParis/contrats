@@ -96,7 +96,7 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         style={{ width: `min(${width}px, 100%)` }}
-        className={`anim-dialog flex flex-col gap-3 overflow-y-auto bg-surface p-5 shadow-pop outline-none ${
+        className={`anim-dialog flex flex-col gap-3 overflow-y-auto bg-surface p-5 shadow-pop outline-hidden ${
           centre ? 'max-h-[calc(100vh-48px)] rounded-lg' : 'h-full'
         }`}
       >

@@ -82,7 +82,7 @@ export function GridPanel({ kind, canManage }: { kind: ContractKindRow; canManag
       </p>
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-[5px]">
-          <label htmlFor={`${uid}-on`} className="text-xs+ font-button text-ink-muted">Prix en vigueur au</label>
+          <label htmlFor={`${uid}-on`} className="text-xs-plus font-button text-ink-muted">Prix en vigueur au</label>
           <Input id={`${uid}-on`} type="date" value={on} onChange={(e) => setOn(e.target.value)} />
         </div>
         <label className="inline-flex items-center gap-2 pb-2 text-sm">
@@ -198,7 +198,7 @@ function PriceInputs({ uid, terms, rows, onChange }: {
   if (terms.length === 0) return <p className="text-13 text-ink-faint">Aucune durée d’engagement active : en créer une dans « Types de contrats › Durées d’engagement ».</p>;
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-xs+ font-button text-ink-muted">Prix HT par durée (vide = non proposée)</legend>
+      <legend className="mb-1 text-xs-plus font-button text-ink-muted">Prix HT par durée (vide = non proposée)</legend>
       {terms.map((t) => (
         <div key={t.id} className="grid grid-cols-2 gap-2">
           <Field label={`Prix de vente — ${t.label}`} htmlFor={`${uid}-u-${t.months}`}>

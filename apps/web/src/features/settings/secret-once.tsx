@@ -40,7 +40,7 @@ export function SecretOnceDialog({
           </span>
         </p>
         {children}
-        <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{label}</label>
+        <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{label}</label>
         <div className="flex gap-2">
           <input
             id={id}

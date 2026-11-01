@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     // En dev, l'API tourne sur 3001 ; on proxifie /v1 pour rester same-origin.
     proxy: { '/v1': 'http://localhost:3001', '/api': 'http://localhost:3001', '/health': 'http://localhost:3001' },

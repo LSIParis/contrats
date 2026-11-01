@@ -33,7 +33,7 @@ export function Field({
       : children;
   return (
     <div className="flex min-w-0 flex-col gap-[5px]">
-      <label htmlFor={htmlFor} className="text-xs+ font-button text-ink-muted">{label}</label>
+      <label htmlFor={htmlFor} className="text-xs-plus font-button text-ink-muted">{label}</label>
       {control}
       {hint && <p id={hintId} className="text-xs text-ink-faint">{hint}</p>}
       {error && <p id={errorId} className="text-13 text-danger">{error}</p>}

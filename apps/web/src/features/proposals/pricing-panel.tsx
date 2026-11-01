@@ -93,7 +93,7 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
           <legend className="px-1 text-sm font-title text-ink">Configuration proposée au client</legend>
           {def.choices.map((ch) => (
             <div key={ch.key} role="radiogroup" aria-labelledby={`choix-${ch.key}`} className="flex flex-col gap-2">
-              <span id={`choix-${ch.key}`} className="text-xs+ font-button text-ink-muted">{ch.label}</span>
+              <span id={`choix-${ch.key}`} className="text-xs-plus font-button text-ink-muted">{ch.label}</span>
               <div className="flex flex-wrap gap-2">
                 {ch.options.map((o) => (
                   <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded border border-line-strong bg-surface px-3 py-1.5 text-sm">
@@ -107,7 +107,7 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
           ))}
           {optional.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs+ font-button text-ink-muted">Options facultatives</span>
+              <span className="text-xs-plus font-button text-ink-muted">Options facultatives</span>
               {optional.map((l) => (
                 <label key={l.key} className="inline-flex items-center gap-2 text-sm">
                   <input
@@ -132,7 +132,7 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
                 };
                 return (
                   <div key={l.key} className="flex flex-col gap-[5px]">
-                    <label htmlFor={id} className="text-xs+ font-button text-ink-muted">Quantité — {l.label}</label>
+                    <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">Quantité — {l.label}</label>
                     <Input id={id} type="number" inputMode="numeric" step={1} min={l.quantity!.min} {...(l.quantity!.max !== undefined ? { max: l.quantity!.max } : {})}
                       value={value} onChange={(e) => setQty((s) => ({ ...s, [l.key]: e.target.value }))} onBlur={commit}
                       onKeyDown={(e) => { if (e.key === 'Enter') commit(); }} />
@@ -163,7 +163,7 @@ export function PricingPanel({ detail, me, onDetail }: { detail: ProposalDetail;
         <table className="w-full min-w-[640px] border-collapse text-sm">
           <caption className="sr-only">Lignes retenues (montants HT)</caption>
           <thead>
-            <tr className="border-b border-line text-left text-xs+ text-ink-muted">
+            <tr className="border-b border-line text-left text-xs-plus text-ink-muted">
               <th scope="col" className="py-2 pr-3 font-button">Prestation</th>
               <th scope="col" className="py-2 pr-3 font-button">Périodicité</th>
               <th scope="col" className="py-2 pr-3 text-right font-button">Qté</th>
@@ -337,7 +337,7 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
   const set = (k: string, v: string) => setValues((s) => ({ ...s, [k]: v }));
   const field = (id: string, label: string, value: string, onChange: (v: string) => void, extra: Record<string, unknown> = {}) => (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{label}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{label}</label>
       <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} {...extra} />
     </div>
   );
@@ -362,7 +362,7 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs+ font-button text-ink-muted">Descriptions des lignes (affichées sous chaque ligne, sans effet sur les prix)</span>
+        <span className="text-xs-plus font-button text-ink-muted">Descriptions des lignes (affichées sous chaque ligne, sans effet sur les prix)</span>
         <ul className="flex flex-col gap-1">
           {def.lines.map((l) => (
             <li key={l.key} className="flex flex-wrap items-center gap-2 text-sm">
@@ -395,7 +395,7 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
           {field('nl-libelle', 'Libellé de la ligne', nl.label, (v) => setNl({ ...nl, label: v }))}
           {field('nl-unite', 'Unité', nl.unit, (v) => setNl({ ...nl, unit: v }), { placeholder: 'poste / mois' })}
           <div className="flex flex-col gap-[5px]">
-            <label htmlFor="nl-type" className="text-xs+ font-button text-ink-muted">Type de ligne</label>
+            <label htmlFor="nl-type" className="text-xs-plus font-button text-ink-muted">Type de ligne</label>
             <Select id="nl-type" value={nl.kind} onChange={(e) => setNl({ ...nl, kind: e.target.value })}>
               <option value="REQUIRED">Obligatoire</option>
               <option value="OPTIONAL">Option facultative</option>
@@ -404,7 +404,7 @@ function DefinitionEditor({ def, proposalId, onDone }: { def: PricingDefinition;
           </div>
           {nl.kind !== 'SETUP' && (
             <div className="flex flex-col gap-[5px]">
-              <label htmlFor="nl-recurrence" className="text-xs+ font-button text-ink-muted">Récurrence</label>
+              <label htmlFor="nl-recurrence" className="text-xs-plus font-button text-ink-muted">Récurrence</label>
               <Select id="nl-recurrence" value={nl.recurrence} onChange={(e) => setNl({ ...nl, recurrence: e.target.value })}>
                 <option value="MONTHLY">Mensuel</option>
                 <option value="QUARTERLY">Trimestriel</option>

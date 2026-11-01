@@ -32,7 +32,7 @@ export function HtmlField({ label, value, onChange, maxLength = HTML_MAX, hint }
   return (
     <div className="flex min-w-0 flex-col gap-[5px]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span id={`${uid}-label`} className="text-xs+ font-button text-ink-muted">{label}</span>
+        <span id={`${uid}-label`} className="text-xs-plus font-button text-ink-muted">{label}</span>
         <div className="inline-flex gap-1 rounded border border-line bg-slate-50 p-0.5" role="group" aria-label={`Mode d’édition — ${label}`}>
           <button type="button" className={tab(!source)} aria-pressed={!source} onClick={() => setSource(false)}>Texte mis en forme</button>
           <button type="button" className={tab(source)} aria-pressed={source} onClick={() => setSource(true)}>HTML source</button>

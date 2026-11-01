@@ -241,7 +241,7 @@ export function SectionsEditor({ detail, me, editable, onDetail }: { detail: Pro
               {editable && (
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="flex min-w-[240px] flex-1 flex-col gap-[5px]">
-                    <label htmlFor={`titre-${i}`} className="text-xs+ font-button text-ink-muted">Titre de la section {i + 1}</label>
+                    <label htmlFor={`titre-${i}`} className="text-xs-plus font-button text-ink-muted">Titre de la section {i + 1}</label>
                     <Input id={`titre-${i}`} value={s.title} onChange={(e) => patch(i, { title: e.target.value })} />
                   </div>
                   {s.optional && (
@@ -318,7 +318,7 @@ function BlockEditor({
   const c = block.content ?? {};
   const suffix = index > 0 ? ` (bloc ${index + 1})` : '';
   const header = (
-    <div className="flex items-center gap-2 text-xs+ font-button text-ink-muted">
+    <div className="flex items-center gap-2 text-xs-plus font-button text-ink-muted">
       <span>{BLOCK_TYPE_LABELS[block.type] ?? block.type}</span>
       {editable && onRemove && <Button size="sm" variant="danger-ghost" aria-label={`Retirer le bloc ${index + 1} — ${sectionTitle}`} onClick={onRemove}>Retirer</Button>}
     </div>
@@ -398,7 +398,7 @@ function LabeledInput({ label, value, onChange, long }: { label: string; value: 
   const id = `champ-${label.replace(/\W+/g, '-')}`;
   return (
     <div className="flex flex-col gap-[5px]">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">{label}</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">{label}</label>
       {long ? (
         <textarea id={id} className="min-h-[64px] w-full rounded border border-line-strong px-2.5 py-2 text-sm" value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (

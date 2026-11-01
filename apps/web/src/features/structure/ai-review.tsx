@@ -31,7 +31,7 @@ export function ClauseReviewControls({ contractId, clause }: { contractId: strin
   const act = (decision: 'APPROVED' | 'REJECTED') => review.mutate({ clauseId: clause.id, decision, comment }, { onSuccess: () => setComment('') });
   return (
     <div className="flex flex-col gap-2 rounded border border-line bg-page px-3 py-2">
-      <label htmlFor={id} className="text-xs+ font-button text-ink-muted">Commentaire de revue — {clause.title} (facultatif)</label>
+      <label htmlFor={id} className="text-xs-plus font-button text-ink-muted">Commentaire de revue — {clause.title} (facultatif)</label>
       <Input id={id} value={comment} maxLength={2000} onChange={(e) => setComment(e.target.value)} />
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" disabled={review.isPending} aria-label={`Valider la clause ${clause.title}`} onClick={() => act('APPROVED')}>

@@ -64,7 +64,7 @@ export function TerminationPanel({ contractId, status, terminationEffectiveDate,
         </p>
         {canAct && (
           <form onSubmit={submit} className="flex flex-col gap-2 rounded border border-line px-3 py-2">
-            <label htmlFor="term-letter" className="text-xs+ font-button text-ink-muted">Courrier de résiliation scanné (PDF)</label>
+            <label htmlFor="term-letter" className="text-xs-plus font-button text-ink-muted">Courrier de résiliation scanné (PDF)</label>
             <input id="term-letter" type="file" accept="application/pdf,.pdf" onChange={pick} className="text-sm" />
             {fileError && <p role="alert" className="text-danger">{fileError}</p>}
             {upload.error ? <p role="alert" className="text-danger">{errorMessage(upload.error)}</p> : null}
