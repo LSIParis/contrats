@@ -34,7 +34,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "fastify": "5.12.7",
-    "ioredis": "^5.11.1",
+    "ioredis": "^6.0.0",
     "nestjs-pino": "^5.3.1",
     "openid-client": "^6.8.8",
     "pino": "^10.4.0",
