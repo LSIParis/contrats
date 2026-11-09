@@ -28,7 +28,7 @@
     "seed:contract-kinds": "pnpm --filter @lsi/persistence exec tsx src/seed/contract-kinds.ts"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^10.14.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1"
